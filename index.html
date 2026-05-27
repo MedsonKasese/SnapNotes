@@ -1,27 +1,65 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-   <meta charset="UTF-8">
-   <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>SnapNotes</title>
-        <link rel="stylesheet" href="/SnapNotes/styles.css">
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SnapNotes</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
-
 <body>
 
-     <h2>SnapNotes</h2>
+    <!-- THEME TOGGLE -->
+    <button id="themeToggle">🌙</button>
 
-     <p id="titlePara">Save & Edit Your Notes Quickly.</p>
+    <!-- HEADER -->
+    
+    <h2>SnapNotes</h2>
+    <p id="titlePara">Save Your Mind.</p>
 
-<input type="text" id="textInput"
-                                              placeholder="Enter Your Notes Here">
-                                                    <button onclick="addNote()">Add Notes</button>
-                                                                <div class="notesContainer" id="notesContainer"></div>
-                                                                                                                               <div id="toast"></div>
-                                                                                                                                                <script src="/SnapNotes/script.js"></script>
+    <!-- INPUT SECTION -->
+    <div class="inputSection">
+        <input type="text" id="textInput" placeholder="Enter Your Notes Here">
+        <select id="categorySelect">
+            <option value="general">General</option>
+            <option value="work">Work</option>
+            <option value="personal">Personal</option>
+            <option value="ideas">Ideas</option>
+            <option value="important">Important</option>
+        </select>
+        <button id="addBtn" onclick="addNote()">Add Notes</button>
+    </div>
 
-                                                                            </body>
+    <!-- NOTES COUNT -->
+    <p id="notesCount" style="text-align:center;">Saved Notes: 0</p>
 
-                                                                            </html>
+    <!-- SEARCH INPUT -->
+    
+    <input type="text" id="searchInput" placeholder="Search notes...">
+
+    <!-- CATEGORY FILTER -->
+    
+    <div style="text-align:center; margin-top:10px;">
+        <select id="categoryFilter">
+            <option value="all">All Categories</option>
+            <option value="general">General</option>
+            <option value="work">Work</option>
+            <option value="personal">Personal</option>
+            <option value="ideas">Ideas</option>
+            <option value="important">Important</option>
+        </select>
+    </div>
+
+    <!-- EMPTY STATE -->
+    <p id="emptyState">No notes yet. Start adding some!</p>
+
+    <!-- NOTES CONTAINER -->
+    <div id="notesContainer" class="notesContainer"></div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast"></div>
+
+    <!-- JAVASCRIPT -->
+    <script src="script.js"></script>
+
+</body>
+</html>
