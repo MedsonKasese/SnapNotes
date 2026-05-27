@@ -441,3 +441,32 @@ body.dark-mode .todoDiv {
     border-left: 5px solid gold;
     box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
 }
+
+/* FILTER AND SEARCH CONTROL STYLES*/
+
+.filter-controls {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    align-items: center;
+
+    margin-top: 20px;
+    flex-wrap: wrap;
+}
+
+#searchInput,
+#categoryFilter {
+    padding: 15px;
+    border: 3px solid #4a90ff;
+    border-radius: 10px;
+
+    font-size: 16px;
+}
+
+#searchInput {
+    width: 300px; /*previous 250px*/
+}
+
+#categoryFilter {
+    width: 150px; /*previous 200px*/
+}
