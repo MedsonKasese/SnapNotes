@@ -1,4 +1,4 @@
-# SnapNotes 📝
+# SnapNotes 
 
 **Save Your Mind.**
 
