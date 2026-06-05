@@ -107,6 +107,17 @@ timestamp.textContent =
     categoryLabel.textContent = category.charAt(0).toUpperCase() + category.slice(1);
     categoryLabel.classList.add("categoryLabel");
 
+    //ACTION GROUP PIN AND KABAB BTN
+    const actionsDiv = document.createElement("div");
+    actionsDiv.classList.add("actionsDiv"); 
+    
+    // PIN BUTTON
+    const pinBtn = document.createElement("button");
+    pinBtn.textContent = " 📌 ";
+    pinBtn.classList.add("pinBtn");
+
+  
+
     // PIN STATE
     let isPinned = savedPinned;
 
