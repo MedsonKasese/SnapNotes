@@ -367,19 +367,6 @@ function showToast(message, type = "default") {
 
 
 
-/* OLD TOAST NOTIFICATION FUNCTION
-function showToast(message) {
-
-    clearTimeout(toastTimeout);
-    toast.textContent = message;
-    toast.style.opacity = "1";
-
-    toastTimeout = setTimeout(function() {
-        toast.style.opacity = "0";
-    }, 2000);
-}
-
-*/
 // =========================
 // SEARCH FUNCTIONALITY
 // =========================
