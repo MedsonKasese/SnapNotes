@@ -91,7 +91,7 @@ const formattedTime = now.toLocaleTimeString("en-US", {
 });
 
 timestamp.textContent =
-    savedTime || `Created : ${formattedDate} at ${formattedTime}`;
+    savedTime || `Created On: ${formattedDate} at ${formattedTime}`;
   timestamp.classList.add("timestamp");
     /*
     timestamp.textContent = savedTime || "Created on: " + now.toLocaleString();
