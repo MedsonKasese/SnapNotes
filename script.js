@@ -1,4 +1,4 @@
-7// VARIABLES 
+// VARIABLES 
 
 const inputValue = document.getElementById("textInput");
 const notesContainer = document.getElementById("notesContainer");
@@ -466,6 +466,15 @@ categoryFilter.addEventListener("change", function() {
     });
 
 });
+
+// CLOSE DROPDOWN MENUS WHEN CLICKING OUTSIDE
+document.addEventListener("click", function() {
+    const allMenus = document.querySelectorAll(".dropdown-menu.show");
+    allMenus.forEach(function(menu) {
+        menu.classList.remove("show");
+    });
+}); 
+
 
 // =========================
 // INITIALIZE APP
