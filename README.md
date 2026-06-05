@@ -1,100 +1,64 @@
-# SnapNotes 
+# SnapNotes
 
 **Save Your Mind.**
 
-SnapNotes is a modern, feature-rich note-taking web application built entirely with vanilla HTML, CSS, and JavaScript. No frameworks, no libraries — just clean, hand-written code.
-
----
+SnapNotes is a modern, feature-rich note-taking web application meticulously crafted with vanilla HTML, CSS, and JavaScript. Designed for simplicity and efficiency, it provides a seamless experience for organizing your thoughts and tasks without the overhead of external frameworks or libraries.
 
 ## Features
 
+SnapNotes offers a comprehensive set of features to enhance your note-taking experience:
+
 | Feature | Description |
-|---------|-------------|
-| **Create & Delete Notes** | Add notes instantly and delete with confirmation |
-| **Inline Editing** | Edit notes directly inside the card — no popups |
-| **Persistent Storage** | Notes survive page refresh using localStorage |
-| **Dark Mode** | Toggle between light and dark themes (remembered across sessions) |
-| **Categories** | Organize notes by category: General, Work, Personal, Ideas, Important |
-| **Category Filtering** | Filter notes by category with a dropdown |
-| **Color-Coded Borders** | Each category has a unique color for quick visual identification |
-| **Pin Notes** | Pin important notes to the top of the list |
-| **Search** | Instantly search through all notes by content |
-| **Character Limit** | Live character counter with 200-character max |
-| **Timestamps** | Each note displays its original creation date and time |
-| **Toast Notifications** | Contextual feedback messages for every action |
-| **Keyboard Shortcuts** | Enter to add/save, Escape to cancel editing |
-| **Responsive Design** | Works on desktop and mobile devices |
-| **Animations** | Smooth fade-in animations when notes are added |
+|---|---|
+| **localStorage Persistence** | Notes are automatically saved and retrieved from your browser's local storage, ensuring your data persists across sessions. |
+| **Persistent Timestamps** | Each note displays its creation date and time, formatted as "Created On: DD Month YYYY at HH:MM AM/PM", for easy tracking. |
+| **Dark Mode with Theme Memory** | Toggle between light and dark themes. Your preference is saved in local storage and applied automatically on subsequent visits. |
+| **Inline Editing** | Edit notes directly within their cards. Press `Enter` to save changes or `Escape` to cancel, eliminating disruptive pop-up prompts. |
+| **Delete Confirmation Dialog** | A clear confirmation dialog prevents accidental deletion of notes. |
+| **Toast Notifications** | Receive subtle, type-based (success, warning, delete, update) toast notifications for all key actions, providing immediate feedback. |
+| **Real-time Search/Filter** | Instantly search and filter your notes as you type, making it easy to find specific information quickly. |
+| **Category System** | Organize notes into predefined categories: General, Work, Personal, Ideas, and Important. |
+| **Color-Coded Borders** | Each category is visually distinguished with a unique color-coded border for quick identification. |
+| **Category Filtering Dropdown** | Filter notes by category using a convenient dropdown menu. |
+| **Pin/Unpin Notes** | Pin important notes to the top of your list for easy access; unpinned notes return to their original position. |
+| **Character Limit with Live Counter** | Notes are limited to 200 characters, with a live counter to help you stay concise. |
+| **Empty State Message** | A friendly message is displayed when no notes exist, guiding new users. |
+| **Note Counter Display** | Keep track of your total number of notes with a clear counter display. |
+| **Fade-in Animations** | Enjoy a smooth user experience with subtle fade-in animations when notes are added or updated. |
+| **Ellipsis Menu (⋮)** | Each note card features a discreet ellipsis (⋮) button, revealing a dropdown with Share, Edit, and Delete options for a cleaner UI. |
+| **Share Functionality** | Share your notes effortlessly. On mobile devices, this utilizes the native Web Share API; otherwise, it provides a clipboard copy as a fallback. |
+| **Modular Code Structure** | The application is built with a clean, modular code structure (`storage.js`, `notes.js`, `app.js`), promoting maintainability and scalability. |
 
----
+## Tech Stack
 
-## Technologies Used
+SnapNotes is built using fundamental web technologies, demonstrating the power of vanilla development:
 
-- **HTML5** — Semantic structure
-- **CSS3** — Custom properties (variables), Flexbox, animations, media queries
-- **JavaScript (ES6)** — DOM manipulation, localStorage API, event handling
+- **HTML5**: For semantic structure and content organization.
+- **CSS3**: For styling, responsive design, and dynamic visual effects, including custom properties and animations.
+- **JavaScript (ES6+)**: For all application logic, DOM manipulation, local storage management, and interactive features.
 
----
+## How to Use
 
-## How to Run
+Getting started with SnapNotes is straightforward:
 
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/MedsonKasese/SnapNotes.git
-   ```
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/MedsonKasese/SnapNotes.git
+    ```
+2.  **Navigate to the project directory:**
+    ```bash
+    cd SnapNotes
+    ```
+3.  **Open `index.html`:** Simply open the `index.html` file in your preferred web browser.
 
-2. Open `index.html` in your browser.
-
-That's it. No build tools, no dependencies, no setup required.
-
----
-
-## Project Structure
-
-```
-SnapNotes/
-├── index.html      # App structure and layout
-├── styles.css      # All styling including dark mode and responsive design
-├── script.js       # App logic, localStorage, and event handling
-├── LICENSE         # MIT License
-└── README.md       # This file
-```
-
----
-
-## What I Learned
-
-Building SnapNotes taught me:
-
-- How to use **localStorage** to persist data across sessions
-- How to implement **inline editing** without browser prompts
-- How to build a **dark mode** toggle with CSS variables
-- How to structure a growing JavaScript project with clean code organization
-- How to handle **DOM manipulation** at scale (creating, appending, removing elements)
-- How to implement **search and filter** functionality from scratch
-- The importance of **user experience** — confirmations, keyboard shortcuts, and visual feedback
-
----
-
-## Future Improvements
-
-- [ ] Export notes as .txt or .json file
-- [ ] Drag-and-drop to reorder notes
-- [ ] Undo delete with timed toast
-- [ ] Sort notes (by date, alphabetical, category)
-- [ ] Smooth delete animation (fade out)
-- [ ] Multi-select and bulk delete
-
----
-
-## License
-
-This project is licensed under the [MIT License](LICENSE).
-
----
+No build tools, no dependencies, and no complex setup required. Just open and start taking notes!
 
 ## Author
 
 **Medson Kasese**
 
-Built with determination and vanilla JavaScript. No frameworks needed.
+This project was developed by Medson Kasese, showcasing a commitment to clean code and robust vanilla JavaScript development.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
