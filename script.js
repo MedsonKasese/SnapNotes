@@ -1,4 +1,4 @@
-// VARIABLES 
+7// VARIABLES 
 
 const inputValue = document.getElementById("textInput");
 const notesContainer = document.getElementById("notesContainer");
@@ -218,7 +218,33 @@ pinBtn.addEventListener("click", function () {
 
     saveNotes();
 });
+// APPEND NOTE TEXT AND EDIT INPUT TO CONTENT
+contentDiv.appendChild(noteText);
+contentDiv.appendChild(editInput);
 
+// APPEND FOOTER ITEMS (order matters: left to right)
+footerDiv.appendChild(timestamp);
+footerDiv.appendChild(categoryLabel);
+
+// APPEND PIN BUTTON
+actionsDiv.appendChild(pinBtn);
+actionsDiv.appendChild(menuWrapper);
+
+// APPEND MENU TO NOTE CARD
+dropdownMenu.appendChild(shareBtn);
+dropdownMenu.appendChild(editNoteBtn);
+dropdownMenu.appendChild(deleteBtn);
+menuWrapper.appendChild(menuBtn);
+menuWrapper.appendChild(dropdownMenu);
+
+// BUILD THE CARD
+todoDiv.appendChild(contentDiv);
+todoDiv.appendChild(footerDiv);
+footerDiv.appendChild(actionsDiv);
+
+
+
+/*
     // APPEND NOTE TEXT AND EDIT INPUT TO CONTENT
     
     contentDiv.appendChild(noteText);
@@ -241,6 +267,8 @@ pinBtn.addEventListener("click", function () {
     // BUILD THE CARD
     todoDiv.appendChild(contentDiv);
     todoDiv.appendChild(footerDiv);
+
+*/
 
     // ADD TO PAGE (prepend for new notes, append for loaded notes)
     
