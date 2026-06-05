@@ -434,7 +434,7 @@ body.dark-mode .todoDiv {
 }
 
 .pinBtn {
-    background: #FF9800;
+    background: transparent;
 }
 
 .pinned {
