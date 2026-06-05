@@ -107,6 +107,100 @@ timestamp.textContent =
     categoryLabel.textContent = category.charAt(0).toUpperCase() + category.slice(1);
     categoryLabel.classList.add("categoryLabel");
 
+    // PIN STATE
+    let isPinned = savedPinned;
+
+    // RESTORE PINNED NOTES
+    if (savedPinned) {
+        todoDiv.classList.add("pinned");
+        pinBtn.textContent = "❌";
+    }
+    
+   //MENU WRAPPER 
+   
+   // MENU WRAPPER (anchor for dropdown positioning)
+const menuWrapper = document.createElement("div");
+menuWrapper.classList.add("menu-wrapper");
+
+// ELLIPSIS BUTTON (the ⋮ trigger)
+
+const menuBtn = document.createElement("button");
+menuBtn.classList.add("menu-btn");
+menuBtn.innerHTML = "⋮";
+
+// DROPDOWN MENU (hidden by default)
+
+const dropdownMenu = document.createElement("div");
+dropdownMenu.classList.add("dropdown-menu");
+
+// ADD HERE SHARE DELETE AND EDIT BUTTONS
+
+// SHARE BUTTON
+
+const shareBtn = document.createElement("button");
+shareBtn.textContent = " Share Note";
+shareBtn.classList.add("dropdown-item");
+
+// EDIT BUTTON
+
+const editNoteBtn = document.createElement("button");
+editNoteBtn.textContent = "Edit Note";
+editNoteBtn.classList.add("dropdown-item");
+
+// DELETE BUTTON
+
+const deleteBtn = document.createElement("button");
+deleteBtn.textContent = " Delete";
+deleteBtn.classList.add("dropdown-item", "delete-item");
+
+
+ // TOGGLE DROPDOWN MENU
+ 
+menuBtn.addEventListener("click", function(event) {
+    event.stopPropagation();
+    
+    // Close all other open menus first
+    const allMenus = document.querySelectorAll(".dropdown-menu.show");
+    allMenus.forEach(function(menu) {
+        if (menu !== dropdownMenu) {
+            menu.classList.remove("show");
+        }
+    });
+    
+    // Toggle this menu
+    dropdownMenu.classList.toggle("show");
+});
+
+// SHARE FUNCTIONALITY
+shareBtn.addEventListener("click", function() {
+    const noteContent = noteText.textContent;
+    
+    // Close the dropdown after clicking
+    dropdownMenu.classList.remove("show");
+    
+    // Try Web Share API first (works on mobile!)
+    if (navigator.share) {
+        navigator.share({
+            title: "SnapNotes",
+            text: noteContent, 
+        }).then(function() {
+            showToast("Note shared!", "success");
+        }).catch(function(err) {
+            // User cancelled — do nothing
+        });
+    } else {
+        // Fallback: copy to clipboard
+        navigator.clipboard.writeText(noteContent).then(function() {
+            showToast("Note copied to clipboard!", "success");
+        }).catch(function() {
+            showToast("Could not share note", "warning");
+        });
+    }
+});
+
+
+
+/*
     // BUTTON CONTAINER
     const buttonContainer = document.createElement("div");
     buttonContainer.classList.add("buttonContainer");
@@ -136,6 +230,7 @@ if (savedPinned) {
     pinBtn.textContent = "❌";
 }
 
+*/
     // EDIT FUNCTIONALITY (inline editing)
     editNoteBtn.addEventListener("click", function() {
 
