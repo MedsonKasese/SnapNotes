@@ -469,3 +469,119 @@ body.dark-mode .todoDiv {
 #categoryFilter {
     width: 150px; /*previous 200px*/
 }
+
+/*MENU*/
+.menu-wrapper {
+    position: relative;
+   /*margin-left:auto;*/
+}
+
+/*MENU BUTTON*/
+.menu-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 5px 10px;
+    border-radius: 50%;
+    color: #333;
+    transition: background 0.2s;
+}
+.menu-btn:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+/*DARK MODE SUPPORT FOR THE BUTTON*/
+
+body.dark-mode .menu-btn {
+    color: #fff;
+}
+body.dark-mode .menu-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/*THE DROPDOWN MENU (hidden by default)*/
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    bottom: 100%;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    min-width: 100px;
+    z-index: 100;
+    overflow: visible;/*previous hidden*/
+}
+
+.dropdown-menu::after {
+    content: "";
+    position: absolute;
+
+    bottom: -8px;
+    right: 8px;
+
+    width: 0;
+    height: 0;
+
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid #fff;
+}
+
+body.dark-mode .dropdown-menu::after {
+    border-top-color: #2a2a2a;
+} 
+
+/*SHOW STATE (when active):*/
+.dropdown-menu.show {
+    display: block;
+}
+
+/*THE DROPDOWN ITEMS*/
+.dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    background: none;
+    text-align: left;
+    font-size: 14px;
+    padding:10px 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.dropdown-item:hover {
+    background: #f0f0f0;
+}
+.delete-item {
+    color: #FF4545;
+}
+.delete-item:hover {
+    background: #ffe5e5;
+}
+ /*DARK MODE FOR DROPDOWN:*/
+body.dark-mode .dropdown-menu {
+    background: #2a2a2a;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+}
+.dropdown-item {
+  color:#2a2a2a;
+}
+
+body.dark-mode .dropdown-item {
+    color: #eee;
+}
+body.dark-mode .dropdown-item:hover {
+    background: #3a3a3a;
+}
+body.dark-mode .delete-item:hover {
+    background: #4a2020;
+}
+
+.actionsDiv {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+}
