@@ -4,6 +4,8 @@
 
 SnapNotes is a modern, feature-rich note-taking web application meticulously crafted with vanilla HTML, CSS, and JavaScript. Designed for simplicity and efficiency, it provides a seamless experience for organizing your thoughts and tasks without the overhead of external frameworks or libraries.
 
+**Live Demo:** [https://snapnotesmw.vercel.app](https://snapnotesmw.vercel.app)
+
 ## Features
 
 SnapNotes offers a comprehensive set of features to enhance your note-taking experience:
@@ -27,6 +29,7 @@ SnapNotes offers a comprehensive set of features to enhance your note-taking exp
 | **Fade-in Animations** | Enjoy a smooth user experience with subtle fade-in animations when notes are added or updated. |
 | **Ellipsis Menu (⋮)** | Each note card features a discreet ellipsis (⋮) button, revealing a dropdown with Share, Edit, and Delete options for a cleaner UI. |
 | **Share Functionality** | Share your notes effortlessly. On mobile devices, this utilizes the native Web Share API; otherwise, it provides a clipboard copy as a fallback. |
+| **Drag and Drop Reordering** | Reorder your notes by dragging and dropping them into your preferred position. Supports both desktop (mouse) and mobile (touch) interactions. |
 | **Modular Code Structure** | The application is built with a clean, modular code structure (`storage.js`, `notes.js`, `app.js`), promoting maintainability and scalability. |
 
 ## Tech Stack
