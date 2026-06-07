@@ -46,7 +46,7 @@ function addNote(
 
     // VALIDATION
     if (!savedText && inputValue.value.trim() === "") {
-        alert("Sorry, you can't create empty notes!");
+        alert("Sorry! You can't create empty notes!");
         return;
     }
 
