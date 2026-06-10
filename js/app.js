@@ -7,7 +7,7 @@ const maintenanceBtn = document.getElementById("maintenanceBtn");
 
 maintenanceBtn.addEventListener("click", function() {
     window.close();
-    // Fallback if window.close() doesn't work (most browsers block it)
+    // Fallback if window.close() doesn't work
     window.location.href = "about:blank";
 });
 
