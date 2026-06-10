@@ -95,8 +95,10 @@ content="SnapNotes | Smart Note-Taking Made Simple" />
     <!-- TOAST NOTIFICATION -->
     <div id="toast"></div>
 
-    <!-- JAVASCRIPT -->
-    <script src="script.js"></script>
+    <!-- JAVASCRIPT (loaded in order: storage first, then notes, then app) -->
+    <script src="storage.js"></script>
+    <script src="notes.js"></script>
+    <script src="app.js"></script>
 
 </body>
 </html>
