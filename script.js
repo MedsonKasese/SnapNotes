@@ -1,3 +1,20 @@
+
+// =========================
+// MAINTENANCE MODE
+// =========================
+const maintenanceOverlay = document.getElementById("maintenanceOverlay");
+const maintenanceBtn = document.getElementById("maintenanceBtn");
+maintenanceBtn.addEventListener("click", function() {
+    window.close();
+    // Fallback if window.close() doesn't work (most browsers block it)
+    window.location.href = "about:blank";
+});
+
+
+
+
+
+
 // VARIABLES 
 
 const inputValue = document.getElementById("textInput");
