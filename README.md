@@ -4,7 +4,7 @@
 
 SnapNotes is a modern, feature-rich note-taking web application meticulously crafted with vanilla HTML, CSS, and JavaScript. Designed for simplicity and efficiency, it provides a seamless experience for organizing your thoughts and tasks without the overhead of external frameworks or libraries.
 
-** View Live:** [https://snapnotesmw.vercel.app](https://snapnotesmw.vercel.app)
+**View Live:** [https://snapnotesmw.vercel.app](https://snapnotesmw.vercel.app)
 
 ## Features
 
