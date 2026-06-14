@@ -635,3 +635,78 @@ body.dark-mode .delete-item:hover {
     background: #45a049;
 }
 
+/* AUTH MODAL */
+
+.auth-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+
+    display: none;
+
+    align-items: flex-end;
+    justify-content: center;
+
+    z-index: 1000;
+}
+
+/* SHOW STATE */
+
+.auth-modal.show {
+    display: flex;
+}
+
+/* BOTTOM SHEET */
+
+.auth-sheet {
+    width: 100%;
+    max-width: 500px;
+
+    background: white;
+
+    border-radius: 20px 20px 0 0;
+
+    padding: 20px;
+
+    animation: slideUp 0.3s ease;
+}
+
+/* INPUTS */
+
+.auth-sheet input {
+    width: 100%;
+    margin: 8px 0;
+    padding: 12px;
+    box-sizing: border-box;
+}
+
+/* BUTTONS */
+
+.auth-sheet button {
+    width: 100%;
+    margin-top: 10px;
+}
+
+/* DARK MODE */
+
+body.dark-mode .auth-sheet {
+    background: #2a2a2a;
+    color: white;
+}
+
+#closeModalBtn{
+  background-color:#FF4646;
+}
+
+/* ANIMATION */
+
+@keyframes slideUp {
+
+    from {
+        transform: translateY(100%);
+    }
+
+    to {
+        transform: translateY(0);
+    }
+}
