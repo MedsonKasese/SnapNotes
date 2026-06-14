@@ -96,7 +96,45 @@ content="SnapNotes | Smart Note-Taking Made Simple" />
     <!-- TOAST NOTIFICATION -->
     <div id="toast"></div>
 
-    <!-- JAVASCRIPT (loaded in order: storage first, then notes, then app) -->
+    <!-- AUTHENTICATION -->
+    
+    <!-- AUTH MODAL -->
+
+<div id="authModal" class="auth-modal">
+
+    <div class="auth-sheet">
+
+        <h3>Sign In to Sync Notes</h3>
+
+        <input
+            type="email"
+            id="emailInput"
+            placeholder="Email" required>
+
+        <input
+            type="password"
+            id="passwordInput"
+            placeholder="Password" required>
+
+        <button id="signinBtn">
+            Sign In
+        </button>
+
+        <button id="signupBtn">
+            Create Account
+        </button>
+
+        <button id="closeModalBtn">
+            Cancel
+        </button>
+
+    </div>
+
+</div>
+
+   
+<!-- JAVASCRIPT (loaded in order: storage first, then notes, then app) -->
+
     <script type="module" src="js/firebaseConfig.js">
     <script type="module" src="js/firestore.js">
     <script type="module" src="js/auth.js">
