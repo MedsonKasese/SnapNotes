@@ -30,7 +30,7 @@ function addNote(
 
     // VALIDATION
     if (!savedText && inputValue.value.trim() === "") {
-        alert("Sorry! You can't create empty notes.");
+        showToast("Sorry! You can't create empty notes.", "warning");
         return;
     }
 
