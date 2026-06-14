@@ -1,3 +1,4 @@
+/*
 // =========================
 // MAINTENANCE MODE
 // =========================
@@ -11,6 +12,7 @@ maintenanceBtn.addEventListener("click", function() {
     window.location.href = "about:blank";
 });
 
+*/
 // =========================
 // VARIABLES
 // =========================
