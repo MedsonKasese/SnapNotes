@@ -14,10 +14,11 @@ function saveNotes() {
         const pinned = div.classList.contains("pinned");
 
         allNotes.push({
-            text: text,
-            time: time,
-            category: category,
-            pinned: pinned
+            id
+            text,
+            time,
+            category,
+            pinned
         });
     });
 
