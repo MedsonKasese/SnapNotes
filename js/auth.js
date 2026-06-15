@@ -157,3 +157,10 @@ onAuthStateChanged(auth, function (user) {
 
 });
 
+const closeModalBtn =
+    document.getElementById("closeModalBtn");
+
+closeModalBtn.addEventListener("click", function() {
+    authModal.classList.remove("show");
+});
+
