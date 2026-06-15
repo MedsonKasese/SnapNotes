@@ -39,12 +39,7 @@ function loadNotes() {
     const notesArray = JSON.parse(savedNotes);
 
     notesArray.forEach(function(note) {
-        addNote(
-            note.text,
-            note.time,
-            note.category || "general",
-            note.pinned
-        );
+        addNote(note);
     });
 }
 
