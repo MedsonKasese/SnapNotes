@@ -148,7 +148,16 @@ content="SnapNotes | Smart Note-Taking Made Simple" />
 
 </div>
 
-   
+  <!--RECAPCHA-->
+    <script src="https://www.google.com/recaptcha/enterprise.js" async defer></script>
+  </head>
+  <body>
+    <form action="" method="POST">
+      <div class="g-recaptcha" data-sitekey="6Lef9SMtAAAAABISyH8hkeog40gu4acAtrfp77-e" data-action="LOGIN"></div>
+      <br/>
+      <input type="submit" value="Submit">
+    </form>
+ 
 <!-- JAVASCRIPT (loaded in order: storage first, then notes, then app) -->
 
     <script type="module" src="js/firebaseConfig.js"></script>
