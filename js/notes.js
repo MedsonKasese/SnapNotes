@@ -106,7 +106,7 @@ function createNoteElement(note) {
     const dropdownMenu = document.createElement("div");
     dropdownMenu.classList.add("dropdown-menu");
 
-    const shareBtn = createDropdownItem("Share Note", () => shareNote(note.text));
+    const shareBtn = createDropdownItem("Share Note", () => shareNote(note.text, note.time));
     const editBtn = createDropdownItem("Edit Note", () => {
         noteText.style.display = "none";
         editInput.style.display = "block";
@@ -217,7 +217,68 @@ function updateNoteText(id, newText) {
     }
 }
 
-function shareNote(text) {
+async function shareNote(text, time) {
+    const shareTemplate = document.getElementById("shareTemplate");
+    const shareContent = document.getElementById("shareContent");
+    const shareTimestamp = document.getElementById("shareTimestamp");
+
+    if (!shareTemplate || !shareContent || !shareTimestamp) {
+        // Fallback to text sharing if template is missing
+        fallbackShare(text);
+        return;
+    }
+
+    // Set content for image generation
+    shareContent.textContent = text;
+    shareTimestamp.textContent = time;
+
+    try {
+        showToast("Generating image...", "default");
+        
+        // Generate canvas from template
+        const canvas = await html2canvas(shareTemplate, {
+            backgroundColor: "#ffffff",
+            scale: 2, // Higher quality
+            logging: false,
+            useCORS: true
+        });
+
+        // Convert to Blob
+        canvas.toBlob(async (blob) => {
+            if (!blob) {
+                fallbackShare(text);
+                return;
+            }
+
+            const file = new File([blob], "SnapNote.png", { type: "image/png" });
+
+            // Check if Web Share API supports files
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: 'SnapNotes',
+                        text: text
+                    });
+                    showToast("Note shared as image!", "success");
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        fallbackShare(text);
+                    }
+                }
+            } else {
+                // Fallback to text sharing if file sharing is not supported
+                fallbackShare(text);
+            }
+        }, "image/png");
+
+    } catch (error) {
+        console.error("Error generating image:", error);
+        fallbackShare(text);
+    }
+}
+
+function fallbackShare(text) {
     if (navigator.share) {
         navigator.share({ title: "SnapNotes", text: text })
             .then(() => showToast("Note shared!", "success"))
@@ -246,5 +307,6 @@ function updateNotesCount() {
 // Expose to window
 window.addNote = addNote;
 window.renderNotes = renderNotes;
+window.shareNote = shareNote;
 window.updateEmptyState = updateEmptyState;
 window.updateNotesCount = updateNotesCount;
