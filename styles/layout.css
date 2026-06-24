@@ -31,26 +31,32 @@
 .auth-modal {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.5);
+    background: rgba(0,0,0,0.6);
     display: none;
-    align-items: flex-end;
+    align-items: center;
     justify-content: center;
     z-index: 1000;
+    padding: 20px;
 }
 
 .auth-modal.show { display: flex; }
 
 .auth-sheet {
     width: 100%;
-    max-width: 500px;
+    max-width: 400px;
     background: white;
-    border-radius: 20px 20px 0 0;
-    padding: 20px;
-    animation: slideUp 0.3s ease;
+    border-radius: 15px;
+    padding: 25px;
+    animation: modalFadeIn 0.3s ease;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 15px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
 
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .auth-sheet h3{
