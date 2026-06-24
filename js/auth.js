@@ -103,7 +103,7 @@ onAuthStateChanged(auth, (user) => {
 
 function handleAuthError(error) {
     let message = "An error occurred.";
-    if (error.code === 'auth/email-already-in-use') message = "Email already in use.";
+    if (error.code === 'auth/email-already-in-use') message = "Email address already in use.";
     else if (error.code === 'auth/invalid-credential') message = "Invalid email or password.";
     else if (error.code === 'auth/user-disabled') message = "Account disabled.Please Contact Support";
     else if (error.code === 'auth/weak-password') message = "Password must be at least 6 characters.";
