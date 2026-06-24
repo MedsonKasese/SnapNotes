@@ -1,0 +1,432 @@
+/* =========================
+   ROOT VARIABLES
+========================= */
+
+:root {
+    --card-color: #f5f5f5;
+    --text-color: #333;
+    --bg-color: #fff;
+}
+
+body.dark-mode {
+    --card-color: #2a2a2a;
+    --text-color: #fff;
+    --bg-color: #1a1a1a;
+}
+
+/* =========================
+   GENERAL STYLES
+========================= */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    padding: 20px;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+body.dark-mode {
+    background-color: #1a1a1a;
+    color: #fff;
+}
+
+/* =========================
+   INPUT & SELECT STYLES
+========================= */
+
+input, select {
+    padding: 12px;
+    border-radius: 5px;
+    border: 2px solid #2A84FF;
+    background-color: var(--card-color);
+    color: var(--text-color);
+}
+
+input:focus {
+    outline: 1px solid #48A111;
+    box-shadow: 0 0 0 3px rgba(72, 161, 17, 0.2);
+    border-color: #48A111;
+}
+
+/* =========================
+   BUTTON STYLES
+========================= */
+
+button {
+    border: none;
+    border-radius: 5px;
+    background-color: #48A111;
+    color: white;
+    font-size: 15px;
+    font-weight: bold;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+button:hover {
+    opacity: 0.9;
+    transform: translateY(-2px);
+}
+
+button:active {
+    transform: scale(0.95);
+}
+.pinBtn{
+   background-color:transparent;
+}
+/* =========================
+   ANIMATIONS
+========================= */
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+    }
+    to {
+        transform: translateY(0);
+    }
+}
+
+/* =========================
+   TITLE & HEADING
+========================= */
+
+h2 {
+    font-size: 28px;
+    font-weight: bold;
+    text-align: center;
+    margin-top: 2rem;
+}
+
+/* =========================
+   TOAST NOTIFICATION
+========================= */
+
+#toast {
+    position: fixed;
+    top: 90px;
+    right: 20px;
+    color: white;
+    padding: 12px 18px;
+    border-radius: 8px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    z-index: 1002;
+}
+
+/* =========================
+   TOAST TYPES
+========================= */
+
+.success {
+    background: #48A111;
+}
+
+.delete {
+    background: #FF4545;
+}
+
+.update {
+    background: #2A84FF;
+}
+
+.warning {
+    background: #FF9800;
+}
+
+.default {
+    background: #333;
+}
+
+body.dark-mode .default {
+    background: #555;
+}
+
+/* =========================
+   APP HEADER
+========================= */
+
+.app-header {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 10px 15px !important;
+    background-color: var(--card-color) !important;
+    border-bottom: 2px solid #2A84FF !important;
+    margin: -20px -20px 20px -20px !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+    width: calc(100% + 40px) !important;
+    min-height: 60px !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 9999 !important;
+}
+
+body.dark-mode .app-header {
+    border-bottom-color: #48A111;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* =========================
+   THEME TOGGLE BUTTON
+========================= */
+
+#themeToggle {
+    border: none !important;
+    padding: 8px 12px !important;
+    border-radius: 10px !important;
+    cursor: pointer !important;
+    background-color: transparent !important;
+    color: var(--text-color) !important;
+    font-size: 20px !important;
+    transition: transform 0.3s ease, background-color 0.3s ease !important;
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    width: 50px !important;
+    height: 50px !important;
+    position: static !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+#themeToggle:hover {
+    background-color: rgba(42, 132, 255, 0.2);
+    transform: scale(1.1);
+}
+
+/* =========================
+   HEADER CENTER (SEARCH & FILTER)
+========================= */
+
+.header-center {
+    display: flex !important;
+    align-items: center !important;
+    flex: 1 !important;
+    justify-content: center !important;
+    margin: 0 10px !important;
+}
+
+.combined-controls {
+    display: flex !important;
+    align-items: stretch !important;
+    gap: 0 !important;
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(42, 132, 255, 0.3) !important;
+    border-radius: 8px !important;
+    padding: 0 !important;
+    max-width: 400px !important;
+    width: 100% !important;
+    height: 40px !important;
+    overflow: hidden !important;
+}
+
+body.dark-mode .combined-controls {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(72, 161, 17, 0.3) !important;
+}
+
+.search-box {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    flex: 1 !important;
+    padding: 0 12px !important;
+    min-width: 0 !important;
+    height: 100% !important;
+}
+
+.search-box i {
+    color: var(--text-color) !important;
+    font-size: 14px !important;
+    flex-shrink: 0 !important;
+}
+
+#searchInput {
+    border: none !important;
+    background: transparent !important;
+    color: var(--text-color) !important;
+    font-size: 13px !important;
+    width: 100% !important;
+    padding: 0 !important;
+    outline: none !important;
+    min-width: 0 !important;
+}
+
+#searchInput::placeholder {
+    color: rgba(0, 0, 0, 0.4) !important;
+}
+
+body.dark-mode #searchInput::placeholder {
+    color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.divider {
+    width: 1px !important;
+    height: 24px !important;
+    background-color: rgba(0, 0, 0, 0.1) !important;
+    flex-shrink: 0 !important;
+}
+
+body.dark-mode .divider {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.filter-box {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 0 12px !important;
+    flex-shrink: 0 !important;
+    height: 100% !important;
+}
+
+.filter-box i {
+    color: var(--text-color) !important;
+    font-size: 14px !important;
+    flex-shrink: 0 !important;
+}
+
+#categoryFilter {
+    border: none !important;
+    background: transparent !important;
+    color: var(--text-color) !important;
+    font-size: 13px !important;
+    padding: 0 !important;
+    outline: none !important;
+    cursor: pointer !important;
+    flex-shrink: 0 !important;
+}
+
+/* =========================
+   USER SECTION
+========================= */
+
+#userSection {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+#userStatus {
+    font-weight: 500;
+    font-size: 14px;
+}
+
+#loginBtn {
+    padding: 8px 16px;
+    font-size: 14px;
+    background-color: #48A111;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    color: white;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+#userAvatar {
+    width: 40px;
+    height: 40px;
+    background-color: #2A84FF;
+    color: white;
+    border-radius: 50%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 14px;
+    border: 2px solid white;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    flex-shrink: 0;
+}
+
+body.dark-mode #userAvatar {
+    background-color: #48A111;
+    border-color: #333;
+}
+
+#loginBtn:hover {
+    opacity: 0.9;
+    transform: translateY(-2px);
+}
+
+#loginBtn:active {
+    transform: scale(0.95);
+}
+
+/* =========================
+   MOBILE RESPONSIVENESS
+========================= */
+
+@media (max-width: 768px) {
+    .app-header {
+        padding: 8px 10px !important;
+        gap: 5px !important;
+    }
+    
+    .header-center {
+        margin: 0 5px !important;
+        flex: 1 !important;
+        min-width: 0 !important;
+    }
+
+    .combined-controls {
+        max-width: 200px !important;
+        height: 36px !important;
+        margin: 0 auto !important;
+    }
+
+    .filter-box {
+        padding: 0 5px !important;
+    }
+
+    #categoryFilter {
+        width: 50px !important;
+        font-size: 11px !important;
+    }
+
+    #searchInput {
+        font-size: 12px !important;
+    }
+
+    #themeToggle {
+        width: 36px !important;
+        height: 36px !important;
+        font-size: 16px !important;
+    }
+
+    #loginBtn {
+        padding: 6px 8px !important;
+        font-size: 11px !important;
+        white-space: nowrap !important;
+    }
+
+    #userAvatar {
+        width: 32px !important;
+        height: 32px !important;
+        font-size: 12px !important;
+    }
+}

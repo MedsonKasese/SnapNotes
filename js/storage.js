@@ -1,28 +1,21 @@
 // =========================
+// CENTRALIZED STATE
+// =========================
+
+let notes = [];
+window.notes = notes ;
+
+// =========================
 // SAVE NOTES TO LOCALSTORAGE
 // =========================
 
 function saveNotes() {
-
-    const allNotes = [];
-    const noteDivs = document.querySelectorAll(".todoDiv");
-
-    noteDivs.forEach(function(div) {
-        const text = div.querySelector("p").textContent;
-        const time = div.querySelector(".timestamp").textContent;
-        const category = div.getAttribute("data-category");
-        const pinned = div.classList.contains("pinned");
-
-        allNotes.push({
-            id
-            text,
-            time,
-            category,
-            pinned
-        });
-    });
-
-    localStorage.setItem("SnapNotes", JSON.stringify(allNotes));
+    localStorage.setItem("SnapNotes", JSON.stringify(window.notes));
+    
+    // Check if user is logged in for Firestore sync (Phase 3)
+    if (typeof syncToCloud === 'function') {
+        syncToCloud();
+    }
 }
 
 // =========================
@@ -30,39 +23,39 @@ function saveNotes() {
 // =========================
 
 function loadNotes() {
-
     const savedNotes = localStorage.getItem("SnapNotes");
-
-    if (savedNotes === null) {
-        return;
+    if (savedNotes) {
+        try {
+            window.notes = JSON.parse(savedNotes);
+            renderNotes();
+        } catch (e) {
+            console.error("Failed to parse notes from local storage", e);
+            window.notes = [];
+        }
     }
-
-    const notesArray = JSON.parse(savedNotes);
-
-    notesArray.forEach(function(note) {
-        addNote(note);
-    });
 }
 
 // =========================
 // TOAST NOTIFICATION
 // =========================
 
+let toastTimeout;
 function showToast(message, type = "default") {
+    const toast = document.getElementById("toast");
+    if (!toast) return;
+
     clearTimeout(toastTimeout);
-
     toast.textContent = message;
-
-    // RESET CLASSES
     toast.className = "";
-
-    // ADD TYPE CLASS
     toast.classList.add(type);
-
-    // SHOW TOAST
     toast.style.opacity = "1";
 
     toastTimeout = setTimeout(function () {
         toast.style.opacity = "0";
     }, 2000);
 }
+
+// Expose to window for other modules
+window.showToast = showToast;
+window.saveNotes = saveNotes;
+window.loadNotes = loadNotes;
