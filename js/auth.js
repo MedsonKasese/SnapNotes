@@ -26,7 +26,7 @@ signupBtn.addEventListener("click", async () => {
     const password = passwordInput.value;
 
     if (!email || !password) {
-        window.showToast("Please fill out both fields.", "warning");
+        window.showToast("Please fill out all fields.", "warning");
         return;
     }
 
@@ -44,13 +44,13 @@ signinBtn.addEventListener("click", async () => {
     const password = passwordInput.value.trim();
 
     if (!email || !password) {
-        window.showToast("Please fill out both fields.", "warning");
+        window.showToast("Please fill out all fields.", "warning");
         return;
     }
 
     try {
         await signInWithEmailAndPassword(auth, email, password);
-        window.showToast("Welcome back!", "success");
+        window.showToast(`Welcome! ${user.email.split('@')[0]} `, "success");
         closeModal();
     } catch (error) {
         handleAuthError(error);
