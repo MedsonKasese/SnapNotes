@@ -50,7 +50,7 @@ signinBtn.addEventListener("click", async () => {
 
     try {
         await signInWithEmailAndPassword(auth, email, password);
-        window.showToast(`Welcome! ${user.email.split('@')[0]} `, "success");
+        window.showToast(`Welcome! ${email.split('@')[0]} `, "success");
         closeModal();
     } catch (error) {
         handleAuthError(error);
