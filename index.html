@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SnapNotes</title>
+    <title>SnapSave</title>
    
     <meta name="google-site-verification" content="9PvFobY6qcalJMCqB5-4-nZLePuBZGmhA9ioe6R4cgc" />
     <meta name="description" content="SnapNotes is a fast and simple note-taking app that helps you create, organize, pin, search, and share notes with ease." />
@@ -53,13 +53,12 @@
             <div id="userAvatar" style="display: none;"></div>
         </div>
     </header>
+  <!--END OF HEADER SECTION-->
+  
 
-    <!-- 
-TITLE SECTION
-    <h2 style="text-align: center;">SnapNotes</h2>
-  -->
+    <!--TITLE SECTION
     <p id="titlePara" style="text-align: center;">Save Your Mind.</p>
-
+     -->
     <!-- NOTES COUNT -->
     <p id="notesCount" style="text-align:center;margin-top :10px">Saved Notes: 0</p> 
 
@@ -76,7 +75,6 @@ TITLE SECTION
             <option value="ideas">Ideas</option>
             <option value="important">Important</option>
         </select>
-        <button id="addBtn" onclick="addNote()">Add Notes</button>
     </div>
 
 
@@ -109,6 +107,11 @@ TITLE SECTION
         <div id="shareTimestamp" style="font-size: 14px; color: #777; border-top: 1px solid #eee; padding-top: 10px;"></div>
         <div style="margin-top: 20px; text-align: center; font-weight: bold; color: #2A84FF; font-size: 14px;">Made With SnapNotes</div>
     </div>
+  <div class="bottom-button">
+    <button id="addBtn" onclick="addNote()">
+      +
+    </button>
+  </div>
 
     <!-- JAVASCRIPT -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>

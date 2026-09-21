@@ -90,7 +90,26 @@ body.dark-mode .auth-sheet {
     .footer-right {
         justify-content: flex-end;
     }
-}
+  }
+  .bottom-button button{
+    display: flex;
+    position: fixed;
+    bottom: 20px;
+    right: 15px;
+    height: 60px;
+    width: 60px;
+    border-radius: 50%;
+    justify-content: center;
+    align-items: center;
+    font-size: 20px;
+    font-weight: bold;
+    border: 1px solid dimgray;
+  }
+  .bottom-button button:hover{
+    background-color :white;
+    color:black;
+  }
+
 
 /* =========================
    MAINTENANCE OVERLAY

@@ -68,7 +68,7 @@ userAvatar.addEventListener("click", () => {
             window.notes = [];
             localStorage.removeItem("SnapNotes");
             window.renderNotes();
-            window.showToast("Logged Out", "warning");
+            window.showToast(`${email.split('@')[0]} Logged Out`, "warning");
         });
     }
 });
@@ -102,7 +102,7 @@ onAuthStateChanged(auth, (user) => {
 });
 
 function handleAuthError(error) {
-    let message = "An error occurred.";
+    let message = "An error occurred.Please try again later!";
     if (error.code === 'auth/email-already-in-use') message = "Email address already in use.";
     else if (error.code === 'auth/invalid-credential') message = "Invalid email or password.";
     else if (error.code === 'auth/user-disabled') message = "Account disabled.Please Contact Support";
