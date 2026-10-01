@@ -3,117 +3,206 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SnapSave</title>
-   
-    <meta name="google-site-verification" content="9PvFobY6qcalJMCqB5-4-nZLePuBZGmhA9ioe6R4cgc" />
-    <meta name="description" content="SnapNotes is a fast and simple note-taking app that helps you create, organize, pin, search, and share notes with ease." />
-    <meta property="og:title" content="SnapNotes | Smart Note-Taking Made Simple" />
-    <meta property="og:description" content="Capture ideas instantly, organize notes by category, pin important notes, search quickly, and share notes with ease." />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://snapnotesmw.vercel.app/snapnotes-preview.png" />
-    <meta name="keywords" content="SnapNotes, notes app, note taking, productivity, organize notes, share notes, pinned notes, dark mode notes" />
-    
+    <title>SnapNotes</title>
+    <meta name="google-site-verification" content="9PvFobY6qcalJMCqB5-4-nZLePuBZGmhA9ioe6R4cgc">
+    <meta name="description" content="SnapNotes is a fast and simple note-taking app that helps you create, organize, pin, search, and share notes with ease.">
+    <meta property="og:title" content="SnapNotes | Smart Note-Taking Made Simple">
+    <meta property="og:description" content="Capture ideas instantly, organize notes by category, pin important notes, search quickly, and share notes with ease.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://snapnotesmw.vercel.app/snapnotes-preview.png">
+    <meta name="keywords" content="SnapNotes, notes app, note taking, productivity, organize notes, share notes, pinned notes, dark mode notes">
+
     <link rel="stylesheet" href="styles/main.css">
     <link rel="stylesheet" href="styles/components.css">
     <link rel="stylesheet" href="styles/layout.css">
     <link rel="stylesheet" href="styles/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-
- 
 </head>
 <body>
-
-    <!-- HEADER -->
-    <header class="app-header">
-        <button id="themeToggle">🌙</button>
-        
-        <!-- SEARCH & FILTER CENTER -->
-        <div class="header-center">
-            <div class="combined-controls">
-                <div class="search-box"> 
-            
-               <input type="text" id="searchInput" placeholder="Search...">
-                </div>
-                <div class="divider"></div>
-                <div class="filter-box">
-                    <select id="categoryFilter">
-                        <option value="all">Filters</option>
-                        <option value="general">General</option>
-                        <option value="work">Work</option>
-                        <option value="personal">Personal</option>
-                        <option value="ideas">Ideas</option>
-                        <option value="important">Important</option>
-                    </select>
-                </div>
-            </div>
+    <header class="app-header" id="appHeader">
+        <div class="header-left">
+            <button id="menuToggle" class="icon-button" type="button" aria-label="Open notes menu" aria-expanded="false">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+            <button id="logoButton" class="brand-button" type="button" aria-label="Open new note">
+                <span class="brand-mark"><i class="fa-regular fa-note-sticky"></i></span>
+                <span class="brand-name">SnapNotes</span>
+            </button>
         </div>
 
-        <div id="userSection">
-            <button id="loginBtn">Sign In</button>
-            <div id="userAvatar" style="display: none;"></div>
+        <div class="header-count" id="notesCount" aria-live="polite">0 notes</div>
+
+        <div class="header-right">
+            <div id="userSection">
+                <button id="loginBtn" class="header-action" type="button">
+                    <i class="fa-regular fa-user"></i>
+                    <span>Sign In</span>
+                </button>
+                <button id="userAvatar" class="avatar-button" type="button" aria-label="Account menu" hidden></button>
+            </div>
+            <button id="themeToggle" class="icon-button" type="button" aria-label="Toggle theme">
+                <i class="fa-solid fa-moon"></i>
+            </button>
         </div>
     </header>
-  <!--END OF HEADER SECTION-->
-  
 
-    <!--TITLE SECTION
-    <p id="titlePara" style="text-align: center;">Save Your Mind.</p>
-     -->
-    <!-- NOTES COUNT -->
-    <p id="notesCount" style="text-align:center;margin-top :10px">Saved Notes: 0</p> 
-
-    <!-- INPUT SECTION -->
-    <div class="inputSection">
-        <div style="width: 100%; display: flex; flex-direction: column; gap: 4px;">
-            <input type="text" id="textInput" placeholder="Enter Your Notes Here" maxlength="200">
-            <small id="charCount" style="text-align:left; color: #888; margin-left: 5px;">0/200</small>
+    <section class="search-panel" id="searchPanel" aria-label="Search notes">
+        <div class="search-row">
+            <div class="search-input-wrap">
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <input type="search" id="searchInput" placeholder="Search your notes..." autocomplete="off">
+                <button id="closeSearch" class="search-close" type="button" aria-label="Close search">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="filter-wrap">
+                <i class="fa-solid fa-filter" aria-hidden="true"></i>
+                <select id="categoryFilter" aria-label="Filter notes by category">
+                    <option value="all">All categories</option>
+                    <option value="general">General</option>
+                    <option value="work">Work</option>
+                    <option value="personal">Personal</option>
+                    <option value="ideas">Ideas</option>
+                    <option value="important">Important</option>
+                </select>
+            </div>
         </div>
-        <select id="categorySelect">
-            <option value="general">General</option>
-            <option value="work">Work</option>
-            <option value="personal">Personal</option>
-            <option value="ideas">Ideas</option>
-            <option value="important">Important</option>
-        </select>
-    </div>
+    </section>
 
+    <main class="app-main">
+        <button id="openSearch" class="search-trigger" type="button">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <span>Search notes...</span>
+        </button>
 
-  <!-- OLD SEARCH AND FILTER REMOVED (MOVED TO HEADER) -->
+        <section id="newNoteView" class="view new-note-view" aria-label="Create a new note">
+            <div class="editor-toolbar">
+                <button id="editorCategory" class="category-picker" type="button" aria-haspopup="true" aria-expanded="false">
+                    <span class="category-dot general"></span>
+                    <span id="selectedCategoryLabel">General</span>
+                    <i class="fa-solid fa-chevron-down"></i>
+                </button>
+                <time id="editorTimestamp" class="editor-timestamp"></time>
+            </div>
 
-    <!-- EMPTY STATE -->
-    <p id="emptyState" style="text-align: center; margin-top: 50px;">No notes yet. Start adding some!</p>
+            <div
+                id="noteEditor"
+                class="note-editor"
+                contenteditable="true"
+                role="textbox"
+                aria-multiline="true"
+                data-placeholder="## Add your note title here
+Then write your notes below..."
+                spellcheck="true"
+            ></div>
 
-    <!-- NOTES CONTAINER -->
-    <div id="notesContainer" class="notesContainer"></div>
+            <div class="editor-footer">
+                <p class="editor-hint">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    Start the first line with <strong>##</strong> to make it your note title.
+                </p>
+                <button id="saveNoteBtn" class="primary-action" type="button">
+                    <i class="fa-solid fa-check"></i>
+                    Save note
+                </button>
+            </div>
+        </section>
 
-    <!-- TOAST NOTIFICATION -->
-    <div id="toast"></div>
+        <section id="notesView" class="view notes-view" aria-label="Saved notes" hidden>
+            <div class="view-heading">
+                <div>
+                    <p class="eyebrow" id="notesViewEyebrow">Your notes</p>
+                    <h1 id="notesViewTitle">All notes</h1>
+                </div>
+                <button id="newNoteBtn" class="secondary-action" type="button">
+                    <i class="fa-solid fa-plus"></i>
+                    New note
+                </button>
+            </div>
+            <p id="emptyState" class="empty-state">No notes yet. Create your first one.</p>
+            <div id="notesContainer" class="notesContainer"></div>
+        </section>
+    </main>
 
-    <!-- AUTH MODAL -->
-    <div id="authModal" class="auth-modal">
-        <div class="auth-sheet">
-            <h3>Sign In to Sync Notes</h3>
-            <input type="email" id="emailInput" placeholder="Email" required>
-            <input type="password" id="passwordInput" placeholder="Password" required>
-            <button id="signinBtn">Sign In</button>
-            <button id="signupBtn">Create Account</button>
-            <button id="closeModalBtn" style="background-color: #FF4545;">Cancel</button>
-        </div>
-    </div>
-
-    <!-- SHARE TEMPLATE (HIDDEN) -->
-    <div id="shareTemplate" style="position: absolute; left: -9999px; top: -9999px; width: 400px; padding: 30px; background: white; border-radius: 15px; font-family: sans-serif; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-        <div id="shareContent" style="font-size: 18px; line-height: 1.6; color: #333; margin-bottom: 20px; white-space: pre-wrap; word-wrap: break-word;"></div>
-        <div id="shareTimestamp" style="font-size: 14px; color: #777; border-top: 1px solid #eee; padding-top: 10px;"></div>
-        <div style="margin-top: 20px; text-align: center; font-weight: bold; color: #2A84FF; font-size: 14px;">Made With SnapNotes</div>
-    </div>
-  <div class="bottom-button">
-    <button id="addBtn" onclick="addNote()">
-      +
+    <button id="addBtn" class="floating-add" type="button" aria-label="Create a new note">
+        <i class="fa-solid fa-plus"></i>
     </button>
-  </div>
 
-    <!-- JAVASCRIPT -->
+    <aside id="notesDrawer" class="notes-drawer" aria-label="Notes navigation" aria-hidden="true">
+        <div class="drawer-header">
+            <div>
+                <p class="eyebrow">Library</p>
+                <h2>My notes</h2>
+            </div>
+            <button id="closeMenu" class="icon-button" type="button" aria-label="Close notes menu">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <nav class="drawer-nav" id="drawerNav">
+            <button class="drawer-item active" type="button" data-category="all">
+                <i class="fa-solid fa-inbox"></i>
+                <span>All notes</span>
+                <span class="drawer-count" data-count-for="all">0</span>
+            </button>
+            <button class="drawer-item" type="button" data-category="general">
+                <i class="fa-regular fa-note-sticky"></i>
+                <span>General</span>
+                <span class="drawer-count" data-count-for="general">0</span>
+            </button>
+            <button class="drawer-item" type="button" data-category="work">
+                <i class="fa-solid fa-briefcase"></i>
+                <span>Work</span>
+                <span class="drawer-count" data-count-for="work">0</span>
+            </button>
+            <button class="drawer-item" type="button" data-category="personal">
+                <i class="fa-solid fa-user"></i>
+                <span>Personal</span>
+                <span class="drawer-count" data-count-for="personal">0</span>
+            </button>
+            <button class="drawer-item" type="button" data-category="ideas">
+                <i class="fa-regular fa-lightbulb"></i>
+                <span>Ideas</span>
+                <span class="drawer-count" data-count-for="ideas">0</span>
+            </button>
+            <button class="drawer-item" type="button" data-category="important">
+                <i class="fa-solid fa-star"></i>
+                <span>Important</span>
+                <span class="drawer-count" data-count-for="important">0</span>
+            </button>
+        </nav>
+    </aside>
+    <div id="drawerBackdrop" class="drawer-backdrop" hidden></div>
+
+    <div id="categoryMenu" class="category-menu" role="menu" hidden>
+        <button type="button" data-category="general"><span class="category-dot general"></span>General</button>
+        <button type="button" data-category="work"><span class="category-dot work"></span>Work</button>
+        <button type="button" data-category="personal"><span class="category-dot personal"></span>Personal</button>
+        <button type="button" data-category="ideas"><span class="category-dot ideas"></span>Ideas</button>
+        <button type="button" data-category="important"><span class="category-dot important"></span>Important</button>
+    </div>
+
+    <div id="toast" role="status" aria-live="polite"></div>
+
+    <div id="authModal" class="auth-modal" aria-hidden="true">
+        <div class="auth-sheet" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+            <div class="modal-heading">
+                <p class="eyebrow">SnapNotes account</p>
+                <h3 id="authTitle">Sign in to sync notes</h3>
+            </div>
+            <input type="email" id="emailInput" placeholder="Email" autocomplete="email" required>
+            <input type="password" id="passwordInput" placeholder="Password" autocomplete="current-password" required>
+            <button id="signinBtn" type="button">Sign In</button>
+            <button id="signupBtn" type="button" class="secondary-auth">Create Account</button>
+            <button id="closeModalBtn" type="button" class="cancel-button">Cancel</button>
+        </div>
+    </div>
+
+    <div id="shareTemplate" aria-hidden="true">
+        <div id="shareContent"></div>
+        <div id="shareTimestamp"></div>
+        <div>Made With SnapNotes</div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="js/storage.js"></script>
     <script src="js/notes.js"></script>
@@ -121,6 +210,5 @@
     <script type="module" src="js/firestore.js"></script>
     <script type="module" src="js/auth.js"></script>
     <script src="js/app.js"></script>
-
 </body>
 </html>
