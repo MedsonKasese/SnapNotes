@@ -114,6 +114,8 @@ function openNewNoteView() {
 }
 
 function openNotesView(category = activeCategory) {
+    activeCategory = category;
+    document.getElementById("categoryFilter").value = category;
     document.getElementById("newNoteView").hidden = true;
     document.getElementById("notesView").hidden = false;
 
