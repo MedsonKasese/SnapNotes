@@ -3,6 +3,8 @@ import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
     signInWithPopup,
+    signInWithRedirect,
+    getRedirectResult,
     GoogleAuthProvider,
     sendEmailVerification,
     signOut,
@@ -33,9 +35,7 @@ signupBtn.addEventListener("click", async () => {
 
     try {
         const credential = await createUserWithEmailAndPassword(auth, email, password);
-
         await sendEmailVerification(credential.user);
-
         showVerificationState(credential.user);
         window.showToast("Verification email sent. Check your inbox.", "success");
     } catch (error) {
@@ -73,10 +73,20 @@ googleSignInBtn.addEventListener("click", async () => {
     const provider = new GoogleAuthProvider();
 
     try {
+        googleSignInBtn.disabled = true;
+
+        // Redirect is more reliable for Android/mobile browsers and installed PWAs.
+        // Desktop browsers keep the popup experience.
+        if (isMobileAuthEnvironment()) {
+            await signInWithRedirect(auth, provider);
+            return;
+        }
+
         await signInWithPopup(auth, provider);
         window.showToast("Signed in with Google", "success");
         closeModal();
     } catch (error) {
+        googleSignInBtn.disabled = false;
         handleAuthError(error);
     }
 });
@@ -117,9 +127,11 @@ userAvatar.addEventListener("click", () => {
             window.notes = [];
             localStorage.removeItem("SnapNotes");
             window.renderNotes("", "all");
+
             if (typeof window.updateNavigationCounts === "function") {
                 window.updateNavigationCounts();
             }
+
             window.showToast("Logged out", "warning");
         })
         .catch(error => {
@@ -173,7 +185,27 @@ function clearVerificationState() {
     verificationStatus.textContent = "";
 }
 
+function isMobileAuthEnvironment() {
+    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+        window.matchMedia("(display-mode: standalone)").matches;
+}
+
+getRedirectResult(auth)
+    .then(result => {
+        if (!result?.user) return;
+
+        googleSignInBtn.disabled = false;
+        window.showToast("Signed in with Google", "success");
+        closeModal();
+    })
+    .catch(error => {
+        googleSignInBtn.disabled = false;
+        handleAuthError(error);
+    });
+
 onAuthStateChanged(auth, user => {
+    googleSignInBtn.disabled = false;
+
     if (user) {
         const initials = user.displayName
             ? user.displayName.slice(0, 2).toUpperCase()
@@ -186,7 +218,11 @@ onAuthStateChanged(auth, user => {
         userAvatar.hidden = false;
         loginBtn.hidden = true;
 
-        if (!user.emailVerified && user.providerData.every(provider => provider.providerId === "password")) {
+        if (
+            !user.emailVerified &&
+            user.providerData.length > 0 &&
+            user.providerData.every(provider => provider.providerId === "password")
+        ) {
             showVerificationState(user);
         } else {
             clearVerificationState();
@@ -202,6 +238,8 @@ onAuthStateChanged(auth, user => {
 });
 
 function handleAuthError(error) {
+    console.error("Authentication error:", error);
+
     let message = "Something went wrong. Please try again.";
 
     if (error.code === "auth/email-already-in-use") {
@@ -222,8 +260,14 @@ function handleAuthError(error) {
         message = "Google sign-in was cancelled.";
     } else if (error.code === "auth/popup-blocked") {
         message = "Google sign-in popup was blocked. Please allow popups and try again.";
+    } else if (error.code === "auth/unauthorized-domain") {
+        message = "This SnapNotes domain is not authorized for Google sign-in in Firebase.";
+    } else if (error.code === "auth/operation-not-allowed") {
+        message = "Google sign-in is not enabled in the Firebase project.";
     } else if (error.code === "auth/account-exists-with-different-credential") {
         message = "An account already exists with this email using another sign-in method.";
+    } else if (error.code) {
+        message = `Google sign-in failed (${error.code}). Check Firebase Authentication settings.`;
     }
 
     window.showToast(message, "warning");
