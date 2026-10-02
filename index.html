@@ -198,8 +198,17 @@ Then write your notes below..."
             </div>
             <input type="email" id="emailInput" placeholder="Email" autocomplete="email" required>
             <input type="password" id="passwordInput" placeholder="Password" autocomplete="current-password" required>
+            <button id="googleSignInBtn" type="button" class="google-auth">
+                <i class="fa-brands fa-google"></i>
+                Continue with Google
+            </button>
+            <div class="auth-divider"><span>or</span></div>
             <button id="signinBtn" type="button">Sign In</button>
             <button id="signupBtn" type="button" class="secondary-auth">Create Account</button>
+            <div id="verificationStatus" class="verification-status" hidden></div>
+            <button id="resendVerificationBtn" type="button" class="verification-button" hidden>
+                Resend verification email
+            </button>
             <button id="closeModalBtn" type="button" class="cancel-button">Cancel</button>
         </div>
     </div>
