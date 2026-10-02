@@ -108,6 +108,7 @@ function setupEventListeners() {
 function openNewNoteView() {
     document.getElementById("newNoteView").hidden = false;
     document.getElementById("notesView").hidden = true;
+    document.getElementById("addBtn").hidden = true;
     document.getElementById("noteEditor").focus();
     closeSearchPanel();
     closeDrawer();
@@ -118,6 +119,7 @@ function openNotesView(category = activeCategory) {
     document.getElementById("categoryFilter").value = category;
     document.getElementById("newNoteView").hidden = true;
     document.getElementById("notesView").hidden = false;
+    document.getElementById("addBtn").hidden = false;
 
     const title = category === "all" ? "All notes" : CATEGORIES[category];
     document.getElementById("notesViewTitle").textContent = title;
