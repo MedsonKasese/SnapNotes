@@ -58,7 +58,9 @@ userAvatar.addEventListener("click", () => {
     const user = auth.currentUser;
     if (!user) return;
 
-    if (!confirm(`Log out ${user.email}?`)) return;
+    const accountName = user.email ? user.email.split("@")[0] : "this account";
+
+    if (!confirm(`Log out ${accountName}?`)) return;
 
     signOut(auth)
         .then(() => {

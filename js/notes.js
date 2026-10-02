@@ -65,55 +65,7 @@ function createNoteElement(note) {
     content.appendChild(title);
     content.appendChild(body);
 
-    const actions = document.createElement("div");
-    actions.className = "note-card-actions";
-
-    const pinButton = document.createElement("button");
-    pinButton.className = "note-action pin" + (note.pinned ? " active" : "");
-    pinButton.type = "button";
-    pinButton.setAttribute("aria-label", note.pinned ? "Unpin note" : "Pin note");
-    pinButton.innerHTML = `<i class="fa-solid fa-thumbtack"></i>`;
-    pinButton.addEventListener("click", () => togglePin(note.id));
-
-    const menuWrapper = document.createElement("div");
-    menuWrapper.className = "note-menu";
-
-    const menuButton = document.createElement("button");
-    menuButton.className = "note-action";
-    menuButton.type = "button";
-    menuButton.setAttribute("aria-label", "Note actions");
-    menuButton.innerHTML = `<i class="fa-solid fa-ellipsis"></i>`;
-
-    const dropdown = document.createElement("div");
-    dropdown.className = "note-dropdown";
-
-    const shareButton = createDropdownItem(
-        "Share note",
-        () => shareNote(note)
-    );
-
-    const editButton = createDropdownItem(
-        "Edit note",
-        () => startEditing(card, note)
-    );
-
-    const deleteButton = createDropdownItem(
-        "Delete note",
-        () => deleteNote(note.id),
-        "delete-action"
-    );
-
-    dropdown.append(shareButton, editButton, deleteButton);
-
-    menuButton.addEventListener("click", event => {
-        event.stopPropagation();
-        closeNoteMenus();
-        dropdown.classList.toggle("show");
-    });
-
-    menuWrapper.append(menuButton, dropdown);
-    actions.append(pinButton, menuWrapper);
-    top.append(content, actions);
+    top.appendChild(content);
 
     const meta = document.createElement("div");
     meta.className = "note-card-meta";
@@ -130,7 +82,46 @@ function createNoteElement(note) {
     time.textContent = note.time || formatDate(note.createdAt);
 
     metaLeft.append(category, time);
-    meta.appendChild(metaLeft);
+
+    const actions = document.createElement("div");
+    actions.className = "note-card-actions";
+
+    const pinButton = document.createElement("button");
+    pinButton.className = "note-action pin" + (note.pinned ? " active" : "");
+    pinButton.type = "button";
+    pinButton.setAttribute("aria-label", note.pinned ? "Unpin note" : "Pin note");
+    pinButton.title = note.pinned ? "Unpin note" : "Pin note";
+    pinButton.innerHTML = `<i class="fa-solid fa-thumbtack"></i>`;
+    pinButton.addEventListener("click", () => togglePin(note.id));
+
+    const menuWrapper = document.createElement("div");
+    menuWrapper.className = "note-menu";
+
+    const menuButton = document.createElement("button");
+    menuButton.className = "note-action";
+    menuButton.type = "button";
+    menuButton.setAttribute("aria-label", "Note actions");
+    menuButton.title = "Note actions";
+    menuButton.innerHTML = `<i class="fa-solid fa-ellipsis"></i>`;
+
+    const dropdown = document.createElement("div");
+    dropdown.className = "note-dropdown";
+
+    const shareButton = createDropdownItem("Share note", () => shareNote(note));
+    const editButton = createDropdownItem("Edit note", () => startEditing(card, note));
+    const deleteButton = createDropdownItem("Delete note", () => deleteNote(note.id), "delete-action");
+
+    dropdown.append(shareButton, editButton, deleteButton);
+
+    menuButton.addEventListener("click", event => {
+        event.stopPropagation();
+        closeNoteMenus();
+        dropdown.classList.toggle("show");
+    });
+
+    menuWrapper.append(menuButton, dropdown);
+    actions.append(pinButton, menuWrapper);
+    meta.append(metaLeft, actions);
 
     card.append(top, meta);
     return card;
