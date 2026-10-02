@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#48a111">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>SnapNotes</title>
     <meta name="google-site-verification" content="9PvFobY6qcalJMCqB5-4-nZLePuBZGmhA9ioe6R4cgc">
     <meta name="description" content="SnapNotes is a fast and simple note-taking app that helps you create, organize, pin, search, and share notes with ease.">
@@ -12,6 +16,9 @@
     <meta property="og:image" content="https://snapnotesmw.vercel.app/snapnotes-preview.png">
     <meta name="keywords" content="SnapNotes, notes app, note taking, productivity, organize notes, share notes, pinned notes, dark mode notes">
 
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="assets/icons/snapnotes-icon.png">
+    <link rel="apple-touch-icon" href="assets/icons/snapnotes-icon.png">
     <link rel="stylesheet" href="styles/main.css">
     <link rel="stylesheet" href="styles/components.css">
     <link rel="stylesheet" href="styles/layout.css">
@@ -25,7 +32,7 @@
                 <i class="fa-solid fa-bars"></i>
             </button>
             <button id="logoButton" class="brand-button" type="button" aria-label="Open new note">
-                <span class="brand-mark"><i class="fa-regular fa-note-sticky"></i></span>
+                <span class="brand-mark"><img src="assets/icons/snapnotes-icon.png" alt="" aria-hidden="true"></span>
                 <span class="brand-name">SnapNotes</span>
             </button>
         </div>
@@ -210,5 +217,14 @@ Then write your notes below..."
     <script type="module" src="js/firestore.js"></script>
     <script type="module" src="js/auth.js"></script>
     <script src="js/app.js"></script>
+    <script>
+        if ("serviceWorker" in navigator) {
+            window.addEventListener("load", () => {
+                navigator.serviceWorker.register("./sw.js").catch(error => {
+                    console.warn("SnapNotes offline support could not start:", error);
+                });
+            });
+        }
+    </script>
 </body>
 </html>
