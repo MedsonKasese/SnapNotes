@@ -13,10 +13,13 @@ const CATEGORIES = {
 let activeCategory = "all";
 let selectedEditorCategory = "general";
 let clockTimer = null;
+let draftTimer = null;
+const DRAFT_KEY = "SnapNotesDraft";
 
 document.addEventListener("DOMContentLoaded", () => {
     loadNotes();
     setupEventListeners();
+    restoreDraft();
     setupTheme();
     setupTimestamp();
     openNewNoteView();
@@ -96,6 +99,8 @@ function setupEventListeners() {
             closeNoteMenus();
         }
     });
+
+    document.getElementById("noteEditor").addEventListener("input", scheduleDraftSave);
 
     document.getElementById("noteEditor").addEventListener("keydown", (event) => {
         if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
@@ -220,6 +225,61 @@ function setEditorCategory(category) {
     closeCategoryMenu();
 }
 
+
+function scheduleDraftSave() {
+    clearTimeout(draftTimer);
+    setDraftStatus("Saving draft...");
+    draftTimer = setTimeout(saveDraft, 500);
+}
+
+function saveDraft() {
+    const editor = document.getElementById("noteEditor");
+    const content = editor?.innerHTML?.trim() || "";
+    const text = editor?.innerText?.trim() || "";
+
+    if (!text) {
+        localStorage.removeItem(DRAFT_KEY);
+        setDraftStatus("Drafts save automatically");
+        return;
+    }
+
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        content,
+        category: selectedEditorCategory,
+        savedAt: new Date().toISOString()
+    }));
+    setDraftStatus("Draft saved");
+}
+
+function restoreDraft() {
+    const editor = document.getElementById("noteEditor");
+    if (!editor) return;
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return;
+
+    try {
+        const draft = JSON.parse(raw);
+        if (!draft.content) return;
+        editor.innerHTML = draft.content;
+        setEditorCategory(draft.category || "general");
+        setDraftStatus("Draft restored");
+    } catch (error) {
+        localStorage.removeItem(DRAFT_KEY);
+        console.error("Failed to restore SnapNotes draft:", error);
+    }
+}
+
+function clearDraft() {
+    clearTimeout(draftTimer);
+    localStorage.removeItem(DRAFT_KEY);
+    setDraftStatus("Drafts save automatically");
+}
+
+function setDraftStatus(message) {
+    const status = document.getElementById("draftStatus");
+    if (status) status.querySelector("span").textContent = message;
+}
+
 function saveEditorNote() {
     const editor = document.getElementById("noteEditor");
     const rawText = editor.innerText.replace(/\r/g, "").trim();
@@ -273,7 +333,8 @@ function saveEditorNote() {
 
     window.notes.unshift(newNote);
     saveNotes();
-    editor.innerText = "";
+    clearDraft();
+    editor.innerHTML = "";
     renderNotes("", activeCategory);
     updateNavigationCounts();
     showToast("Note saved", "success");
