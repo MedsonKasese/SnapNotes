@@ -38,6 +38,15 @@ function setupEventListeners() {
     const settingsTheme = document.getElementById("settingsTheme");
     const confirmDeleteSetting = document.getElementById("confirmDeleteSetting");
     const settingsAccount = document.getElementById("settingsAccount");
+    document.getElementById("closeDetailBtn").addEventListener("click", closeNoteDetail);
+    document.getElementById("detailEditBtn").addEventListener("click", () => {
+        const detail = document.getElementById("noteDetailView");
+        const id = detail.dataset.noteId;
+        closeNoteDetail();
+        const card = document.querySelector(".note-card[data-id="" + id + ""]");
+        const note = window.notes.find(item => item.id === id);
+        if (card && note) window.startNoteEditing?.(card, note);
+    });
     const openSearch = document.getElementById("openSearch");
     const closeSearch = document.getElementById("closeSearch");
     const menuToggle = document.getElementById("menuToggle");
@@ -169,6 +178,29 @@ function setupEventListeners() {
             saveEditorNote();
         }
     });
+}
+
+function openNoteDetail(id) {
+    const note = window.notes.find(item => item.id === id);
+    if (!note) return;
+    const detail = document.getElementById("noteDetailView");
+    detail.dataset.noteId = id;
+    document.getElementById("detailTitle").textContent = note.title || "Untitled note";
+    document.getElementById("detailMeta").textContent = (CATEGORIES[note.category] || "General") + " • " + (note.time || "");
+    const content = document.getElementById("detailContent");
+    content.innerHTML = typeof window.sanitizeNoteHtml === "function" ? window.sanitizeNoteHtml(note.html || "") : "";
+    if (!content.innerHTML) content.textContent = note.text || "";
+    document.getElementById("newNoteView").hidden = true;
+    document.getElementById("notesView").hidden = true;
+    detail.hidden = false;
+    document.getElementById("addBtn").hidden = true;
+}
+
+function closeNoteDetail() {
+    document.getElementById("noteDetailView").hidden = true;
+    document.getElementById("notesView").hidden = false;
+    document.getElementById("addBtn").hidden = false;
+    applyNoteFilters();
 }
 
 function openNewNoteView() {
@@ -660,6 +692,7 @@ function closeNoteMenus() {
 
 window.openNewNoteView = openNewNoteView;
 window.openNotesView = openNotesView;
+window.openNoteDetail = openNoteDetail;
 window.applyNoteFilters = applyNoteFilters;
 window.updateNavigationCounts = updateNavigationCounts;
 window.closeNoteMenus = closeNoteMenus;

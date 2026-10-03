@@ -797,3 +797,9 @@
 .drawer-tools button:hover {
     background: var(--surface-soft);
 }
+
+.note-card { cursor: pointer; }
+.note-card:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 3px; }
+.note-detail-content { padding: 22px 0; line-height: 1.7; white-space: normal; }
+.note-detail-content p, .note-detail-content div { margin-bottom: 12px; }
+.note-detail-meta { color: var(--muted-color); font-size: 13px; }

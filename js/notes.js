@@ -82,6 +82,11 @@ function createNoteElement(note) {
     card.className = "note-card";
     card.dataset.id = note.id;
     card.dataset.category = note.category || "general";
+    card.tabIndex = 0;
+    card.addEventListener("click", event => {
+        if (event.target.closest("button, a, .note-dropdown")) return;
+        window.openNoteDetail?.(note.id);
+    });
 
     if (note.pinned) {
         card.classList.add("pinned");
