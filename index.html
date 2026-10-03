@@ -47,6 +47,7 @@
                 </button>
                 <button id="userAvatar" class="avatar-button" type="button" aria-label="Account menu" hidden></button>
             </div>
+            <button id="settingsBtn" class="icon-button" type="button" aria-label="Open settings"><i class="fa-solid fa-gear"></i></button>
             <button id="themeToggle" class="icon-button" type="button" aria-label="Toggle theme">
                 <i class="fa-solid fa-moon"></i>
             </button>
@@ -211,6 +212,17 @@ Then write your notes below..."
         <button type="button" data-category="personal"><span class="category-dot personal"></span>Personal</button>
         <button type="button" data-category="ideas"><span class="category-dot ideas"></span>Ideas</button>
         <button type="button" data-category="important"><span class="category-dot important"></span>Important</button>
+    </div>
+
+    <div id="settingsModal" class="auth-modal" aria-hidden="true">
+        <div class="auth-sheet settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+            <div class="modal-heading"><p class="eyebrow">SnapNotes</p><h3 id="settingsTitle">Settings</h3></div>
+            <div class="settings-account" id="settingsAccount"></div>
+            <label class="settings-option"><span>Theme</span><select id="settingsTheme"><option value="light">Light</option><option value="dark">Dark</option></select></label>
+            <label class="settings-option"><span>Confirm before deleting</span><input type="checkbox" id="confirmDeleteSetting" checked></label>
+            <button id="signOutSettingsBtn" type="button" class="secondary-auth">Sign Out</button>
+            <button id="closeSettingsBtn" type="button" class="cancel-button">Close</button>
+        </div>
     </div>
 
     <div id="toast" role="status" aria-live="polite"></div>

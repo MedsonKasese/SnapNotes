@@ -31,6 +31,13 @@ function setupEventListeners() {
     const searchInput = document.getElementById("searchInput");
     const categoryFilter = document.getElementById("categoryFilter");
     const themeToggle = document.getElementById("themeToggle");
+    const settingsBtn = document.getElementById("settingsBtn");
+    const settingsModal = document.getElementById("settingsModal");
+    const closeSettingsBtn = document.getElementById("closeSettingsBtn");
+    const signOutSettingsBtn = document.getElementById("signOutSettingsBtn");
+    const settingsTheme = document.getElementById("settingsTheme");
+    const confirmDeleteSetting = document.getElementById("confirmDeleteSetting");
+    const settingsAccount = document.getElementById("settingsAccount");
     const openSearch = document.getElementById("openSearch");
     const closeSearch = document.getElementById("closeSearch");
     const menuToggle = document.getElementById("menuToggle");
@@ -62,6 +69,16 @@ function setupEventListeners() {
     closeSearch.addEventListener("click", closeSearchPanel);
 
     themeToggle.addEventListener("click", toggleTheme);
+    settingsBtn.addEventListener("click", openSettings);
+    closeSettingsBtn.addEventListener("click", closeSettings);
+    signOutSettingsBtn.addEventListener("click", () => document.getElementById("userAvatar").click());
+    settingsTheme.addEventListener("change", () => {
+        applyTheme(settingsTheme.value);
+        localStorage.setItem("theme", settingsTheme.value);
+    });
+    confirmDeleteSetting.addEventListener("change", () => {
+        localStorage.setItem("SnapNotesConfirmDelete", String(confirmDeleteSetting.checked));
+    });
 
     menuToggle.addEventListener("click", openDrawer);
     closeMenu.addEventListener("click", closeDrawer);
@@ -569,19 +586,38 @@ function updateNavigationCounts() {
     });
 }
 
+function openSettings() {
+    const user = window.firebaseAuth?.currentUser;
+    settingsAccount.textContent = user ? (user.displayName || user.email || "Signed in") : "Using SnapNotes locally";
+    settingsTheme.value = localStorage.getItem("theme") === "dark" ? "dark" : "light";
+    confirmDeleteSetting.checked = localStorage.getItem("SnapNotesConfirmDelete") !== "false";
+    settingsModal.classList.add("show");
+    settingsModal.setAttribute("aria-hidden", "false");
+}
+
+function closeSettings() {
+    settingsModal.classList.remove("show");
+    settingsModal.setAttribute("aria-hidden", "true");
+}
+
+function applyTheme(theme) {
+    document.body.classList.toggle("dark-mode", theme === "dark");
+    updateThemeIcon();
+}
+
 function setupTheme() {
     const themeToggle = document.getElementById("themeToggle");
     const savedTheme = localStorage.getItem("theme");
 
     if (savedTheme === "dark") {
-        document.body.classList.add("dark-mode");
+        applyTheme("dark");
     }
 
     updateThemeIcon();
 }
 
 function toggleTheme() {
-    document.body.classList.toggle("dark-mode");
+    applyTheme(document.body.classList.contains("dark-mode") ? "light" : "dark");
     localStorage.setItem(
         "theme",
         document.body.classList.contains("dark-mode") ? "dark" : "light"
