@@ -1,4 +1,4 @@
-const CACHE_NAME = "snapnotes-v7";
+const CACHE_NAME = "snapnotes-v8";
 const APP_SHELL = [
   "./",
   "./index.html",
