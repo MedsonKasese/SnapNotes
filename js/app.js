@@ -11,6 +11,7 @@ const CATEGORIES = {
 };
 
 let activeCategory = "all";
+let activeView = "all";
 let selectedEditorCategory = "general";
 let clockTimer = null;
 let draftTimer = null;
@@ -63,9 +64,10 @@ function setupEventListeners() {
     drawerBackdrop.addEventListener("click", closeDrawer);
 
     drawerNav.addEventListener("click", (event) => {
-        const item = event.target.closest("[data-category]");
+        const item = event.target.closest("[data-category], [data-view]");
         if (!item) return;
-        selectCategory(item.dataset.category);
+        if (item.dataset.view) selectView(item.dataset.view);
+        else selectCategory(item.dataset.category);
         closeDrawer();
     });
 
@@ -120,6 +122,7 @@ function openNewNoteView() {
 }
 
 function openNotesView(category = activeCategory) {
+    activeView = "all";
     activeCategory = category;
     document.getElementById("categoryFilter").value = category;
     document.getElementById("newNoteView").hidden = true;
@@ -130,6 +133,20 @@ function openNotesView(category = activeCategory) {
     document.getElementById("notesViewTitle").textContent = title;
     document.getElementById("notesViewEyebrow").textContent = category === "all" ? "Your notes" : "Category";
 
+    applyNoteFilters();
+}
+
+function selectView(view) {
+    activeView = view;
+    document.querySelectorAll(".drawer-item").forEach(item => {
+        item.classList.toggle("active", item.dataset.view === view);
+    });
+    document.getElementById("categoryFilter").value = "all";
+    document.getElementById("newNoteView").hidden = true;
+    document.getElementById("notesView").hidden = false;
+    document.getElementById("addBtn").hidden = view !== "all";
+    document.getElementById("notesViewTitle").textContent = view === "archive" ? "Archived" : "Trash";
+    document.getElementById("notesViewEyebrow").textContent = "Library";
     applyNoteFilters();
 }
 
@@ -147,7 +164,7 @@ function applyNoteFilters() {
     const categoryFilter = document.getElementById("categoryFilter");
 
     activeCategory = categoryFilter.value;
-    renderNotes(searchInput.value.trim(), activeCategory);
+    renderNotes(searchInput.value.trim(), activeCategory, activeView);
     updateNavigationCounts();
 }
 
@@ -363,15 +380,21 @@ function updateEditorTimestamp() {
 
 function updateNavigationCounts() {
     const notes = Array.isArray(window.notes) ? window.notes : [];
+    const activeNotes = notes.filter(note => !note.deletedAt);
+    const currentCount = activeNotes.filter(note => !note.archived).length;
 
     document.getElementById("notesCount").textContent =
-        `${notes.length} ${notes.length === 1 ? "note" : "notes"}`;
+        `${currentCount} ${currentCount === 1 ? "note" : "notes"}`;
 
     document.querySelectorAll("[data-count-for]").forEach(element => {
-        const category = element.dataset.countFor;
-        const count = category === "all"
-            ? notes.length
-            : notes.filter(note => note.category === category).length;
+        const key = element.dataset.countFor;
+        let count = 0;
+
+        if (key === "all") count = activeNotes.filter(note => !note.archived).length;
+        else if (key === "archive") count = activeNotes.filter(note => note.archived).length;
+        else if (key === "trash") count = notes.filter(note => note.deletedAt).length;
+        else count = activeNotes.filter(note => !note.archived && note.category === key).length;
+
         element.textContent = count;
     });
 }
