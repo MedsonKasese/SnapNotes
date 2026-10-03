@@ -43,7 +43,7 @@ function setupEventListeners() {
         const detail = document.getElementById("noteDetailView");
         const id = detail.dataset.noteId;
         closeNoteDetail();
-        const card = document.querySelector(".note-card[data-id="" + id + ""]");
+        const card = document.querySelector(".note-card[data-id=\"" + id + "\"]");
         const note = window.notes.find(item => item.id === id);
         if (card && note) window.startNoteEditing?.(card, note);
     });
