@@ -11,12 +11,16 @@ const CATEGORIES = {
 };
 
 let activeCategory = "all";
+let activeView = "all";
 let selectedEditorCategory = "general";
 let clockTimer = null;
+let draftTimer = null;
+const DRAFT_KEY = "SnapNotesDraft";
 
 document.addEventListener("DOMContentLoaded", () => {
     loadNotes();
     setupEventListeners();
+    restoreDraft();
     setupTheme();
     setupTimestamp();
     openNewNoteView();
@@ -39,6 +43,10 @@ function setupEventListeners() {
     const editorCategory = document.getElementById("editorCategory");
     const drawerNav = document.getElementById("drawerNav");
     const categoryMenu = document.getElementById("categoryMenu");
+    const exportNotesBtn = document.getElementById("exportNotesBtn");
+    const importNotesBtn = document.getElementById("importNotesBtn");
+    const importNotesInput = document.getElementById("importNotesInput");
+    const formatToolbar = document.getElementById("formatToolbar");
 
     searchInput.addEventListener("input", applyNoteFilters);
     categoryFilter.addEventListener("change", () => {
@@ -60,18 +68,46 @@ function setupEventListeners() {
     drawerBackdrop.addEventListener("click", closeDrawer);
 
     drawerNav.addEventListener("click", (event) => {
-        const item = event.target.closest("[data-category]");
+        const item = event.target.closest("[data-category], [data-view]");
         if (!item) return;
-        selectCategory(item.dataset.category);
+        if (item.dataset.view) selectView(item.dataset.view);
+        else selectCategory(item.dataset.category);
         closeDrawer();
     });
 
     saveNoteBtn.addEventListener("click", saveEditorNote);
     addBtn.addEventListener("click", openNewNoteView);
     newNoteBtn.addEventListener("click", openNewNoteView);
+
+    exportNotesBtn.addEventListener("click", exportNotes);
+    importNotesBtn.addEventListener("click", () => importNotesInput.click());
+    importNotesInput.addEventListener("change", importNotes);
     logoButton.addEventListener("click", openNewNoteView);
 
     editorCategory.addEventListener("click", toggleCategoryMenu);
+
+    formatToolbar.addEventListener("mousedown", event => event.preventDefault());
+    formatToolbar.addEventListener("click", event => {
+        const button = event.target.closest("[data-format]");
+        if (!button) return;
+        document.execCommand(button.dataset.format, false);
+        document.getElementById("noteEditor").focus();
+        scheduleDraftSave();
+    });
+
+    document.getElementById("insertChecklist").addEventListener("click", () => {
+        document.execCommand("insertText", false, "☐ ");
+        document.getElementById("noteEditor").focus();
+        scheduleDraftSave();
+    });
+
+    document.getElementById("insertLink").addEventListener("click", () => {
+        const url = prompt("Enter a URL:");
+        if (!url) return;
+        document.execCommand("createLink", false, url);
+        document.getElementById("noteEditor").focus();
+        scheduleDraftSave();
+    });
 
     categoryMenu.addEventListener("click", (event) => {
         const item = event.target.closest("[data-category]");
@@ -97,6 +133,8 @@ function setupEventListeners() {
         }
     });
 
+    document.getElementById("noteEditor").addEventListener("input", scheduleDraftSave);
+
     document.getElementById("noteEditor").addEventListener("keydown", (event) => {
         if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
             event.preventDefault();
@@ -115,6 +153,7 @@ function openNewNoteView() {
 }
 
 function openNotesView(category = activeCategory) {
+    activeView = "all";
     activeCategory = category;
     document.getElementById("categoryFilter").value = category;
     document.getElementById("newNoteView").hidden = true;
@@ -125,6 +164,20 @@ function openNotesView(category = activeCategory) {
     document.getElementById("notesViewTitle").textContent = title;
     document.getElementById("notesViewEyebrow").textContent = category === "all" ? "Your notes" : "Category";
 
+    applyNoteFilters();
+}
+
+function selectView(view) {
+    activeView = view;
+    document.querySelectorAll(".drawer-item").forEach(item => {
+        item.classList.toggle("active", item.dataset.view === view);
+    });
+    document.getElementById("categoryFilter").value = "all";
+    document.getElementById("newNoteView").hidden = true;
+    document.getElementById("notesView").hidden = false;
+    document.getElementById("addBtn").hidden = view !== "all";
+    document.getElementById("notesViewTitle").textContent = view === "archive" ? "Archived" : "Trash";
+    document.getElementById("notesViewEyebrow").textContent = "Library";
     applyNoteFilters();
 }
 
@@ -142,7 +195,7 @@ function applyNoteFilters() {
     const categoryFilter = document.getElementById("categoryFilter");
 
     activeCategory = categoryFilter.value;
-    renderNotes(searchInput.value.trim(), activeCategory);
+    renderNotes(searchInput.value.trim(), activeCategory, activeView);
     updateNavigationCounts();
 }
 
@@ -220,6 +273,61 @@ function setEditorCategory(category) {
     closeCategoryMenu();
 }
 
+
+function scheduleDraftSave() {
+    clearTimeout(draftTimer);
+    setDraftStatus("Saving draft...");
+    draftTimer = setTimeout(saveDraft, 500);
+}
+
+function saveDraft() {
+    const editor = document.getElementById("noteEditor");
+    const content = editor?.innerHTML?.trim() || "";
+    const text = editor?.innerText?.trim() || "";
+
+    if (!text) {
+        localStorage.removeItem(DRAFT_KEY);
+        setDraftStatus("Drafts save automatically");
+        return;
+    }
+
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        content,
+        category: selectedEditorCategory,
+        savedAt: new Date().toISOString()
+    }));
+    setDraftStatus("Draft saved");
+}
+
+function restoreDraft() {
+    const editor = document.getElementById("noteEditor");
+    if (!editor) return;
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return;
+
+    try {
+        const draft = JSON.parse(raw);
+        if (!draft.content) return;
+        editor.innerHTML = draft.content;
+        setEditorCategory(draft.category || "general");
+        setDraftStatus("Draft restored");
+    } catch (error) {
+        localStorage.removeItem(DRAFT_KEY);
+        console.error("Failed to restore SnapNotes draft:", error);
+    }
+}
+
+function clearDraft() {
+    clearTimeout(draftTimer);
+    localStorage.removeItem(DRAFT_KEY);
+    setDraftStatus("Drafts save automatically");
+}
+
+function setDraftStatus(message) {
+    const status = document.getElementById("draftStatus");
+    if (status) status.querySelector("span").textContent = message;
+}
+
 function saveEditorNote() {
     const editor = document.getElementById("noteEditor");
     const rawText = editor.innerText.replace(/\r/g, "").trim();
@@ -265,6 +373,7 @@ function saveEditorNote() {
         id: crypto.randomUUID(),
         title,
         text: body,
+        html: sanitizeNoteHtml(editor.innerHTML),
         category: selectedEditorCategory,
         pinned: false,
         time: `Created: ${formattedDate} • ${formattedTime}`,
@@ -273,11 +382,150 @@ function saveEditorNote() {
 
     window.notes.unshift(newNote);
     saveNotes();
-    editor.innerText = "";
+    clearDraft();
+    editor.innerHTML = "";
     renderNotes("", activeCategory);
     updateNavigationCounts();
     showToast("Note saved", "success");
     openNotesView("all");
+}
+
+function sanitizeNoteHtml(html) {
+    const template = document.createElement("div");
+    template.innerHTML = html || "";
+
+    template.querySelectorAll("*").forEach(element => {
+        const allowed = ["B", "STRONG", "I", "EM", "U", "UL", "OL", "LI", "BR", "A", "DIV", "P"];
+        if (!allowed.includes(element.tagName)) {
+            element.replaceWith(...Array.from(element.childNodes));
+            return;
+        }
+        Array.from(element.attributes).forEach(attribute => {
+            if (element.tagName === "A" && attribute.name === "href") {
+                const value = attribute.value.trim();
+                try {
+                    const parsedUrl = new URL(value, window.location.href);
+                    if (!["http:", "https:"].includes(parsedUrl.protocol)) element.removeAttribute("href");
+                } catch {
+                    element.removeAttribute("href");
+                }
+            } else {
+                element.removeAttribute(attribute.name);
+            }
+        });
+        if (element.tagName === "A") {
+            element.target = "_blank";
+            element.rel = "noopener noreferrer";
+        }
+    });
+
+    return template.innerHTML;
+}
+
+window.sanitizeNoteHtml = sanitizeNoteHtml;
+
+
+function downloadFile(filename, content, type) {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function exportNotes() {
+    const notes = Array.isArray(window.notes) ? window.notes : [];
+    if (!notes.length) {
+        showToast("There are no notes to export.", "warning");
+        return;
+    }
+
+    const format = prompt("Export format: JSON, Markdown, or TXT", "JSON");
+    if (!format) return;
+
+    const choice = format.trim().toLowerCase();
+
+    if (choice === "json") {
+        downloadFile(
+            `snapnotes-export-${new Date().toISOString().slice(0, 10)}.json`,
+            JSON.stringify({
+                app: "SnapNotes",
+                version: 1,
+                exportedAt: new Date().toISOString(),
+                notes
+            }, null, 2),
+            "application/json"
+        );
+    } else if (choice === "markdown" || choice === "md") {
+        const markdown = notes.map(note => {
+            const title = note.title ? `# ${note.title}` : "# Untitled note";
+            return `${title}\n\n${note.text || ""}\n\n---`;
+        }).join("\n\n");
+        downloadFile("snapnotes-export.md", markdown, "text/markdown");
+    } else if (choice === "txt" || choice === "text") {
+        const text = notes.map(note => {
+            const title = note.title || "Untitled note";
+            return `${title}\n${note.text || ""}`;
+        }).join("\n\n====================\n\n");
+        downloadFile("snapnotes-export.txt", text, "text/plain");
+    } else {
+        showToast("Choose JSON, Markdown, or TXT.", "warning");
+        return;
+    }
+
+    showToast("Notes exported", "success");
+}
+
+async function importNotes(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        const imported = Array.isArray(parsed) ? parsed : parsed.notes;
+
+        if (!Array.isArray(imported)) {
+            throw new Error("Invalid SnapNotes export.");
+        }
+
+        const existingIds = new Set((window.notes || []).map(note => note.id));
+        const normalized = imported
+            .filter(note => note && typeof note === "object")
+            .map(note => ({
+                id: existingIds.has(note.id) ? crypto.randomUUID() : (note.id || crypto.randomUUID()),
+                title: String(note.title || ""),
+                text: String(note.text || ""),
+                html: typeof note.html === "string" ? note.html : "",
+                category: CATEGORIES[note.category] ? note.category : "general",
+                pinned: Boolean(note.pinned),
+                archived: Boolean(note.archived),
+                deletedAt: note.deletedAt || null,
+                time: String(note.time || ""),
+                createdAt: note.createdAt || new Date().toISOString(),
+                updatedAt: note.updatedAt || note.createdAt || new Date().toISOString()
+            }));
+
+        if (!normalized.length) {
+            showToast("No valid notes found in that file.", "warning");
+            return;
+        }
+
+        window.notes = [...normalized, ...(window.notes || [])];
+        localStorage.setItem("SnapNotes", JSON.stringify(window.notes));
+        await saveNotes();
+        renderNotes();
+        updateNavigationCounts();
+        showToast(`${normalized.length} notes imported`, "success");
+    } catch (error) {
+        console.error("Import failed:", error);
+        showToast("Could not import that file. Use a SnapNotes JSON export.", "warning");
+    }
 }
 
 function setupTimestamp() {
@@ -302,15 +550,21 @@ function updateEditorTimestamp() {
 
 function updateNavigationCounts() {
     const notes = Array.isArray(window.notes) ? window.notes : [];
+    const activeNotes = notes.filter(note => !note.deletedAt);
+    const currentCount = activeNotes.filter(note => !note.archived).length;
 
     document.getElementById("notesCount").textContent =
-        `${notes.length} ${notes.length === 1 ? "note" : "notes"}`;
+        `${currentCount} ${currentCount === 1 ? "note" : "notes"}`;
 
     document.querySelectorAll("[data-count-for]").forEach(element => {
-        const category = element.dataset.countFor;
-        const count = category === "all"
-            ? notes.length
-            : notes.filter(note => note.category === category).length;
+        const key = element.dataset.countFor;
+        let count = 0;
+
+        if (key === "all") count = activeNotes.filter(note => !note.archived).length;
+        else if (key === "archive") count = activeNotes.filter(note => note.archived).length;
+        else if (key === "trash") count = notes.filter(note => note.deletedAt).length;
+        else count = activeNotes.filter(note => !note.archived && note.category === key).length;
+
         element.textContent = count;
     });
 }

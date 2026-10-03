@@ -2,14 +2,20 @@
 // NOTE LIST + NOTE ACTIONS
 // =========================
 
-function renderNotes(filterText = "", filterCategory = "all") {
+function renderNotes(filterText = "", filterCategory = "all", view = window.getActiveNotesView ? window.getActiveNotesView() : "all") {
     const notesContainer = document.getElementById("notesContainer");
     if (!notesContainer) return;
 
     const notes = Array.isArray(window.notes) ? window.notes : [];
     const query = filterText.toLowerCase();
 
-    const filteredNotes = notes.filter(note => {
+    const visibleNotes = notes.filter(note => {
+        if (view === "trash") return Boolean(note.deletedAt);
+        if (view === "archive") return Boolean(note.archived) && !note.deletedAt;
+        return !note.archived && !note.deletedAt;
+    });
+
+    const filteredNotes = visibleNotes.filter(note => {
         const searchableText = [
             note.title || "",
             note.text || "",
@@ -58,9 +64,13 @@ function createNoteElement(note) {
     title.className = "note-card-title";
     title.textContent = note.title || "Untitled note";
 
-    const body = document.createElement("p");
+    const body = document.createElement("div");
     body.className = "note-card-body";
-    body.textContent = note.text || "";
+    if (note.html && typeof window.sanitizeNoteHtml === "function") {
+        body.innerHTML = window.sanitizeNoteHtml(note.html);
+    } else {
+        body.textContent = note.text || "";
+    }
 
     content.appendChild(title);
     content.appendChild(body);
@@ -109,9 +119,19 @@ function createNoteElement(note) {
 
     const shareButton = createDropdownItem("Share note", () => shareNote(note));
     const editButton = createDropdownItem("Edit note", () => startEditing(card, note));
-    const deleteButton = createDropdownItem("Delete note", () => deleteNote(note.id), "delete-action");
-
-    dropdown.append(shareButton, editButton, deleteButton);
+    const noteView = viewForNote(note);
+    if (noteView === "trash") {
+        dropdown.append(
+            createDropdownItem("Restore note", () => restoreNote(note.id)),
+            createDropdownItem("Delete forever", () => permanentlyDeleteNote(note.id), "delete-action")
+        );
+    } else {
+        const archiveButton = noteView === "archive"
+            ? createDropdownItem("Restore note", () => restoreNote(note.id))
+            : createDropdownItem("Archive note", () => archiveNote(note.id));
+        const deleteButton = createDropdownItem("Move to trash", () => deleteNote(note.id), "delete-action");
+        dropdown.append(shareButton, editButton, archiveButton, deleteButton);
+    }
 
     menuButton.addEventListener("click", event => {
         event.stopPropagation();
@@ -227,14 +247,55 @@ function startEditing(card, note) {
 
     titleInput.focus();
 }
-function deleteNote(id) {
-    if (!confirm("Are you sure you want to delete this note?")) return;
+function viewForNote(note) {
+    if (note.deletedAt) return "trash";
+    if (note.archived) return "archive";
+    return "all";
+}
 
+function archiveNote(id) {
+    const note = window.notes.find(item => item.id === id);
+    if (!note) return;
+    note.archived = true;
+    note.updatedAt = new Date().toISOString();
+    saveNotes();
+    renderNotes();
+    updateNavigationCounts();
+    showToast("Note archived", "update");
+}
+
+function restoreNote(id) {
+    const note = window.notes.find(item => item.id === id);
+    if (!note) return;
+    note.archived = false;
+    note.deletedAt = null;
+    note.updatedAt = new Date().toISOString();
+    saveNotes();
+    renderNotes();
+    updateNavigationCounts();
+    showToast("Note restored", "success");
+}
+
+function deleteNote(id) {
+    if (!confirm("Move this note to Trash?")) return;
+    const note = window.notes.find(item => item.id === id);
+    if (!note) return;
+    note.deletedAt = new Date().toISOString();
+    note.archived = false;
+    note.updatedAt = note.deletedAt;
+    saveNotes();
+    renderNotes();
+    updateNavigationCounts();
+    showToast("Note moved to Trash", "delete");
+}
+
+function permanentlyDeleteNote(id) {
+    if (!confirm("Delete this note permanently? This cannot be undone.")) return;
     window.notes = window.notes.filter(note => note.id !== id);
     saveNotes();
     renderNotes();
     updateNavigationCounts();
-    showToast("Note deleted", "delete");
+    showToast("Note permanently deleted", "delete");
 }
 
 function togglePin(id) {
@@ -277,6 +338,31 @@ function updateEmptyState(filteredCount, totalCount) {
     }
 
     emptyState.style.display = "none";
+}
+
+function sanitizeNoteHtml(html) {
+    const template = document.createElement("div");
+    template.innerHTML = html || "";
+    template.querySelectorAll("*").forEach(element => {
+        const allowed = ["B", "STRONG", "I", "EM", "U", "UL", "OL", "LI", "BR", "A", "DIV", "P"];
+        if (!allowed.includes(element.tagName)) {
+            element.replaceWith(...Array.from(element.childNodes));
+            return;
+        }
+        Array.from(element.attributes).forEach(attribute => {
+            if (element.tagName === "A" && attribute.name === "href") {
+                const value = attribute.value.trim();
+                if (!/^https?:\/\//i.test(value)) element.removeAttribute("href");
+            } else {
+                element.removeAttribute(attribute.name);
+            }
+        });
+        if (element.tagName === "A") {
+            element.target = "_blank";
+            element.rel = "noopener noreferrer";
+        }
+    });
+    return template.innerHTML;
 }
 
 function formatCategory(category = "general") {

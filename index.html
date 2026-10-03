@@ -92,6 +92,15 @@
                 <time id="editorTimestamp" class="editor-timestamp"></time>
             </div>
 
+            <div class="format-toolbar" id="formatToolbar" aria-label="Formatting tools">
+                <button type="button" data-format="bold" aria-label="Bold"><i class="fa-solid fa-bold"></i></button>
+                <button type="button" data-format="italic" aria-label="Italic"><i class="fa-solid fa-italic"></i></button>
+                <button type="button" data-format="insertUnorderedList" aria-label="Bulleted list"><i class="fa-solid fa-list-ul"></i></button>
+                <button type="button" data-format="insertOrderedList" aria-label="Numbered list"><i class="fa-solid fa-list-ol"></i></button>
+                <button type="button" id="insertChecklist" aria-label="Checklist"><i class="fa-solid fa-square-check"></i></button>
+                <button type="button" id="insertLink" aria-label="Insert link"><i class="fa-solid fa-link"></i></button>
+            </div>
+
             <div
                 id="noteEditor"
                 class="note-editor"
@@ -104,6 +113,7 @@ Then write your notes below..."
             ></div>
 
             <div class="editor-footer">
+                <div class="editor-status" id="draftStatus" aria-live="polite"><i class="fa-regular fa-floppy-disk"></i><span>Drafts save automatically</span></div>
                 <p class="editor-hint">
                     <i class="fa-solid fa-lightbulb"></i>
                     Start the first line with <strong>##</strong> to make it your note title.
@@ -176,7 +186,22 @@ Then write your notes below..."
                 <span>Important</span>
                 <span class="drawer-count" data-count-for="important">0</span>
             </button>
+            <button class="drawer-item" type="button" data-view="archive">
+                <i class="fa-solid fa-box-archive"></i>
+                <span>Archived</span>
+                <span class="drawer-count" data-count-for="archive">0</span>
+            </button>
+            <button class="drawer-item" type="button" data-view="trash">
+                <i class="fa-solid fa-trash"></i>
+                <span>Trash</span>
+                <span class="drawer-count" data-count-for="trash">0</span>
+            </button>
         </nav>
+        <div class="drawer-tools">
+            <button type="button" id="exportNotesBtn"><i class="fa-solid fa-file-export"></i><span>Export notes</span></button>
+            <button type="button" id="importNotesBtn"><i class="fa-solid fa-file-import"></i><span>Import notes</span></button>
+            <input type="file" id="importNotesInput" accept=".json,application/json" hidden>
+        </div>
     </aside>
     <div id="drawerBackdrop" class="drawer-backdrop" hidden></div>
 

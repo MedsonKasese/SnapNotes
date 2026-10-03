@@ -203,3 +203,29 @@
         transform: translateY(0);
     }
 }
+
+.note-card-body strong,
+.note-card-body b {
+    font-weight: 800;
+}
+
+.note-card-body em,
+.note-card-body i {
+    font-style: italic;
+}
+
+.note-card-body ul,
+.note-card-body ol {
+    margin: 7px 0 7px 20px;
+    padding: 0;
+}
+
+.note-card-body a {
+    color: var(--primary-color);
+    text-decoration: underline;
+}
+
+.note-card-body p,
+.note-card-body div {
+    margin: 0 0 5px;
+}
