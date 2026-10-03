@@ -7,7 +7,14 @@ function renderNotes(filterText = "", filterCategory = "all", view = window.getA
     if (!notesContainer) return;
 
     const notes = Array.isArray(window.notes) ? window.notes : [];
-    const query = filterText.toLowerCase();
+    const rawQuery = filterText.toLowerCase().trim();
+    let sortMode = "newest";
+    const tokens = rawQuery.split(/\s+/).filter(Boolean);
+    const categoryToken = tokens.find(token => token.startsWith("category:"));
+    const pinnedToken = tokens.find(token => token === "is:pinned");
+    if (tokens.includes("sort:oldest")) sortMode = "oldest";
+    const searchTerms = tokens.filter(token => !token.startsWith("category:") && token !== "is:pinned" && !token.startsWith("sort:"));
+    const query = searchTerms.join(" ");
 
     const visibleNotes = notes.filter(note => {
         if (view === "trash") return Boolean(note.deletedAt);
@@ -22,16 +29,18 @@ function renderNotes(filterText = "", filterCategory = "all", view = window.getA
             note.category || ""
         ].join(" ").toLowerCase();
 
-        const matchesSearch = searchableText.includes(query);
-        const matchesCategory =
-            filterCategory === "all" || note.category === filterCategory;
-
-        return matchesSearch && matchesCategory;
+        const matchesSearch = !query || searchTerms.every(term => searchableText.includes(term));
+        const requestedCategory = categoryToken ? categoryToken.replace("category:", "") : filterCategory;
+        const matchesCategory = requestedCategory === "all" || note.category === requestedCategory;
+        const matchesPinned = !pinnedToken || note.pinned;
+        return matchesSearch && matchesCategory && matchesPinned;
     });
 
     filteredNotes.sort((a, b) => {
         if (a.pinned !== b.pinned) return b.pinned ? 1 : -1;
-        return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
+        const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
+        const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
+        return sortMode === "oldest" ? aTime - bTime : bTime - aTime;
     });
 
     notesContainer.innerHTML = "";
