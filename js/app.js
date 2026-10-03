@@ -30,7 +30,6 @@ document.addEventListener("DOMContentLoaded", () => {
 function setupEventListeners() {
     const searchInput = document.getElementById("searchInput");
     const categoryFilter = document.getElementById("categoryFilter");
-    const themeToggle = document.getElementById("themeToggle");
     const settingsBtn = document.getElementById("settingsBtn");
     const settingsModal = document.getElementById("settingsModal");
     const closeSettingsBtn = document.getElementById("closeSettingsBtn");
@@ -77,7 +76,6 @@ function setupEventListeners() {
     openSearch.addEventListener("click", openSearchPanel);
     closeSearch.addEventListener("click", closeSearchPanel);
 
-    themeToggle.addEventListener("click", toggleTheme);
     settingsBtn.addEventListener("click", openSettings);
     closeSettingsBtn.addEventListener("click", closeSettings);
     signOutSettingsBtn.addEventListener("click", () => document.getElementById("userAvatar").click());
@@ -645,18 +643,15 @@ function closeSettings() {
 
 function applyTheme(theme) {
     document.body.classList.toggle("dark-mode", theme === "dark");
-    updateThemeIcon();
 }
 
 function setupTheme() {
-    const themeToggle = document.getElementById("themeToggle");
     const savedTheme = localStorage.getItem("theme");
 
     if (savedTheme === "dark") {
         applyTheme("dark");
     }
 
-    updateThemeIcon();
 }
 
 function toggleTheme() {
@@ -666,22 +661,6 @@ function toggleTheme() {
         document.body.classList.contains("dark-mode") ? "dark" : "light"
     );
     updateThemeIcon();
-}
-
-function updateThemeIcon() {
-    const icon = document.querySelector("#themeToggle i");
-    if (!icon) return;
-
-    icon.className = document.body.classList.contains("dark-mode")
-        ? "fa-solid fa-sun"
-        : "fa-solid fa-moon";
-
-    document.getElementById("themeToggle").setAttribute(
-        "aria-label",
-        document.body.classList.contains("dark-mode")
-            ? "Switch to light theme"
-            : "Switch to dark theme"
-    );
 }
 
 function closeNoteMenus() {
