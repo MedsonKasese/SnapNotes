@@ -326,12 +326,15 @@
 .editor-footer {
     padding-top: 13px;
     border-top: 1px solid var(--border-color);
+    display: grid;
+    gap: 12px;
 }
 
 .editor-hint {
     margin: 0;
     color: var(--muted-color);
     font-size: 12px;
+    margin: 0;
 }
 
 .editor-hint i {
@@ -757,6 +760,16 @@
 .format-toolbar button:hover {
     color: var(--text-color);
     background: var(--surface-soft);
+}
+
+.editor-footer-copy {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+}
+
+.editor-footer .primary-action {
+    width: 100%;
 }
 
 .editor-status {
