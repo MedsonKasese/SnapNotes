@@ -1,0 +1,27 @@
+name: SnapNotes automated checks
+
+on:
+  push:
+    branches: [main, feature/snapnotes-vnext-polish]
+  pull_request:
+    branches: [main]
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate JavaScript files
+        run: |
+          node --check js/app.js
+          node --check js/notes.js
+          node --check js/storage.js
+          node --check js/auth.js
+          node --check js/firestore.js
+      - name: Validate required PWA files
+        run: |
+          test -f manifest.json
+          test -f sw.js
+          grep -q 'snapnotes-v' sw.js
+      - name: Validate test harness
+        run: test -f tests/test.html

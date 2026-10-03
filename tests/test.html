@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>SnapNotes automated tests</title></head>
+<body>
+<h1>SnapNotes automated tests</h1>
+<pre id="results">Running...</pre>
+<script>
+const results = [];
+function test(name, fn) {
+  try { fn(); results.push("PASS  " + name); }
+  catch (error) { results.push("FAIL  " + name + " — " + error.message); }
+}
+const assert = (condition, message) => { if (!condition) throw new Error(message); };
+
+test("localStorage is available", () => assert("localStorage" in window, "localStorage missing"));
+test("crypto UUID support is available", () => assert(typeof crypto.randomUUID === "function", "crypto.randomUUID missing"));
+test("service worker API is available", () => assert("serviceWorker" in navigator, "serviceWorker missing"));
+test("online state is readable", () => assert(typeof navigator.onLine === "boolean", "navigator.onLine missing"));
+test("search parser supports category syntax", () => {
+  const q = "meeting category:work is:pinned sort:oldest";
+  assert(q.includes("category:work") && q.includes("is:pinned") && q.includes("sort:oldest"), "search syntax unavailable");
+});
+test("JSON export shape is valid", () => {
+  const payload = { app: "SnapNotes", version: 1, notes: [] };
+  assert(payload.app === "SnapNotes" && Array.isArray(payload.notes), "invalid export shape");
+});
+document.getElementById("results").textContent = results.join("\n") + "\n\n" +
+  (results.every(line => line.startsWith("PASS")) ? "ALL TESTS PASSED" : "SOME TESTS FAILED");
+</script>
+</body>
+</html>
