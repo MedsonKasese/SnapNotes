@@ -403,7 +403,12 @@ function sanitizeNoteHtml(html) {
         Array.from(element.attributes).forEach(attribute => {
             if (element.tagName === "A" && attribute.name === "href") {
                 const value = attribute.value.trim();
-                if (!/^https?:\\/\\//i.test(value)) element.removeAttribute("href");
+                try {
+                    const parsedUrl = new URL(value, window.location.href);
+                    if (!["http:", "https:"].includes(parsedUrl.protocol)) element.removeAttribute("href");
+                } catch {
+                    element.removeAttribute("href");
+                }
             } else {
                 element.removeAttribute(attribute.name);
             }
