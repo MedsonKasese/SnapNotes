@@ -7,6 +7,20 @@ import {
 
 const PENDING_KEY = "SnapNotesSyncPending";
 
+function getDeviceId() {
+    let id = localStorage.getItem("SnapNotesDeviceId");
+    if (!id) {
+        id = crypto.randomUUID();
+        localStorage.setItem("SnapNotesDeviceId", id);
+    }
+    return id;
+}
+
+function getDeviceName() {
+    return /Android/i.test(navigator.userAgent) ? "Android device" :
+        /iPhone|iPad/i.test(navigator.userAgent) ? "iPhone/iPad" : "Web browser";
+}
+
 function markSyncPending() {
     localStorage.setItem(PENDING_KEY, "true");
     window.dispatchEvent(new CustomEvent("snapnotes:sync-status", {
@@ -59,7 +73,13 @@ export async function syncToCloud() {
         const userDocRef = doc(db, "users", uid);
         await setDoc(userDocRef, {
             notes: Array.isArray(window.notes) ? window.notes : [],
-            lastSynced: new Date().toISOString()
+            lastSynced: new Date().toISOString(),
+            devices: {
+                [getDeviceId()]: {
+                    name: getDeviceName(),
+                    lastSeen: new Date().toISOString()
+                }
+            }
         }, { merge: true });
 
         clearSyncPending();

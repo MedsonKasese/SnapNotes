@@ -7,7 +7,14 @@ function renderNotes(filterText = "", filterCategory = "all", view = window.getA
     if (!notesContainer) return;
 
     const notes = Array.isArray(window.notes) ? window.notes : [];
-    const query = filterText.toLowerCase();
+    const rawQuery = filterText.toLowerCase().trim();
+    let sortMode = "newest";
+    const tokens = rawQuery.split(/\s+/).filter(Boolean);
+    const categoryToken = tokens.find(token => token.startsWith("category:"));
+    const pinnedToken = tokens.find(token => token === "is:pinned");
+    if (tokens.includes("sort:oldest")) sortMode = "oldest";
+    const searchTerms = tokens.filter(token => !token.startsWith("category:") && token !== "is:pinned" && !token.startsWith("sort:"));
+    const query = searchTerms.join(" ");
 
     const visibleNotes = notes.filter(note => {
         if (view === "trash") return Boolean(note.deletedAt);
@@ -22,16 +29,18 @@ function renderNotes(filterText = "", filterCategory = "all", view = window.getA
             note.category || ""
         ].join(" ").toLowerCase();
 
-        const matchesSearch = searchableText.includes(query);
-        const matchesCategory =
-            filterCategory === "all" || note.category === filterCategory;
-
-        return matchesSearch && matchesCategory;
+        const matchesSearch = !query || searchTerms.every(term => searchableText.includes(term));
+        const requestedCategory = categoryToken ? categoryToken.replace("category:", "") : filterCategory;
+        const matchesCategory = requestedCategory === "all" || note.category === requestedCategory;
+        const matchesPinned = !pinnedToken || note.pinned;
+        return matchesSearch && matchesCategory && matchesPinned;
     });
 
     filteredNotes.sort((a, b) => {
         if (a.pinned !== b.pinned) return b.pinned ? 1 : -1;
-        return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
+        const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
+        const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
+        return sortMode === "oldest" ? aTime - bTime : bTime - aTime;
     });
 
     notesContainer.innerHTML = "";
@@ -44,11 +53,49 @@ function renderNotes(filterText = "", filterCategory = "all", view = window.getA
     updateNotesCount();
 }
 
+const historyStack = [];
+const redoStack = [];
+
+function recordHistory(id) {
+    const note = window.notes.find(item => item.id === id);
+    if (note) historyStack.push({ id, snapshot: structuredClone(note) });
+    redoStack.length = 0;
+}
+
+function undoLastNoteChange() {
+    const change = historyStack.pop();
+    if (!change) return showToast("Nothing to undo", "warning");
+    const index = window.notes.findIndex(note => note.id === change.id);
+    if (index === -1) return;
+    redoStack.push({ id: change.id, snapshot: structuredClone(window.notes[index]) });
+    window.notes[index] = change.snapshot;
+    saveNotes();
+    renderNotes();
+    showToast("Change undone", "update");
+}
+
+function redoLastNoteChange() {
+    const change = redoStack.pop();
+    if (!change) return showToast("Nothing to redo", "warning");
+    const index = window.notes.findIndex(note => note.id === change.id);
+    if (index === -1) return;
+    historyStack.push({ id: change.id, snapshot: structuredClone(window.notes[index]) });
+    window.notes[index] = change.snapshot;
+    saveNotes();
+    renderNotes();
+    showToast("Change redone", "update");
+}
+
 function createNoteElement(note) {
     const card = document.createElement("article");
     card.className = "note-card";
     card.dataset.id = note.id;
     card.dataset.category = note.category || "general";
+    card.tabIndex = 0;
+    card.addEventListener("click", event => {
+        if (event.target.closest("button, a, .note-dropdown")) return;
+        window.openNoteDetail?.(note.id);
+    });
 
     if (note.pinned) {
         card.classList.add("pinned");
@@ -219,10 +266,16 @@ function startEditing(card, note) {
 
         const updatedAt = new Date().toISOString();
 
+        recordHistory(note.id);
+        const previous = window.notes[noteIndex];
         window.notes[noteIndex] = {
-            ...window.notes[noteIndex],
+            ...previous,
             title,
             text: body,
+            html: body
+                .split("\n")
+                .map(line => line ? "<p>" + line.replace(/[&<>]/g, char => ({ "&":"&amp;","<":"&lt;",">":"&gt;" }[char])) + "</p>" : "<br>")
+                .join(""),
             updatedAt
         };
 
@@ -256,6 +309,7 @@ function viewForNote(note) {
 function archiveNote(id) {
     const note = window.notes.find(item => item.id === id);
     if (!note) return;
+    recordHistory(id);
     note.archived = true;
     note.updatedAt = new Date().toISOString();
     saveNotes();
@@ -267,6 +321,7 @@ function archiveNote(id) {
 function restoreNote(id) {
     const note = window.notes.find(item => item.id === id);
     if (!note) return;
+    recordHistory(id);
     note.archived = false;
     note.deletedAt = null;
     note.updatedAt = new Date().toISOString();
@@ -280,6 +335,7 @@ function deleteNote(id) {
     if (!confirm("Move this note to Trash?")) return;
     const note = window.notes.find(item => item.id === id);
     if (!note) return;
+    recordHistory(id);
     note.deletedAt = new Date().toISOString();
     note.archived = false;
     note.updatedAt = note.deletedAt;
@@ -291,6 +347,8 @@ function deleteNote(id) {
 
 function permanentlyDeleteNote(id) {
     if (!confirm("Delete this note permanently? This cannot be undone.")) return;
+    const deleted = window.notes.find(note => note.id === id);
+    if (deleted) historyStack.push({ id, snapshot: structuredClone(deleted) });
     window.notes = window.notes.filter(note => note.id !== id);
     saveNotes();
     renderNotes();
@@ -302,6 +360,7 @@ function togglePin(id) {
     const note = window.notes.find(item => item.id === id);
     if (!note) return;
 
+    recordHistory(id);
     note.pinned = !note.pinned;
     saveNotes();
     renderNotes();
@@ -467,4 +526,7 @@ window.addNote = addNote;
 window.renderNotes = renderNotes;
 window.shareNote = shareNote;
 window.updateEmptyState = updateEmptyState;
+window.startNoteEditing = startEditing;
 window.updateNotesCount = updateNotesCount;
+window.undoLastNoteChange = undoLastNoteChange;
+window.redoLastNoteChange = redoLastNoteChange;

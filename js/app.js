@@ -31,6 +31,22 @@ function setupEventListeners() {
     const searchInput = document.getElementById("searchInput");
     const categoryFilter = document.getElementById("categoryFilter");
     const themeToggle = document.getElementById("themeToggle");
+    const settingsBtn = document.getElementById("settingsBtn");
+    const settingsModal = document.getElementById("settingsModal");
+    const closeSettingsBtn = document.getElementById("closeSettingsBtn");
+    const signOutSettingsBtn = document.getElementById("signOutSettingsBtn");
+    const settingsTheme = document.getElementById("settingsTheme");
+    const confirmDeleteSetting = document.getElementById("confirmDeleteSetting");
+    const settingsAccount = document.getElementById("settingsAccount");
+    document.getElementById("closeDetailBtn").addEventListener("click", closeNoteDetail);
+    document.getElementById("detailEditBtn").addEventListener("click", () => {
+        const detail = document.getElementById("noteDetailView");
+        const id = detail.dataset.noteId;
+        closeNoteDetail();
+        const card = document.querySelector(".note-card[data-id=\"" + id + "\"]");
+        const note = window.notes.find(item => item.id === id);
+        if (card && note) window.startNoteEditing?.(card, note);
+    });
     const openSearch = document.getElementById("openSearch");
     const closeSearch = document.getElementById("closeSearch");
     const menuToggle = document.getElementById("menuToggle");
@@ -62,6 +78,16 @@ function setupEventListeners() {
     closeSearch.addEventListener("click", closeSearchPanel);
 
     themeToggle.addEventListener("click", toggleTheme);
+    settingsBtn.addEventListener("click", openSettings);
+    closeSettingsBtn.addEventListener("click", closeSettings);
+    signOutSettingsBtn.addEventListener("click", () => document.getElementById("userAvatar").click());
+    settingsTheme.addEventListener("change", () => {
+        applyTheme(settingsTheme.value);
+        localStorage.setItem("theme", settingsTheme.value);
+    });
+    confirmDeleteSetting.addEventListener("change", () => {
+        localStorage.setItem("SnapNotesConfirmDelete", String(confirmDeleteSetting.checked));
+    });
 
     menuToggle.addEventListener("click", openDrawer);
     closeMenu.addEventListener("click", closeDrawer);
@@ -126,6 +152,17 @@ function setupEventListeners() {
     });
 
     document.addEventListener("keydown", (event) => {
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
+            event.preventDefault();
+            if (event.shiftKey) window.redoLastNoteChange?.();
+            else window.undoLastNoteChange?.();
+            return;
+        }
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") {
+            event.preventDefault();
+            window.redoLastNoteChange?.();
+            return;
+        }
         if (event.key === "Escape") {
             closeDrawer();
             closeCategoryMenu();
@@ -141,6 +178,29 @@ function setupEventListeners() {
             saveEditorNote();
         }
     });
+}
+
+function openNoteDetail(id) {
+    const note = window.notes.find(item => item.id === id);
+    if (!note) return;
+    const detail = document.getElementById("noteDetailView");
+    detail.dataset.noteId = id;
+    document.getElementById("detailTitle").textContent = note.title || "Untitled note";
+    document.getElementById("detailMeta").textContent = (CATEGORIES[note.category] || "General") + " • " + (note.time || "");
+    const content = document.getElementById("detailContent");
+    content.innerHTML = typeof window.sanitizeNoteHtml === "function" ? window.sanitizeNoteHtml(note.html || "") : "";
+    if (!content.innerHTML) content.textContent = note.text || "";
+    document.getElementById("newNoteView").hidden = true;
+    document.getElementById("notesView").hidden = true;
+    detail.hidden = false;
+    document.getElementById("addBtn").hidden = true;
+}
+
+function closeNoteDetail() {
+    document.getElementById("noteDetailView").hidden = true;
+    document.getElementById("notesView").hidden = false;
+    document.getElementById("addBtn").hidden = false;
+    applyNoteFilters();
 }
 
 function openNewNoteView() {
@@ -215,7 +275,7 @@ function closeSearchPanel() {
     document.getElementById("categoryFilter").value = activeCategory;
     panel.classList.remove("is-focused");
     panel.hidden = true;
-    renderNotes("", activeCategory);
+    renderNotes("", activeCategory, activeView);
 }
 
 function openDrawer() {
@@ -569,19 +629,38 @@ function updateNavigationCounts() {
     });
 }
 
+function openSettings() {
+    const user = window.firebaseAuth?.currentUser;
+    settingsAccount.textContent = user ? (user.displayName || user.email || "Signed in") : "Using SnapNotes locally";
+    settingsTheme.value = localStorage.getItem("theme") === "dark" ? "dark" : "light";
+    confirmDeleteSetting.checked = localStorage.getItem("SnapNotesConfirmDelete") !== "false";
+    settingsModal.classList.add("show");
+    settingsModal.setAttribute("aria-hidden", "false");
+}
+
+function closeSettings() {
+    settingsModal.classList.remove("show");
+    settingsModal.setAttribute("aria-hidden", "true");
+}
+
+function applyTheme(theme) {
+    document.body.classList.toggle("dark-mode", theme === "dark");
+    updateThemeIcon();
+}
+
 function setupTheme() {
     const themeToggle = document.getElementById("themeToggle");
     const savedTheme = localStorage.getItem("theme");
 
     if (savedTheme === "dark") {
-        document.body.classList.add("dark-mode");
+        applyTheme("dark");
     }
 
     updateThemeIcon();
 }
 
 function toggleTheme() {
-    document.body.classList.toggle("dark-mode");
+    applyTheme(document.body.classList.contains("dark-mode") ? "light" : "dark");
     localStorage.setItem(
         "theme",
         document.body.classList.contains("dark-mode") ? "dark" : "light"
@@ -613,6 +692,7 @@ function closeNoteMenus() {
 
 window.openNewNoteView = openNewNoteView;
 window.openNotesView = openNotesView;
+window.openNoteDetail = openNoteDetail;
 window.applyNoteFilters = applyNoteFilters;
 window.updateNavigationCounts = updateNavigationCounts;
 window.closeNoteMenus = closeNoteMenus;

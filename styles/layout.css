@@ -797,3 +797,15 @@
 .drawer-tools button:hover {
     background: var(--surface-soft);
 }
+
+.note-card { cursor: pointer; }
+.note-card:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 3px; }
+.note-detail-content { padding: 22px 0; line-height: 1.7; white-space: normal; }
+.note-detail-content p, .note-detail-content div { margin-bottom: 12px; }
+.note-detail-meta { color: var(--muted-color); font-size: 13px; }
+
+.settings-sheet { max-width: 460px; }
+.settings-account { padding: 12px 14px; border-radius: 12px; background: var(--surface-soft); color: var(--muted-color); font-size: 13px; margin-bottom: 12px; }
+.settings-option { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; color: var(--text-color); font-size: 14px; }
+.settings-option select { min-width: 110px; padding: 8px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface-color); color: var(--text-color); }
+.settings-option input { width: 18px; height: 18px; }

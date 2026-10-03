@@ -1,4 +1,4 @@
-const CACHE_NAME = "snapnotes-v6";
+const CACHE_NAME = "snapnotes-v7";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -33,6 +33,8 @@ self.addEventListener("activate", event => {
           .map(key => caches.delete(key))
       ))
       .then(() => self.clients.claim())
+      .then(() => self.clients.matchAll({ type: "window" }))
+      .then(clients => clients.forEach(client => client.postMessage({ type: "SNAPNOTES_UPDATED", version: CACHE_NAME })))
   );
 });
 
