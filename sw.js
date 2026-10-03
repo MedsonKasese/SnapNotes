@@ -1,4 +1,4 @@
-const CACHE_NAME = "snapnotes-v3";
+const CACHE_NAME = "snapnotes-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -10,6 +10,9 @@ const APP_SHELL = [
   "./js/storage.js",
   "./js/notes.js",
   "./js/app.js",
+  "./js/firebaseConfig.js",
+  "./js/firestore.js",
+  "./js/auth.js",
   "./assets/icons/snapnotes-icon.png"
 ];
 
