@@ -206,11 +206,11 @@ function startEditing(card, note) {
             updatedAt
         };
 
-        // Persist locally and wait for Firestore sync before reporting success.
-        // This prevents a stale cloud snapshot from replacing the edited note.
+        // Save locally immediately, then wait for Firestore persistence.
+        // This prevents a stale cloud snapshot from replacing the edit.
         saveNotes().then(() => {
             const searchInput = document.getElementById("searchInput");
-        const categoryFilter = document.getElementById("categoryFilter");
+            const categoryFilter = document.getElementById("categoryFilter");
 
             renderNotes(
                 searchInput ? searchInput.value.trim() : "",
@@ -223,10 +223,10 @@ function startEditing(card, note) {
 
             showToast("Note updated successfully", "success");
         });
+    });
 
     titleInput.focus();
 }
-
 function deleteNote(id) {
     if (!confirm("Are you sure you want to delete this note?")) return;
 
