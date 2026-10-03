@@ -44,6 +44,39 @@ function renderNotes(filterText = "", filterCategory = "all", view = window.getA
     updateNotesCount();
 }
 
+const historyStack = [];
+const redoStack = [];
+
+function recordHistory(id) {
+    const note = window.notes.find(item => item.id === id);
+    if (note) historyStack.push({ id, snapshot: structuredClone(note) });
+    redoStack.length = 0;
+}
+
+function undoLastNoteChange() {
+    const change = historyStack.pop();
+    if (!change) return showToast("Nothing to undo", "warning");
+    const index = window.notes.findIndex(note => note.id === change.id);
+    if (index === -1) return;
+    redoStack.push({ id: change.id, snapshot: structuredClone(window.notes[index]) });
+    window.notes[index] = change.snapshot;
+    saveNotes();
+    renderNotes();
+    showToast("Change undone", "update");
+}
+
+function redoLastNoteChange() {
+    const change = redoStack.pop();
+    if (!change) return showToast("Nothing to redo", "warning");
+    const index = window.notes.findIndex(note => note.id === change.id);
+    if (index === -1) return;
+    historyStack.push({ id: change.id, snapshot: structuredClone(window.notes[index]) });
+    window.notes[index] = change.snapshot;
+    saveNotes();
+    renderNotes();
+    showToast("Change redone", "update");
+}
+
 function createNoteElement(note) {
     const card = document.createElement("article");
     card.className = "note-card";
@@ -219,6 +252,7 @@ function startEditing(card, note) {
 
         const updatedAt = new Date().toISOString();
 
+        recordHistory(note.id);
         window.notes[noteIndex] = {
             ...window.notes[noteIndex],
             title,
@@ -256,6 +290,7 @@ function viewForNote(note) {
 function archiveNote(id) {
     const note = window.notes.find(item => item.id === id);
     if (!note) return;
+    recordHistory(id);
     note.archived = true;
     note.updatedAt = new Date().toISOString();
     saveNotes();
@@ -267,6 +302,7 @@ function archiveNote(id) {
 function restoreNote(id) {
     const note = window.notes.find(item => item.id === id);
     if (!note) return;
+    recordHistory(id);
     note.archived = false;
     note.deletedAt = null;
     note.updatedAt = new Date().toISOString();
@@ -280,6 +316,7 @@ function deleteNote(id) {
     if (!confirm("Move this note to Trash?")) return;
     const note = window.notes.find(item => item.id === id);
     if (!note) return;
+    recordHistory(id);
     note.deletedAt = new Date().toISOString();
     note.archived = false;
     note.updatedAt = note.deletedAt;
@@ -291,6 +328,8 @@ function deleteNote(id) {
 
 function permanentlyDeleteNote(id) {
     if (!confirm("Delete this note permanently? This cannot be undone.")) return;
+    const deleted = window.notes.find(note => note.id === id);
+    if (deleted) historyStack.push({ id, snapshot: structuredClone(deleted) });
     window.notes = window.notes.filter(note => note.id !== id);
     saveNotes();
     renderNotes();
@@ -302,6 +341,7 @@ function togglePin(id) {
     const note = window.notes.find(item => item.id === id);
     if (!note) return;
 
+    recordHistory(id);
     note.pinned = !note.pinned;
     saveNotes();
     renderNotes();
@@ -468,3 +508,5 @@ window.renderNotes = renderNotes;
 window.shareNote = shareNote;
 window.updateEmptyState = updateEmptyState;
 window.updateNotesCount = updateNotesCount;
+window.undoLastNoteChange = undoLastNoteChange;
+window.redoLastNoteChange = redoLastNoteChange;

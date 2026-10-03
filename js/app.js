@@ -143,6 +143,17 @@ function setupEventListeners() {
     });
 
     document.addEventListener("keydown", (event) => {
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
+            event.preventDefault();
+            if (event.shiftKey) window.redoLastNoteChange?.();
+            else window.undoLastNoteChange?.();
+            return;
+        }
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") {
+            event.preventDefault();
+            window.redoLastNoteChange?.();
+            return;
+        }
         if (event.key === "Escape") {
             closeDrawer();
             closeCategoryMenu();
