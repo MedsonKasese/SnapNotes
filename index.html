@@ -48,9 +48,6 @@
                 <button id="userAvatar" class="avatar-button" type="button" aria-label="Account menu" hidden></button>
             </div>
             <button id="settingsBtn" class="icon-button" type="button" aria-label="Open settings"><i class="fa-solid fa-gear"></i></button>
-            <button id="themeToggle" class="icon-button" type="button" aria-label="Toggle theme">
-                <i class="fa-solid fa-moon"></i>
-            </button>
         </div>
     </header>
 
@@ -114,11 +111,13 @@ Then write your notes below..."
             ></div>
 
             <div class="editor-footer">
-                <div class="editor-status" id="draftStatus" aria-live="polite"><i class="fa-regular fa-floppy-disk"></i><span>Drafts save automatically</span></div>
-                <p class="editor-hint">
-                    <i class="fa-solid fa-lightbulb"></i>
-                    Start the first line with <strong>##</strong> to make it your note title.
-                </p>
+                <div class="editor-footer-info">
+                    <div class="editor-status" id="draftStatus" aria-live="polite"><i class="fa-regular fa-floppy-disk"></i><span>Drafts save automatically</span></div>
+                    <p class="editor-hint">
+                        <i class="fa-solid fa-lightbulb"></i>
+                        Start the first line with <strong>##</strong> to make it your note title.
+                    </p>
+                </div>
                 <button id="saveNoteBtn" class="primary-action" type="button">
                     <i class="fa-solid fa-check"></i>
                     Save note
