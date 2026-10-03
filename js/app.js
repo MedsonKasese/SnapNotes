@@ -649,39 +649,14 @@ function applyTheme(theme) {
 }
 
 function setupTheme() {
-    const themeToggle = document.getElementById("themeToggle");
     const savedTheme = localStorage.getItem("theme");
-
     if (savedTheme === "dark") {
         applyTheme("dark");
     }
-
-    updateThemeIcon();
-}
-
-function toggleTheme() {
-    applyTheme(document.body.classList.contains("dark-mode") ? "light" : "dark");
-    localStorage.setItem(
-        "theme",
-        document.body.classList.contains("dark-mode") ? "dark" : "light"
-    );
-    updateThemeIcon();
 }
 
 function updateThemeIcon() {
-    const icon = document.querySelector("#themeToggle i");
-    if (!icon) return;
-
-    icon.className = document.body.classList.contains("dark-mode")
-        ? "fa-solid fa-sun"
-        : "fa-solid fa-moon";
-
-    document.getElementById("themeToggle").setAttribute(
-        "aria-label",
-        document.body.classList.contains("dark-mode")
-            ? "Switch to light theme"
-            : "Switch to dark theme"
-    );
+    return;
 }
 
 function closeNoteMenus() {
