@@ -64,9 +64,13 @@ function createNoteElement(note) {
     title.className = "note-card-title";
     title.textContent = note.title || "Untitled note";
 
-    const body = document.createElement("p");
+    const body = document.createElement("div");
     body.className = "note-card-body";
-    body.textContent = note.text || "";
+    if (note.html && typeof window.sanitizeNoteHtml === "function") {
+        body.innerHTML = window.sanitizeNoteHtml(note.html);
+    } else {
+        body.textContent = note.text || "";
+    }
 
     content.appendChild(title);
     content.appendChild(body);
@@ -334,6 +338,31 @@ function updateEmptyState(filteredCount, totalCount) {
     }
 
     emptyState.style.display = "none";
+}
+
+function sanitizeNoteHtml(html) {
+    const template = document.createElement("div");
+    template.innerHTML = html || "";
+    template.querySelectorAll("*").forEach(element => {
+        const allowed = ["B", "STRONG", "I", "EM", "U", "UL", "OL", "LI", "BR", "A", "DIV", "P"];
+        if (!allowed.includes(element.tagName)) {
+            element.replaceWith(...Array.from(element.childNodes));
+            return;
+        }
+        Array.from(element.attributes).forEach(attribute => {
+            if (element.tagName === "A" && attribute.name === "href") {
+                const value = attribute.value.trim();
+                if (!/^https?:\/\//i.test(value)) element.removeAttribute("href");
+            } else {
+                element.removeAttribute(attribute.name);
+            }
+        });
+        if (element.tagName === "A") {
+            element.target = "_blank";
+            element.rel = "noopener noreferrer";
+        }
+    });
+    return template.innerHTML;
 }
 
 function formatCategory(category = "general") {

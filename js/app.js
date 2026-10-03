@@ -43,6 +43,7 @@ function setupEventListeners() {
     const editorCategory = document.getElementById("editorCategory");
     const drawerNav = document.getElementById("drawerNav");
     const categoryMenu = document.getElementById("categoryMenu");
+    const formatToolbar = document.getElementById("formatToolbar");
 
     searchInput.addEventListener("input", applyNoteFilters);
     categoryFilter.addEventListener("change", () => {
@@ -77,6 +78,29 @@ function setupEventListeners() {
     logoButton.addEventListener("click", openNewNoteView);
 
     editorCategory.addEventListener("click", toggleCategoryMenu);
+
+    formatToolbar.addEventListener("mousedown", event => event.preventDefault());
+    formatToolbar.addEventListener("click", event => {
+        const button = event.target.closest("[data-format]");
+        if (!button) return;
+        document.execCommand(button.dataset.format, false);
+        document.getElementById("noteEditor").focus();
+        scheduleDraftSave();
+    });
+
+    document.getElementById("insertChecklist").addEventListener("click", () => {
+        document.execCommand("insertText", false, "☐ ");
+        document.getElementById("noteEditor").focus();
+        scheduleDraftSave();
+    });
+
+    document.getElementById("insertLink").addEventListener("click", () => {
+        const url = prompt("Enter a URL:");
+        if (!url) return;
+        document.execCommand("createLink", false, url);
+        document.getElementById("noteEditor").focus();
+        scheduleDraftSave();
+    });
 
     categoryMenu.addEventListener("click", (event) => {
         const item = event.target.closest("[data-category]");
@@ -342,6 +366,7 @@ function saveEditorNote() {
         id: crypto.randomUUID(),
         title,
         text: body,
+        html: sanitizeNoteHtml(editor.innerHTML),
         category: selectedEditorCategory,
         pinned: false,
         time: `Created: ${formattedDate} • ${formattedTime}`,
@@ -357,6 +382,35 @@ function saveEditorNote() {
     showToast("Note saved", "success");
     openNotesView("all");
 }
+
+function sanitizeNoteHtml(html) {
+    const template = document.createElement("div");
+    template.innerHTML = html || "";
+
+    template.querySelectorAll("*").forEach(element => {
+        const allowed = ["B", "STRONG", "I", "EM", "U", "UL", "OL", "LI", "BR", "A", "DIV", "P"];
+        if (!allowed.includes(element.tagName)) {
+            element.replaceWith(...Array.from(element.childNodes));
+            return;
+        }
+        Array.from(element.attributes).forEach(attribute => {
+            if (element.tagName === "A" && attribute.name === "href") {
+                const value = attribute.value.trim();
+                if (!/^https?:\\/\\//i.test(value)) element.removeAttribute("href");
+            } else {
+                element.removeAttribute(attribute.name);
+            }
+        });
+        if (element.tagName === "A") {
+            element.target = "_blank";
+            element.rel = "noopener noreferrer";
+        }
+    });
+
+    return template.innerHTML;
+}
+
+window.sanitizeNoteHtml = sanitizeNoteHtml;
 
 function setupTimestamp() {
     updateEditorTimestamp();
