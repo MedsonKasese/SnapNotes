@@ -599,6 +599,48 @@
     color: var(--danger-color);
     background: transparent;
 }
+.google-auth {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+}
+
+.google-auth i {
+    font-size: 15px;
+}
+
+.auth-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--muted-color);
+    font-size: 11px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border-color);
+}
+
+.verification-status {
+    padding: 10px 11px;
+    border-radius: 10px;
+    color: var(--muted-color);
+    background: var(--surface-soft);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.verification-button {
+    color: var(--primary-color) !important;
+    background: transparent !important;
+    border: 1px solid var(--border-color) !important;
+}
+
 
 /* Mobile */
 @media (max-width: 680px) {

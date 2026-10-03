@@ -2,6 +2,11 @@ import { auth } from "./firebaseConfig.js";
 import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
+    signInWithPopup,
+    signInWithRedirect,
+    getRedirectResult,
+    GoogleAuthProvider,
+    sendEmailVerification,
     signOut,
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
@@ -11,6 +16,9 @@ const emailInput = document.getElementById("emailInput");
 const passwordInput = document.getElementById("passwordInput");
 const signupBtn = document.getElementById("signupBtn");
 const signinBtn = document.getElementById("signinBtn");
+const googleSignInBtn = document.getElementById("googleSignInBtn");
+const resendVerificationBtn = document.getElementById("resendVerificationBtn");
+const verificationStatus = document.getElementById("verificationStatus");
 const loginBtn = document.getElementById("loginBtn");
 const userAvatar = document.getElementById("userAvatar");
 const authModal = document.getElementById("authModal");
@@ -26,9 +34,10 @@ signupBtn.addEventListener("click", async () => {
     }
 
     try {
-        await createUserWithEmailAndPassword(auth, email, password);
-        window.showToast("Account created!", "success");
-        closeModal();
+        const credential = await createUserWithEmailAndPassword(auth, email, password);
+        await sendEmailVerification(credential.user);
+        showVerificationState(credential.user);
+        window.showToast("Verification email sent. Check your inbox.", "success");
     } catch (error) {
         handleAuthError(error);
     }
@@ -44,10 +53,61 @@ signinBtn.addEventListener("click", async () => {
     }
 
     try {
-        await signInWithEmailAndPassword(auth, email, password);
+        const credential = await signInWithEmailAndPassword(auth, email, password);
+        const user = credential.user;
+
+        if (!user.emailVerified) {
+            showVerificationState(user);
+            window.showToast("Please verify your email before continuing.", "warning");
+            return;
+        }
+
         window.showToast(`Welcome, ${email.split("@")[0]}!`, "success");
         closeModal();
     } catch (error) {
+        handleAuthError(error);
+    }
+});
+
+googleSignInBtn.addEventListener("click", async () => {
+    const provider = new GoogleAuthProvider();
+
+    try {
+        googleSignInBtn.disabled = true;
+
+        // Redirect is more reliable for Android/mobile browsers and installed PWAs.
+        // Desktop browsers keep the popup experience.
+        if (isMobileAuthEnvironment()) {
+            await signInWithRedirect(auth, provider);
+            return;
+        }
+
+        await signInWithPopup(auth, provider);
+        window.showToast("Signed in with Google", "success");
+        closeModal();
+    } catch (error) {
+        googleSignInBtn.disabled = false;
+        handleAuthError(error);
+    }
+});
+
+resendVerificationBtn.addEventListener("click", async () => {
+    const user = auth.currentUser;
+
+    if (!user || user.emailVerified) {
+        window.showToast("Your email is already verified.", "success");
+        return;
+    }
+
+    try {
+        await sendEmailVerification(user);
+        window.showToast("Verification email resent. Check your inbox.", "success");
+    } catch (error) {
+        if (error.code === "auth/too-many-requests") {
+            window.showToast("Please wait before requesting another email.", "warning");
+            return;
+        }
+
         handleAuthError(error);
     }
 });
@@ -67,9 +127,11 @@ userAvatar.addEventListener("click", () => {
             window.notes = [];
             localStorage.removeItem("SnapNotes");
             window.renderNotes("", "all");
+
             if (typeof window.updateNavigationCounts === "function") {
                 window.updateNavigationCounts();
             }
+
             window.showToast("Logged out", "warning");
         })
         .catch(error => {
@@ -87,7 +149,15 @@ authModal.addEventListener("click", event => {
 function openAuthModal() {
     authModal.classList.add("show");
     authModal.setAttribute("aria-hidden", "false");
-    emailInput.focus();
+
+    const user = auth.currentUser;
+
+    if (user && !user.emailVerified) {
+        showVerificationState(user);
+    } else {
+        clearVerificationState();
+        emailInput.focus();
+    }
 }
 
 function closeModal() {
@@ -95,28 +165,81 @@ function closeModal() {
     authModal.setAttribute("aria-hidden", "true");
     emailInput.value = "";
     passwordInput.value = "";
+    clearVerificationState();
 }
 
+function showVerificationState(user) {
+    if (!user?.email) return;
+
+    verificationStatus.hidden = false;
+    resendVerificationBtn.hidden = false;
+    verificationStatus.textContent =
+        `A verification link was sent to ${user.email}. Open it, then return to SnapNotes.`;
+
+    emailInput.focus();
+}
+
+function clearVerificationState() {
+    verificationStatus.hidden = true;
+    resendVerificationBtn.hidden = true;
+    verificationStatus.textContent = "";
+}
+
+function isMobileAuthEnvironment() {
+    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+        window.matchMedia("(display-mode: standalone)").matches;
+}
+
+getRedirectResult(auth)
+    .then(result => {
+        if (!result?.user) return;
+
+        googleSignInBtn.disabled = false;
+        window.showToast("Signed in with Google", "success");
+        closeModal();
+    })
+    .catch(error => {
+        googleSignInBtn.disabled = false;
+        handleAuthError(error);
+    });
+
 onAuthStateChanged(auth, user => {
+    googleSignInBtn.disabled = false;
+
     if (user) {
-        const initials = user.email
-            ? user.email.substring(0, 2).toUpperCase()
-            : "U";
+        const initials = user.displayName
+            ? user.displayName.slice(0, 2).toUpperCase()
+            : user.email
+                ? user.email.substring(0, 2).toUpperCase()
+                : "U";
 
         userAvatar.textContent = initials;
-        userAvatar.title = `Signed in as ${user.email || "user" }`;
+        userAvatar.title = `Signed in as ${user.displayName || user.email || "user"}`;
         userAvatar.hidden = false;
         loginBtn.hidden = true;
+
+        if (
+            !user.emailVerified &&
+            user.providerData.length > 0 &&
+            user.providerData.every(provider => provider.providerId === "password")
+        ) {
+            showVerificationState(user);
+        } else {
+            clearVerificationState();
+        }
 
         loadFromCloud(user.uid);
     } else {
         userAvatar.hidden = true;
         loginBtn.hidden = false;
         loginBtn.querySelector("span").textContent = "Sign In";
+        clearVerificationState();
     }
 });
 
 function handleAuthError(error) {
+    console.error("Authentication error:", error);
+
     let message = "Something went wrong. Please try again.";
 
     if (error.code === "auth/email-already-in-use") {
@@ -133,6 +256,18 @@ function handleAuthError(error) {
         message = "Network error. Check your connection.";
     } else if (error.code === "auth/too-many-requests") {
         message = "Too many attempts. Please try again later.";
+    } else if (error.code === "auth/popup-closed-by-user") {
+        message = "Google sign-in was cancelled.";
+    } else if (error.code === "auth/popup-blocked") {
+        message = "Google sign-in popup was blocked. Please allow popups and try again.";
+    } else if (error.code === "auth/unauthorized-domain") {
+        message = "This SnapNotes domain is not authorized for Google sign-in in Firebase.";
+    } else if (error.code === "auth/operation-not-allowed") {
+        message = "Google sign-in is not enabled in the Firebase project.";
+    } else if (error.code === "auth/account-exists-with-different-credential") {
+        message = "An account already exists with this email using another sign-in method.";
+    } else if (error.code) {
+        message = `Google sign-in failed (${error.code}). Check Firebase Authentication settings.`;
     }
 
     window.showToast(message, "warning");

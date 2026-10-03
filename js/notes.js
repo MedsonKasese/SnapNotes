@@ -25,7 +25,7 @@ function renderNotes(filterText = "", filterCategory = "all") {
 
     filteredNotes.sort((a, b) => {
         if (a.pinned !== b.pinned) return b.pinned ? 1 : -1;
-        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+        return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
     });
 
     notesContainer.innerHTML = "";
@@ -190,18 +190,43 @@ function startEditing(card, note) {
             return;
         }
 
-        note.title = title;
-        note.text = body;
-        note.updatedAt = new Date().toISOString();
+        const noteIndex = window.notes.findIndex(item => item.id === note.id);
 
-        saveNotes();
-        renderNotes();
-        showToast("Note updated", "update");
+        if (noteIndex === -1) {
+            showToast("Could not find this note. Please refresh and try again.", "warning");
+            return;
+        }
+
+        const updatedAt = new Date().toISOString();
+
+        window.notes[noteIndex] = {
+            ...window.notes[noteIndex],
+            title,
+            text: body,
+            updatedAt
+        };
+
+        // Save locally immediately, then wait for Firestore persistence.
+        // This prevents a stale cloud snapshot from replacing the edit.
+        saveNotes().then(() => {
+            const searchInput = document.getElementById("searchInput");
+            const categoryFilter = document.getElementById("categoryFilter");
+
+            renderNotes(
+                searchInput ? searchInput.value.trim() : "",
+                categoryFilter ? categoryFilter.value : "all"
+            );
+
+            if (typeof window.updateNavigationCounts === "function") {
+                window.updateNavigationCounts();
+            }
+
+            showToast("Note updated successfully", "success");
+        });
     });
 
     titleInput.focus();
 }
-
 function deleteNote(id) {
     if (!confirm("Are you sure you want to delete this note?")) return;
 
