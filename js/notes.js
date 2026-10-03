@@ -206,23 +206,23 @@ function startEditing(card, note) {
             updatedAt
         };
 
-        // Persist locally first, then sync to Firestore when a user is signed in.
-        saveNotes();
-
-        const searchInput = document.getElementById("searchInput");
+        // Persist locally and wait for Firestore sync before reporting success.
+        // This prevents a stale cloud snapshot from replacing the edited note.
+        saveNotes().then(() => {
+            const searchInput = document.getElementById("searchInput");
         const categoryFilter = document.getElementById("categoryFilter");
 
-        renderNotes(
-            searchInput ? searchInput.value.trim() : "",
-            categoryFilter ? categoryFilter.value : "all"
-        );
+            renderNotes(
+                searchInput ? searchInput.value.trim() : "",
+                categoryFilter ? categoryFilter.value : "all"
+            );
 
-        if (typeof window.updateNavigationCounts === "function") {
-            window.updateNavigationCounts();
-        }
+            if (typeof window.updateNavigationCounts === "function") {
+                window.updateNavigationCounts();
+            }
 
-        showToast("Note updated successfully", "success");
-    });
+            showToast("Note updated successfully", "success");
+        });
 
     titleInput.focus();
 }
