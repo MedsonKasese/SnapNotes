@@ -275,7 +275,7 @@ function closeSearchPanel() {
     document.getElementById("categoryFilter").value = activeCategory;
     panel.classList.remove("is-focused");
     panel.hidden = true;
-    renderNotes("", activeCategory);
+    renderNotes("", activeCategory, activeView);
 }
 
 function openDrawer() {

@@ -267,10 +267,15 @@ function startEditing(card, note) {
         const updatedAt = new Date().toISOString();
 
         recordHistory(note.id);
+        const previous = window.notes[noteIndex];
         window.notes[noteIndex] = {
-            ...window.notes[noteIndex],
+            ...previous,
             title,
             text: body,
+            html: body
+                .split("\n")
+                .map(line => line ? "<p>" + line.replace(/[&<>]/g, char => ({ "&":"&amp;","<":"&lt;",">":"&gt;" }[char])) + "</p>" : "<br>")
+                .join(""),
             updatedAt
         };
 
@@ -521,6 +526,7 @@ window.addNote = addNote;
 window.renderNotes = renderNotes;
 window.shareNote = shareNote;
 window.updateEmptyState = updateEmptyState;
+window.startNoteEditing = startEditing;
 window.updateNotesCount = updateNotesCount;
 window.undoLastNoteChange = undoLastNoteChange;
 window.redoLastNoteChange = redoLastNoteChange;
