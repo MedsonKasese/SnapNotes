@@ -43,6 +43,9 @@ function setupEventListeners() {
     const editorCategory = document.getElementById("editorCategory");
     const drawerNav = document.getElementById("drawerNav");
     const categoryMenu = document.getElementById("categoryMenu");
+    const exportNotesBtn = document.getElementById("exportNotesBtn");
+    const importNotesBtn = document.getElementById("importNotesBtn");
+    const importNotesInput = document.getElementById("importNotesInput");
     const formatToolbar = document.getElementById("formatToolbar");
 
     searchInput.addEventListener("input", applyNoteFilters);
@@ -75,6 +78,10 @@ function setupEventListeners() {
     saveNoteBtn.addEventListener("click", saveEditorNote);
     addBtn.addEventListener("click", openNewNoteView);
     newNoteBtn.addEventListener("click", openNewNoteView);
+
+    exportNotesBtn.addEventListener("click", exportNotes);
+    importNotesBtn.addEventListener("click", () => importNotesInput.click());
+    importNotesInput.addEventListener("change", importNotes);
     logoButton.addEventListener("click", openNewNoteView);
 
     editorCategory.addEventListener("click", toggleCategoryMenu);
@@ -411,6 +418,110 @@ function sanitizeNoteHtml(html) {
 }
 
 window.sanitizeNoteHtml = sanitizeNoteHtml;
+
+
+function downloadFile(filename, content, type) {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function exportNotes() {
+    const notes = Array.isArray(window.notes) ? window.notes : [];
+    if (!notes.length) {
+        showToast("There are no notes to export.", "warning");
+        return;
+    }
+
+    const format = prompt("Export format: JSON, Markdown, or TXT", "JSON");
+    if (!format) return;
+
+    const choice = format.trim().toLowerCase();
+
+    if (choice === "json") {
+        downloadFile(
+            `snapnotes-export-${new Date().toISOString().slice(0, 10)}.json`,
+            JSON.stringify({
+                app: "SnapNotes",
+                version: 1,
+                exportedAt: new Date().toISOString(),
+                notes
+            }, null, 2),
+            "application/json"
+        );
+    } else if (choice === "markdown" || choice === "md") {
+        const markdown = notes.map(note => {
+            const title = note.title ? `# ${note.title}` : "# Untitled note";
+            return `${title}\n\n${note.text || ""}\n\n---`;
+        }).join("\n\n");
+        downloadFile("snapnotes-export.md", markdown, "text/markdown");
+    } else if (choice === "txt" || choice === "text") {
+        const text = notes.map(note => {
+            const title = note.title || "Untitled note";
+            return `${title}\n${note.text || ""}`;
+        }).join("\n\n====================\n\n");
+        downloadFile("snapnotes-export.txt", text, "text/plain");
+    } else {
+        showToast("Choose JSON, Markdown, or TXT.", "warning");
+        return;
+    }
+
+    showToast("Notes exported", "success");
+}
+
+async function importNotes(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        const imported = Array.isArray(parsed) ? parsed : parsed.notes;
+
+        if (!Array.isArray(imported)) {
+            throw new Error("Invalid SnapNotes export.");
+        }
+
+        const existingIds = new Set((window.notes || []).map(note => note.id));
+        const normalized = imported
+            .filter(note => note && typeof note === "object")
+            .map(note => ({
+                id: existingIds.has(note.id) ? crypto.randomUUID() : (note.id || crypto.randomUUID()),
+                title: String(note.title || ""),
+                text: String(note.text || ""),
+                html: typeof note.html === "string" ? note.html : "",
+                category: CATEGORIES[note.category] ? note.category : "general",
+                pinned: Boolean(note.pinned),
+                archived: Boolean(note.archived),
+                deletedAt: note.deletedAt || null,
+                time: String(note.time || ""),
+                createdAt: note.createdAt || new Date().toISOString(),
+                updatedAt: note.updatedAt || note.createdAt || new Date().toISOString()
+            }));
+
+        if (!normalized.length) {
+            showToast("No valid notes found in that file.", "warning");
+            return;
+        }
+
+        window.notes = [...normalized, ...(window.notes || [])];
+        localStorage.setItem("SnapNotes", JSON.stringify(window.notes));
+        await saveNotes();
+        renderNotes();
+        updateNavigationCounts();
+        showToast(`${normalized.length} notes imported`, "success");
+    } catch (error) {
+        console.error("Import failed:", error);
+        showToast("Could not import that file. Use a SnapNotes JSON export.", "warning");
+    }
+}
 
 function setupTimestamp() {
     updateEditorTimestamp();

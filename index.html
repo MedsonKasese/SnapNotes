@@ -197,6 +197,11 @@ Then write your notes below..."
                 <span class="drawer-count" data-count-for="trash">0</span>
             </button>
         </nav>
+        <div class="drawer-tools">
+            <button type="button" id="exportNotesBtn"><i class="fa-solid fa-file-export"></i><span>Export notes</span></button>
+            <button type="button" id="importNotesBtn"><i class="fa-solid fa-file-import"></i><span>Import notes</span></button>
+            <input type="file" id="importNotesInput" accept=".json,application/json" hidden>
+        </div>
     </aside>
     <div id="drawerBackdrop" class="drawer-backdrop" hidden></div>
 
