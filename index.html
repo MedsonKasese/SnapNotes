@@ -220,12 +220,60 @@ Then write your notes below..."
 
     <div id="settingsModal" class="auth-modal" aria-hidden="true">
         <div class="auth-sheet settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
-            <div class="modal-heading"><p class="eyebrow">SnapNotes</p><h3 id="settingsTitle">Settings</h3></div>
+            <div class="modal-heading">
+                <p class="eyebrow">SnapNotes</p>
+                <h3 id="settingsTitle">Settings</h3>
+            </div>
+
             <div class="settings-account" id="settingsAccount"></div>
-            <label class="settings-option"><span>Theme</span><select id="settingsTheme"><option value="light">Light</option><option value="dark">Dark</option></select></label>
-            <label class="settings-option"><span>Confirm before deleting</span><input type="checkbox" id="confirmDeleteSetting" checked></label>
-            <button id="signOutSettingsBtn" type="button" class="secondary-auth">Sign Out</button>
-            <button id="closeSettingsBtn" type="button" class="cancel-button">Close</button>
+
+            <div class="settings-section">
+                <div class="settings-section-heading">
+                    <div>
+                        <h4>Settings</h4>
+                        <p>Customise your SnapNotes experience</p>
+                    </div>
+                </div>
+                <div class="settings-option settings-toggle-row">
+                    <div>
+                        <span>Appearance</span>
+                        <small id="themeStatus">Light mode enabled</small>
+                    </div>
+                    <button id="settingsThemeToggle" class="settings-toggle" type="button" role="switch" aria-checked="false" aria-label="Toggle dark mode">
+                        <span class="settings-toggle-knob"></span>
+                    </button>
+                </div>
+                <label class="settings-option">
+                    <span><i class="fa-solid fa-trash-can"></i> Confirm before deleting</span>
+                    <input type="checkbox" id="confirmDeleteSetting" checked>
+                </label>
+            </div>
+
+            <div class="settings-section">
+                <div class="settings-section-heading">
+                    <div>
+                        <h4>About</h4>
+                        <p>Learn more and share your thoughts</p>
+                    </div>
+                </div>
+                <button id="aboutSnapNotesBtn" type="button" class="settings-link-button">
+                    <span><i class="fa-solid fa-circle-info"></i> About SnapNotes</span>
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+                <button id="privacyPolicyBtn" type="button" class="settings-link-button">
+                    <span><i class="fa-solid fa-shield-halved"></i> Privacy Policy</span>
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+                <a class="settings-link-button" href="mailto:medsonkasese@yahoo.com?subject=SnapNotes%20Feedback">
+                    <span><i class="fa-solid fa-message"></i> Send Feedback</span>
+                    <i class="fa-solid fa-chevron-right"></i>
+                </a>
+            </div>
+
+            <div class="settings-actions">
+                <button id="signOutSettingsBtn" type="button" class="secondary-auth"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
+                <button id="closeSettingsBtn" type="button" class="cancel-button">Close</button>
+            </div>
         </div>
     </div>
 
