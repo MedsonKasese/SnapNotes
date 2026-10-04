@@ -65,24 +65,46 @@ function recordHistory(id) {
 function undoLastNoteChange() {
     const change = historyStack.pop();
     if (!change) return showToast("Nothing to undo", "warning");
+
     const index = window.notes.findIndex(note => note.id === change.id);
-    if (index === -1) return;
-    redoStack.push({ id: change.id, snapshot: structuredClone(window.notes[index]) });
-    window.notes[index] = change.snapshot;
+
+    if (change.action === "create") {
+        if (index !== -1) {
+            redoStack.push({ id: change.id, action: "create", snapshot: structuredClone(window.notes[index]) });
+            window.notes.splice(index, 1);
+        }
+    } else {
+        if (index === -1) return;
+        redoStack.push({ id: change.id, snapshot: structuredClone(window.notes[index]) });
+        window.notes[index] = change.snapshot;
+    }
+
     saveNotes();
     renderNotes();
+    if (typeof window.updateNavigationCounts === "function") window.updateNavigationCounts();
     showToast("Change undone", "update");
 }
 
 function redoLastNoteChange() {
     const change = redoStack.pop();
     if (!change) return showToast("Nothing to redo", "warning");
+
     const index = window.notes.findIndex(note => note.id === change.id);
-    if (index === -1) return;
-    historyStack.push({ id: change.id, snapshot: structuredClone(window.notes[index]) });
-    window.notes[index] = change.snapshot;
+
+    if (change.action === "create") {
+        if (index === -1) {
+            window.notes.unshift(structuredClone(change.snapshot));
+            historyStack.push({ id: change.id, action: "create", snapshot: structuredClone(change.snapshot) });
+        }
+    } else {
+        if (index === -1) return;
+        historyStack.push({ id: change.id, snapshot: structuredClone(window.notes[index]) });
+        window.notes[index] = change.snapshot;
+    }
+
     saveNotes();
     renderNotes();
+    if (typeof window.updateNavigationCounts === "function") window.updateNavigationCounts();
     showToast("Change redone", "update");
 }
 
