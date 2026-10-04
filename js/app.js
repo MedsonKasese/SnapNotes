@@ -174,6 +174,23 @@ function setupEventListeners() {
     });
 
     document.addEventListener("keydown", (event) => {
+        const activeElement = document.activeElement;
+        const isTyping = activeElement?.matches("input, textarea, select, [contenteditable=\"true\"]");
+        const modifier = event.ctrlKey || event.metaKey;
+
+        if (modifier && event.key.toLowerCase() === "k" && !isTyping) {
+            event.preventDefault();
+            openSearchPanel();
+            document.getElementById("searchInput")?.focus();
+            return;
+        }
+
+        if (modifier && event.key.toLowerCase() === "n" && !isTyping) {
+            event.preventDefault();
+            openNewNoteView();
+            return;
+        }
+
         if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
             event.preventDefault();
             if (event.shiftKey) window.redoLastNoteChange?.();
