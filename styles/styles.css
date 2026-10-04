@@ -330,8 +330,13 @@
 
 .settings-actions {
     display: grid;
-    gap: 8px;
-    margin-top: 2px;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.settings-actions button {
+    width: 100%;
+    min-height: 40px;
 }
 
 .settings-actions .cancel-button {
@@ -450,10 +455,10 @@
 
 .theme-toggle {
     position: relative;
-    width: 48px;
-    height: 27px;
+    width: 40px;
+    height: 22px;
     flex: 0 0 auto;
-    padding: 3px;
+    padding: 2px;
     border: 0;
     border-radius: 999px;
     background: var(--border-color);
@@ -463,8 +468,8 @@
 
 .theme-toggle-knob {
     display: block;
-    width: 21px;
-    height: 21px;
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
     background: var(--surface-color);
     box-shadow: 0 1px 4px rgba(0, 0, 0, .18);
@@ -477,7 +482,7 @@
 }
 
 .theme-toggle.active .theme-toggle-knob {
-    transform: translateX(21px);
+    transform: translateX(18px);
 }
 
 .settings-theme-option #settingsTheme {
