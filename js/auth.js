@@ -3,9 +3,9 @@ import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
     signInWithPopup,
-    signInWithRedirect,
-    getRedirectResult,
     GoogleAuthProvider,
+    setPersistence,
+    browserLocalPersistence,
     sendEmailVerification,
     signOut,
     onAuthStateChanged
@@ -23,6 +23,11 @@ const loginBtn = document.getElementById("loginBtn");
 const userAvatar = document.getElementById("userAvatar");
 const authModal = document.getElementById("authModal");
 const closeModalBtn = document.getElementById("closeModalBtn");
+
+// Keep Firebase Auth persistent across page reloads and PWA sessions.
+const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch(error => {
+    console.warn("Could not enable persistent authentication:", error);
+});
 
 signupBtn.addEventListener("click", async () => {
     const email = emailInput.value.trim();
@@ -74,23 +79,22 @@ googleSignInBtn.addEventListener("click", async () => {
 
     try {
         googleSignInBtn.disabled = true;
-        googleSignInBtn.dataset.originalText = googleSignInBtn.textContent.trim();
-        googleSignInBtn.textContent = "Completing Google sign-in...";
+        await authPersistenceReady;
 
-        // Redirect is more reliable for Android/mobile browsers and installed PWAs.
-        // Desktop browsers keep the popup experience.
-        if (isMobileAuthEnvironment()) {
-            await signInWithRedirect(auth, provider);
-            return;
+        // SnapNotes is hosted on Vercel while Firebase Auth uses the
+        // firebaseapp.com auth domain. Redirect sign-in can fail in browsers
+        // that block third-party storage. Popup sign-in avoids that dependency
+        // and returns the signed-in credential directly.
+        const credential = await signInWithPopup(auth, provider);
+
+        if (credential?.user) {
+            window.showToast("Signed in with Google", "success");
+            closeModal();
         }
-
-        await signInWithPopup(auth, provider);
-        resetGoogleButton();
-        window.showToast("Signed in with Google", "success");
-        closeModal();
     } catch (error) {
-        resetGoogleButton();
         handleAuthError(error);
+    } finally {
+        googleSignInBtn.disabled = false;
     }
 });
 
@@ -192,19 +196,6 @@ function isMobileAuthEnvironment() {
     return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
         window.matchMedia("(display-mode: standalone)").matches;
 }
-
-getRedirectResult(auth)
-    .then(result => {
-        if (!result?.user) return;
-
-        resetGoogleButton();
-        window.showToast("Signed in with Google", "success");
-        closeModal();
-    })
-    .catch(error => {
-        resetGoogleButton();
-        handleAuthError(error);
-    });
 
 onAuthStateChanged(auth, user => {
     resetGoogleButton();
