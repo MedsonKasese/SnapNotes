@@ -460,26 +460,51 @@ function updateEmptyState(filteredCount, totalCount, invalidCategory = "") {
 function getNoteBodyHtml(note) {
     if (!note?.html) return "";
 
-    const sanitized = typeof window.sanitizeNoteHtml === "function"
-        ? window.sanitizeNoteHtml(note.html)
-        : note.html;
+    return stripMarkdownTitleFromHtml(note.html, note.title);
+}
 
+function stripMarkdownTitleFromHtml(html, title = "") {
+    const sanitized = typeof window.sanitizeNoteHtml === "function"
+        ? window.sanitizeNoteHtml(html)
+        : html || "";
     const template = document.createElement("div");
     template.innerHTML = sanitized;
 
-    const firstBlock = template.firstElementChild;
-    if (firstBlock) {
-        const firstText = firstBlock.textContent.trim();
-        const title = (note.title || "").trim();
-        if (firstText === `## ${title}` || firstText === `##${title}`) {
-            firstBlock.remove();
+    const normalizedTitle = title.trim();
+    if (!normalizedTitle) return template.innerHTML;
+
+    const headings = [`## ${normalizedTitle}`, `##${normalizedTitle}`]
+        .map(value => value.toLowerCase());
+
+    for (const node of [...template.childNodes]) {
+        const text = (node.textContent || "")
+            .replace(/\u00a0/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+        if (!text) continue;
+
+        const lowerText = text.toLowerCase();
+        const exactHeading = headings.some(heading =>
+            lowerText === heading || lowerText === `${heading} #`
+        );
+
+        if (exactHeading) {
+            node.remove();
+        } else {
+            const headingPrefix = headings.find(heading =>
+                lowerText.startsWith(`${heading} `)
+            );
+            if (headingPrefix) {
+                node.textContent = text.slice(headingPrefix.length).trim();
+            }
         }
-    } else if (template.textContent.trim() === `## ${(note.title || "").trim()}`) {
-        template.textContent = "";
+        break;
     }
 
     return template.innerHTML;
 }
+
+window.stripMarkdownTitleFromHtml = stripMarkdownTitleFromHtml;
 
 function getNoteBodyText(note) {
     const text = typeof note?.text === "string" ? note.text : "";

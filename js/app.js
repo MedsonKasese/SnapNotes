@@ -475,20 +475,7 @@ async function saveEditorNote() {
 }
 
 function extractNoteBodyHtml(html, title) {
-    const sanitized = sanitizeNoteHtml(html);
-    const template = document.createElement("div");
-    template.innerHTML = sanitized;
-    const firstBlock = template.firstElementChild;
-    const normalizedTitle = (title || "").trim();
-
-    if (firstBlock && normalizedTitle) {
-        const firstText = firstBlock.textContent.trim();
-        if (firstText === `## ${normalizedTitle}` || firstText === `##${normalizedTitle}`) {
-            firstBlock.remove();
-        }
-    }
-
-    return template.innerHTML;
+    return window.stripMarkdownTitleFromHtml(html, title);
 }
 
 function sanitizeNoteHtml(html) {

@@ -38,6 +38,11 @@ test("note editing requires an action container in the note metadata", () => {
   card.innerHTML = '<div class="note-card-top"></div><div class="note-card-meta"><div class="note-card-actions"></div></div>';
   assert(card.querySelector(".note-card-meta .note-card-actions"), "note action container is missing from metadata");
 });
+test("legacy note fixture includes a leading empty block before its title", () => {
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = "<p><br></p><p>## Note title</p><p>Body</p>";
+  assert(wrapper.children[1].textContent === "## Note title", "legacy title fixture is invalid");
+});
 document.getElementById("results").textContent = results.join("\n") + "\n\n" +
   (results.every(line => line.startsWith("PASS")) ? "ALL TESTS PASSED" : "SOME TESTS FAILED");
 </script>
