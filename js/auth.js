@@ -127,7 +127,10 @@ userAvatar.addEventListener("click", () => {
     const user = auth.currentUser;
     if (!user) return;
 
-    const accountName = user.email ? user.email.split("@")[0] : "this account";
+    const isGoogleAccount = user.providerData?.some(provider => provider.providerId === "google.com");
+    const accountName = isGoogleAccount
+        ? (user.displayName || user.email?.split("@")[0] || "this account")
+        : (user.email?.split("@")[0] || user.displayName || "this account");
 
     if (!confirm(`Log out ${accountName}?`)) return;
 
