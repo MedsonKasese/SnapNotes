@@ -229,3 +229,31 @@
 .note-card-body div {
     margin: 0 0 5px;
 }
+
+
+.edit-note-editor {
+    min-height: 120px;
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+.edit-note-editor:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 1px;
+}
+
+.edit-note-editor ul,
+.edit-note-editor ol {
+    margin: 7px 0 7px 20px;
+    padding: 0;
+}
+
+.edit-note-editor a {
+    color: var(--primary-color);
+    text-decoration: underline;
+}
+
+.edit-note-editor p,
+.edit-note-editor div {
+    margin: 0 0 5px;
+}

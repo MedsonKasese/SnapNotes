@@ -277,7 +277,7 @@ Then write your notes below..."
                 registration.update();
                 navigator.serviceWorker.addEventListener("message", event => {
                     if (event.data?.type === "SNAPNOTES_UPDATED") {
-                        window.showToast?.("SnapNotes updated to " + event.data.version, "success");
+                        window.showToast?.("SnapNotes has been updated. Refresh to use the latest version.", "success");
                     }
                 });
             }).catch(error => {

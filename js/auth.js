@@ -74,6 +74,8 @@ googleSignInBtn.addEventListener("click", async () => {
 
     try {
         googleSignInBtn.disabled = true;
+        googleSignInBtn.dataset.originalText = googleSignInBtn.textContent.trim();
+        googleSignInBtn.textContent = "Completing Google sign-in...";
 
         // Redirect is more reliable for Android/mobile browsers and installed PWAs.
         // Desktop browsers keep the popup experience.
@@ -83,10 +85,11 @@ googleSignInBtn.addEventListener("click", async () => {
         }
 
         await signInWithPopup(auth, provider);
+        resetGoogleButton();
         window.showToast("Signed in with Google", "success");
         closeModal();
     } catch (error) {
-        googleSignInBtn.disabled = false;
+        resetGoogleButton();
         handleAuthError(error);
     }
 });
@@ -194,17 +197,17 @@ getRedirectResult(auth)
     .then(result => {
         if (!result?.user) return;
 
-        googleSignInBtn.disabled = false;
+        resetGoogleButton();
         window.showToast("Signed in with Google", "success");
         closeModal();
     })
     .catch(error => {
-        googleSignInBtn.disabled = false;
+        resetGoogleButton();
         handleAuthError(error);
     });
 
 onAuthStateChanged(auth, user => {
-    googleSignInBtn.disabled = false;
+    resetGoogleButton();
 
     if (user) {
         const initials = user.displayName
@@ -236,6 +239,11 @@ onAuthStateChanged(auth, user => {
         clearVerificationState();
     }
 });
+
+function resetGoogleButton() {
+    googleSignInBtn.disabled = false;
+    googleSignInBtn.textContent = "Continue with Google";
+}
 
 function handleAuthError(error) {
     console.error("Authentication error:", error);

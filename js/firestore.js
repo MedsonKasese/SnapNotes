@@ -1,4 +1,4 @@
-import { db } from "./firebaseConfig.js";
+import { db, auth } from "./firebaseConfig.js";
 import {
     doc,
     setDoc,
@@ -59,7 +59,6 @@ function mergeNotes(localNotes = [], cloudNotes = []) {
 }
 
 export async function syncToCloud() {
-    const auth = window.firebaseAuth;
     if (!auth?.currentUser) return false;
 
     if (!navigator.onLine) {
@@ -128,7 +127,7 @@ export async function loadFromCloud(uid) {
 
 async function syncPendingChanges() {
     if (localStorage.getItem(PENDING_KEY) !== "true") return;
-    if (!navigator.onLine || !window.firebaseAuth?.currentUser) return;
+    if (!navigator.onLine || !auth?.currentUser) return;
 
     await syncToCloud();
 }

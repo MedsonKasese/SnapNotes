@@ -168,6 +168,14 @@ function setupEventListeners() {
         }
     });
 
+    window.addEventListener("snapnotes:sync-status", event => {
+        if (event.detail?.status === "pending") {
+            setDraftStatus("Saved locally • Cloud sync pending");
+        } else if (event.detail?.status === "synced") {
+            setDraftStatus("Saved and synced");
+        }
+    });
+
     document.getElementById("noteEditor").addEventListener("input", scheduleDraftSave);
 
     document.getElementById("noteEditor").addEventListener("keydown", (event) => {
@@ -386,7 +394,7 @@ function setDraftStatus(message) {
     if (status) status.querySelector("span").textContent = message;
 }
 
-function saveEditorNote() {
+async function saveEditorNote() {
     const editor = document.getElementById("noteEditor");
     const rawText = editor.innerText.replace(/\r/g, "").trim();
 
@@ -439,13 +447,22 @@ function saveEditorNote() {
     };
 
     window.notes.unshift(newNote);
-    saveNotes();
+    window.recordNoteCreation?.(newNote);
+    const saveResult = await saveNotes();
+
     clearDraft();
     editor.innerHTML = "";
     renderNotes("", activeCategory);
     updateNavigationCounts();
-    showToast("Note saved", "success");
     openNotesView("all");
+
+    if (saveResult.cloudEnabled && !saveResult.synced) {
+        showToast("Note saved locally. Cloud sync pending.", "warning");
+    } else if (saveResult.cloudEnabled) {
+        showToast("Note saved and synced", "success");
+    } else {
+        showToast("Note saved", "success");
+    }
 }
 
 function sanitizeNoteHtml(html) {
@@ -609,10 +626,25 @@ function updateEditorTimestamp() {
 function updateNavigationCounts() {
     const notes = Array.isArray(window.notes) ? window.notes : [];
     const activeNotes = notes.filter(note => !note.deletedAt);
-    const currentCount = activeNotes.filter(note => !note.archived).length;
 
-    document.getElementById("notesCount").textContent =
-        `${currentCount} ${currentCount === 1 ? "note" : "notes"}`;
+    let currentNotes;
+    if (activeView === "trash") {
+        currentNotes = notes.filter(note => note.deletedAt);
+    } else if (activeView === "archive") {
+        currentNotes = activeNotes.filter(note => note.archived);
+    } else {
+        currentNotes = activeNotes.filter(note => !note.archived);
+        if (activeCategory !== "all") {
+            currentNotes = currentNotes.filter(note => note.category === activeCategory);
+        }
+    }
+
+    const currentCount = currentNotes.length;
+    const countEl = document.getElementById("notesCount");
+    if (countEl) {
+        countEl.textContent =
+            `${currentCount} ${currentCount === 1 ? "note" : "notes"}`;
+    }
 
     document.querySelectorAll("[data-count-for]").forEach(element => {
         const key = element.dataset.countFor;

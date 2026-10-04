@@ -65,24 +65,46 @@ function recordHistory(id) {
 function undoLastNoteChange() {
     const change = historyStack.pop();
     if (!change) return showToast("Nothing to undo", "warning");
+
     const index = window.notes.findIndex(note => note.id === change.id);
-    if (index === -1) return;
-    redoStack.push({ id: change.id, snapshot: structuredClone(window.notes[index]) });
-    window.notes[index] = change.snapshot;
+
+    if (change.action === "create") {
+        if (index !== -1) {
+            redoStack.push({ id: change.id, action: "create", snapshot: structuredClone(window.notes[index]) });
+            window.notes.splice(index, 1);
+        }
+    } else {
+        if (index === -1) return;
+        redoStack.push({ id: change.id, snapshot: structuredClone(window.notes[index]) });
+        window.notes[index] = change.snapshot;
+    }
+
     saveNotes();
     renderNotes();
+    if (typeof window.updateNavigationCounts === "function") window.updateNavigationCounts();
     showToast("Change undone", "update");
 }
 
 function redoLastNoteChange() {
     const change = redoStack.pop();
     if (!change) return showToast("Nothing to redo", "warning");
+
     const index = window.notes.findIndex(note => note.id === change.id);
-    if (index === -1) return;
-    historyStack.push({ id: change.id, snapshot: structuredClone(window.notes[index]) });
-    window.notes[index] = change.snapshot;
+
+    if (change.action === "create") {
+        if (index === -1) {
+            window.notes.unshift(structuredClone(change.snapshot));
+            historyStack.push({ id: change.id, action: "create", snapshot: structuredClone(change.snapshot) });
+        }
+    } else {
+        if (index === -1) return;
+        historyStack.push({ id: change.id, snapshot: structuredClone(window.notes[index]) });
+        window.notes[index] = change.snapshot;
+    }
+
     saveNotes();
     renderNotes();
+    if (typeof window.updateNavigationCounts === "function") window.updateNavigationCounts();
     showToast("Change redone", "update");
 }
 
@@ -223,11 +245,17 @@ function startEditing(card, note) {
     titleInput.style.minHeight = "auto";
     titleInput.style.resize = "none";
 
-    const bodyInput = document.createElement("textarea");
-    bodyInput.className = "edit-note-area";
-    bodyInput.value = note.text || "";
-    bodyInput.placeholder = "Your note...";
-    bodyInput.rows = 5;
+    const bodyInput = document.createElement("div");
+    bodyInput.className = "edit-note-area edit-note-editor";
+    bodyInput.contentEditable = "true";
+    bodyInput.setAttribute("role", "textbox");
+    bodyInput.setAttribute("aria-multiline", "true");
+    bodyInput.innerHTML = typeof window.sanitizeNoteHtml === "function"
+        ? window.sanitizeNoteHtml(note.html || "")
+        : "";
+    if (!bodyInput.innerHTML.trim()) {
+        bodyInput.textContent = note.text || "";
+    }
 
     const actions = document.createElement("div");
     actions.className = "edit-save-row";
@@ -250,7 +278,10 @@ function startEditing(card, note) {
     cancelButton.addEventListener("click", () => renderNotes());
     saveButton.addEventListener("click", () => {
         const title = titleInput.value.trim();
-        const body = bodyInput.value.trim();
+        const body = bodyInput.innerText.replace(/\r/g, "").trim();
+        const html = typeof window.sanitizeNoteHtml === "function"
+            ? window.sanitizeNoteHtml(bodyInput.innerHTML)
+            : body;
 
         if (!title && !body) {
             showToast("Note can't be empty.", "warning");
@@ -272,10 +303,7 @@ function startEditing(card, note) {
             ...previous,
             title,
             text: body,
-            html: body
-                .split("\n")
-                .map(line => line ? "<p>" + line.replace(/[&<>]/g, char => ({ "&":"&amp;","<":"&lt;",">":"&gt;" }[char])) + "</p>" : "<br>")
-                .join(""),
+            html,
             updatedAt
         };
 
@@ -527,6 +555,11 @@ window.renderNotes = renderNotes;
 window.shareNote = shareNote;
 window.updateEmptyState = updateEmptyState;
 window.startNoteEditing = startEditing;
+window.recordNoteCreation = note => {
+    if (!note?.id) return;
+    historyStack.push({ id: note.id, action: "create", snapshot: structuredClone(note) });
+    redoStack.length = 0;
+};
 window.updateNotesCount = updateNotesCount;
 window.undoLastNoteChange = undoLastNoteChange;
 window.redoLastNoteChange = redoLastNoteChange;

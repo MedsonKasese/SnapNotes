@@ -12,19 +12,20 @@ window.notes = notes;
 async function saveNotes() {
     const notesSnapshot = Array.isArray(window.notes) ? [...window.notes] : [];
 
-    // Local storage is updated immediately so the edit survives a refresh
-    // even if the network is unavailable.
+    // Always persist locally first. This makes saves resilient to offline use.
     localStorage.setItem("SnapNotes", JSON.stringify(notesSnapshot));
 
-    // If the user is signed in, wait for Firestore persistence to finish.
-    // The previous implementation started the async sync without awaiting it,
-    // which could make a later cloud load restore the old version of a note.
-    if (typeof window.syncToCloud === "function") {
-        try {
-            await window.syncToCloud();
-        } catch (error) {
-            console.error("Cloud save failed after local save:", error);
-        }
+    const cloudEnabled = Boolean(window.firebaseAuth?.currentUser);
+    if (!cloudEnabled || typeof window.syncToCloud !== "function") {
+        return { synced: false, cloudEnabled };
+    }
+
+    try {
+        const synced = await window.syncToCloud();
+        return { synced: synced === true, cloudEnabled: true };
+    } catch (error) {
+        console.error("Cloud save failed after local save:", error);
+        return { synced: false, cloudEnabled: true };
     }
 }
 
