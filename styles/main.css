@@ -121,18 +121,33 @@ body.dark-mode .category-menu {
     color: #333;
 }
 
-#shareContent {
+#shareTitle {
+    margin: 0 0 10px;
+    font-size: 22px;
+    line-height: 1.35;
+    font-weight: 800;
+    word-break: break-word;
+}
+
+#shareBody {
+    margin-bottom: 20px;
     font-size: 18px;
     line-height: 1.6;
-    margin-bottom: 20px;
     white-space: pre-wrap;
     word-break: break-word;
 }
 
 #shareTimestamp {
-    font-size: 14px;
-    color: #777;
-    border-top: 1px solid #eee;
-    padding-top: 10px;
     margin-bottom: 20px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+    color: #777;
+    font-size: 14px;
+}
+
+#shareBranding {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #555;
 }
