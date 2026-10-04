@@ -73,7 +73,7 @@ googleSignInBtn.addEventListener("click", async () => {
     const provider = new GoogleAuthProvider();
 
     try {
-        googleSignInBtn.disabled = true;
+        setGoogleLoading(true);
 
         // Redirect is more reliable for Android/mobile browsers and installed PWAs.
         // Desktop browsers keep the popup experience.
@@ -86,7 +86,7 @@ googleSignInBtn.addEventListener("click", async () => {
         window.showToast("Signed in with Google", "success");
         closeModal();
     } catch (error) {
-        googleSignInBtn.disabled = false;
+        setGoogleLoading(false);
         handleAuthError(error);
     }
 });
@@ -194,12 +194,12 @@ getRedirectResult(auth)
     .then(result => {
         if (!result?.user) return;
 
-        googleSignInBtn.disabled = false;
+        setGoogleLoading(false);
         window.showToast("Signed in with Google", "success");
         closeModal();
     })
-    .catch(error => {
-        googleSignInBtn.disabled = false;
+.catch(error => {
+        setGoogleLoading(false);
         handleAuthError(error);
     });
 
@@ -236,6 +236,13 @@ onAuthStateChanged(auth, user => {
         clearVerificationState();
     }
 });
+
+function setGoogleLoading(loading) {
+    googleSignInBtn.disabled = loading;
+    googleSignInBtn.innerHTML = loading
+        ? '<i class="fa-solid fa-spinner fa-spin"></i> Completing Google sign-in...'
+        : '<i class="fa-brands fa-google"></i> Continue with Google';
+}
 
 function handleAuthError(error) {
     console.error("Authentication error:", error);
