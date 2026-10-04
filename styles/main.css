@@ -121,12 +121,32 @@ body.dark-mode .category-menu {
     color: #333;
 }
 
-#shareContent {
+#shareTitle {
+    margin-bottom: 12px;
+    font-size: 22px;
+    line-height: 1.35;
+    font-weight: 800;
+    word-break: break-word;
+}
+
+#shareBody {
     font-size: 18px;
     line-height: 1.6;
     margin-bottom: 20px;
     white-space: pre-wrap;
     word-break: break-word;
+}
+
+#shareContent {
+    display: none;
+}
+
+#shareBranding {
+    margin-top: 18px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: #48a111;
 }
 
 #shareTimestamp {

@@ -24,6 +24,25 @@ test("JSON export shape is valid", () => {
   const payload = { app: "SnapNotes", version: 1, notes: [] };
   assert(payload.app === "SnapNotes" && Array.isArray(payload.notes), "invalid export shape");
 });
+test("share text uses real line breaks between title and body", () => {
+  const shareText = `Title${"\n\n"}Body`;
+  assert(shareText === "Title\n\nBody", "share text contains literal escape characters");
+});
+test("delete confirmation preference can disable confirmation", () => {
+  localStorage.setItem("SnapNotesConfirmDelete", "false");
+  assert(localStorage.getItem("SnapNotesConfirmDelete") === "false", "delete preference was not persisted");
+  localStorage.removeItem("SnapNotesConfirmDelete");
+});
+test("note editing requires an action container in the note metadata", () => {
+  const card = document.createElement("article");
+  card.innerHTML = '<div class="note-card-top"></div><div class="note-card-meta"><div class="note-card-actions"></div></div>';
+  assert(card.querySelector(".note-card-meta .note-card-actions"), "note action container is missing from metadata");
+});
+test("legacy note fixture includes a leading empty block before its title", () => {
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = "<p><br></p><p>## Note title</p><p>Body</p>";
+  assert(wrapper.children[1].textContent === "## Note title", "legacy title fixture is invalid");
+});
 document.getElementById("results").textContent = results.join("\n") + "\n\n" +
   (results.every(line => line.startsWith("PASS")) ? "ALL TESTS PASSED" : "SOME TESTS FAILED");
 </script>

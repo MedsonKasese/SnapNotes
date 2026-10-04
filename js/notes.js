@@ -120,7 +120,7 @@ function createNoteElement(note) {
     card.tabIndex = 0;
     card.addEventListener("click", event => {
         if (event.target.closest("button, a, .note-dropdown")) return;
-        window.openNoteDetail?.(note.id);
+        startEditing(card, note);
     });
 
     if (note.pinned) {
@@ -140,9 +140,9 @@ function createNoteElement(note) {
     const body = document.createElement("div");
     body.className = "note-card-body";
     if (note.html && typeof window.sanitizeNoteHtml === "function") {
-        body.innerHTML = window.sanitizeNoteHtml(note.html);
+        body.innerHTML = getNoteBodyHtml(note);
     } else {
-        body.textContent = note.text || "";
+        body.textContent = getNoteBodyText(note);
     }
 
     content.appendChild(title);
@@ -239,7 +239,6 @@ function startEditing(card, note) {
     closeNoteMenus();
 
     const content = card.querySelector(".note-card-content");
-    const top = card.querySelector(".note-card-top");
     const meta = card.querySelector(".note-card-meta");
 
     const titleInput = document.createElement("input");
@@ -255,11 +254,9 @@ function startEditing(card, note) {
     bodyInput.contentEditable = "true";
     bodyInput.setAttribute("role", "textbox");
     bodyInput.setAttribute("aria-multiline", "true");
-    bodyInput.innerHTML = typeof window.sanitizeNoteHtml === "function"
-        ? window.sanitizeNoteHtml(note.html || "")
-        : "";
+    bodyInput.innerHTML = getNoteBodyHtml(note);
     if (!bodyInput.innerHTML.trim()) {
-        bodyInput.textContent = note.text || "";
+        bodyInput.textContent = getNoteBodyText(note);
     }
 
     const actions = document.createElement("div");
@@ -277,7 +274,7 @@ function startEditing(card, note) {
     actions.append(cancelButton, saveButton);
 
     content.replaceChildren(titleInput, bodyInput, actions);
-    top.querySelector(".note-card-actions").hidden = true;
+    meta.querySelector(".note-card-actions").hidden = true;
     meta.hidden = true;
 
     cancelButton.addEventListener("click", () => renderNotes());
@@ -365,7 +362,7 @@ function restoreNote(id) {
 }
 
 function deleteNote(id) {
-    if (!confirm("Move this note to Trash?")) return;
+    if (localStorage.getItem("SnapNotesConfirmDelete") !== "false" && !confirm("Move this note to Trash?")) return;
     const note = window.notes.find(item => item.id === id);
     if (!note) return;
     recordHistory(id);
@@ -379,7 +376,7 @@ function deleteNote(id) {
 }
 
 function permanentlyDeleteNote(id) {
-    if (!confirm("Delete this note permanently? This cannot be undone.")) return;
+    if (localStorage.getItem("SnapNotesConfirmDelete") !== "false" && !confirm("Delete this note permanently? This cannot be undone.")) return;
     const deleted = window.notes.find(note => note.id === id);
     if (deleted) historyStack.push({ id, snapshot: structuredClone(deleted) });
     window.notes = window.notes.filter(note => note.id !== id);
@@ -460,6 +457,73 @@ function updateEmptyState(filteredCount, totalCount, invalidCategory = "") {
     emptyState.style.display = "none";
 }
 
+function getNoteBodyHtml(note) {
+    if (!note?.html) return "";
+
+    return stripMarkdownTitleFromHtml(note.html, note.title);
+}
+
+function stripMarkdownTitleFromHtml(html, title = "") {
+    const sanitized = typeof window.sanitizeNoteHtml === "function"
+        ? window.sanitizeNoteHtml(html)
+        : html || "";
+    const template = document.createElement("div");
+    template.innerHTML = sanitized;
+
+    const normalizedTitle = title.trim();
+    if (!normalizedTitle) return template.innerHTML;
+
+    const headings = [`## ${normalizedTitle}`, `##${normalizedTitle}`]
+        .map(value => value.toLowerCase());
+
+    for (const node of [...template.childNodes]) {
+        const text = (node.textContent || "")
+            .replace(/\u00a0/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+        if (!text) continue;
+
+        const lowerText = text.toLowerCase();
+        const exactHeading = headings.some(heading =>
+            lowerText === heading || lowerText === `${heading} #`
+        );
+
+        if (exactHeading) {
+            node.remove();
+        } else {
+            const headingPrefix = headings.find(heading =>
+                lowerText.startsWith(`${heading} `)
+            );
+            if (headingPrefix) {
+                node.textContent = text.slice(headingPrefix.length).trim();
+            }
+        }
+        break;
+    }
+
+    return template.innerHTML;
+}
+
+window.stripMarkdownTitleFromHtml = stripMarkdownTitleFromHtml;
+
+function getNoteBodyText(note) {
+    const text = typeof note?.text === "string" ? note.text : "";
+    const lines = text.replace(/\r/g, "").split("\n");
+    const firstNonEmptyIndex = lines.findIndex(line => line.trim() !== "");
+    const title = (note?.title || "").trim();
+
+    if (firstNonEmptyIndex === -1 || !title) return text.trim();
+
+    const firstLine = lines[firstNonEmptyIndex].trim();
+    const headingMatch = firstLine.match(/^##\s*(.*?)\s*#*$/);
+
+    if (headingMatch && headingMatch[1].trim() === title) {
+        lines.splice(firstNonEmptyIndex, 1);
+    }
+
+    return lines.join("\n").trim();
+}
+
 function sanitizeNoteHtml(html) {
     const template = document.createElement("div");
     template.innerHTML = html || "";
@@ -507,20 +571,23 @@ function formatDate(dateValue) {
 // =========================
 
 async function shareNote(note) {
+    const bodyText = getNoteBodyText(note);
     const text = note.title
-        ? `## ${note.title}${note.text ? "\n\n" + note.text : ""}`
-        : note.text || "";
+        ? `${note.title}${bodyText ? "\n\n" + bodyText : ""}`
+        : bodyText;
 
     const shareTemplate = document.getElementById("shareTemplate");
-    const shareContent = document.getElementById("shareContent");
     const shareTimestamp = document.getElementById("shareTimestamp");
 
-    if (!shareTemplate || !shareContent || !shareTimestamp || typeof html2canvas === "undefined") {
+    if (!shareTemplate || !shareTimestamp || typeof html2canvas === "undefined") {
         fallbackShare(text);
         return;
     }
 
-    shareContent.textContent = text;
+    const shareTitle = document.getElementById("shareTitle");
+    const shareBody = document.getElementById("shareBody");
+    shareTitle.textContent = note.title || "Untitled note";
+    shareBody.textContent = bodyText;
     shareTimestamp.textContent = note.time || "";
 
     try {
