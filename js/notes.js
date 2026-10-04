@@ -203,7 +203,7 @@ function createNoteElement(note) {
             ? createDropdownItem("Restore note", () => restoreNote(note.id))
             : createDropdownItem("Archive note", () => archiveNote(note.id));
         const deleteButton = createDropdownItem("Move to trash", () => deleteNote(note.id), "delete-action");
-        dropdown.append(shareButton, editButton, archiveButton, deleteButton);
+        dropdown.append(duplicateButton, shareButton, editButton, archiveButton, deleteButton);
     }
 
     menuButton.addEventListener("click", event => {
