@@ -123,13 +123,6 @@ Then write your notes below..."
             </div>
         </section>
 
-        <section id="noteDetailView" class="view note-detail-view" aria-label="Note details" hidden>
-            <div class="view-heading"><div><p class="eyebrow">Note</p><h1 id="detailTitle">Note</h1></div><button id="closeDetailBtn" class="secondary-action" type="button"><i class="fa-solid fa-arrow-left"></i> Back</button></div>
-            <div id="detailMeta" class="note-detail-meta"></div>
-            <div id="detailContent" class="note-detail-content"></div>
-            <div class="note-detail-actions"><button id="detailEditBtn" class="primary-action" type="button">Edit note</button></div>
-        </section>
-
         <section id="notesView" class="view notes-view" aria-label="Saved notes" hidden>
             <div class="view-heading">
                 <div>
@@ -288,9 +281,10 @@ Then write your notes below..."
     </div>
 
     <div id="shareTemplate" aria-hidden="true">
-        <div id="shareContent"></div>
+        <div id="shareTitle"></div>
+        <div id="shareBody"></div>
         <div id="shareTimestamp"></div>
-        <div>Made With SnapNotes</div>
+        <div id="shareBranding">Made With SnapNotes</div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
