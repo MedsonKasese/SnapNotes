@@ -222,10 +222,43 @@ Then write your notes below..."
         <div class="auth-sheet settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
             <div class="modal-heading"><p class="eyebrow">SnapNotes</p><h3 id="settingsTitle">Settings</h3></div>
             <div class="settings-account" id="settingsAccount"></div>
-            <label class="settings-option"><span>Theme</span><select id="settingsTheme"><option value="light">Light</option><option value="dark">Dark</option></select></label>
-            <label class="settings-option"><span>Confirm before deleting</span><input type="checkbox" id="confirmDeleteSetting" checked></label>
-            <button id="signOutSettingsBtn" type="button" class="secondary-auth">Sign Out</button>
-            <button id="closeSettingsBtn" type="button" class="cancel-button">Close</button>
+            <div class="settings-intro">
+                <strong>Settings</strong>
+                <span>Customise your SnapNotes experience</span>
+            </div>
+            <section class="settings-section" aria-labelledby="appearanceTitle">
+                <p class="settings-section-title" id="appearanceTitle">Appearance</p>
+                <div class="settings-option settings-theme-option">
+                    <div class="settings-option-copy">
+                        <span id="themeStatusLabel">Light mode</span>
+                        <small id="themeStatusText">Dark mode is disabled</small>
+                    </div>
+                    <button id="settingsThemeToggle" class="theme-toggle" type="button" role="switch" aria-checked="false" aria-label="Toggle dark mode">
+                        <span class="theme-toggle-knob"></span>
+                    </button>
+                    <select id="settingsTheme" aria-hidden="true" tabindex="-1">
+                        <option value="light">Light</option>
+                        <option value="dark">Dark</option>
+                    </select>
+                </div>
+            </section>
+            <section class="settings-section" aria-labelledby="notesSettingsTitle">
+                <p class="settings-section-title" id="notesSettingsTitle">Notes</p>
+                <label class="settings-option">
+                    <span><i class="fa-solid fa-trash-can"></i> Confirm before deleting</span>
+                    <input type="checkbox" id="confirmDeleteSetting" checked>
+                </label>
+            </section>
+            <section class="settings-section settings-info-section" aria-labelledby="aboutTitle">
+                <p class="settings-section-title" id="aboutTitle">About</p>
+                <p>SnapNotes is a simple note-taking app for capturing, organising, and finding your notes quickly, with support for categories, search, pinning, and offline use.</p>
+                <button id="privacyPolicyBtn" class="settings-link-button" type="button"><i class="fa-solid fa-shield-halved"></i> Privacy Policy</button>
+                <button id="feedbackBtn" class="settings-link-button" type="button"><i class="fa-regular fa-message"></i> Send Feedback</button>
+            </section>
+            <div class="settings-actions">
+                <button id="signOutSettingsBtn" type="button" class="secondary-auth"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
+                <button id="closeSettingsBtn" type="button" class="cancel-button">Close</button>
+            </div>
         </div>
     </div>
 
