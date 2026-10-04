@@ -50,7 +50,7 @@ function renderNotes(filterText = "", filterCategory = "all", view = window.getA
     });
 
     updateEmptyState(filteredNotes.length, notes.length);
-    updateNotesCount();
+    updateNotesCount(filteredNotes.length);
 }
 
 const historyStack = [];
@@ -370,8 +370,10 @@ function togglePin(id) {
     showToast(note.pinned ? "Note pinned" : "Note unpinned", note.pinned ? "update" : "warning");
 }
 
-function updateNotesCount() {
-    const count = Array.isArray(window.notes) ? window.notes.length : 0;
+function updateNotesCount(visibleCount = null) {
+    const count = visibleCount === null
+        ? (Array.isArray(window.notes) ? window.notes.length : 0)
+        : visibleCount;
     const countEl = document.getElementById("notesCount");
 
     if (countEl) {
