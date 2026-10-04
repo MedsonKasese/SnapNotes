@@ -164,8 +164,6 @@ function createNoteElement(note) {
     const dropdown = document.createElement("div");
     dropdown.className = "note-dropdown";
 
-    const shareButton = createDropdownItem("Share note", () => shareNote(note));
-    const editButton = createDropdownItem("Edit note", () => startEditing(card, note));
     const noteView = viewForNote(note);
     if (noteView === "trash") {
         dropdown.append(
@@ -173,6 +171,8 @@ function createNoteElement(note) {
             createDropdownItem("Delete forever", () => permanentlyDeleteNote(note.id), "delete-action")
         );
     } else {
+        const shareButton = createDropdownItem("Share note", () => shareNote(note));
+        const editButton = createDropdownItem("Edit note", () => startEditing(card, note));
         const archiveButton = noteView === "archive"
             ? createDropdownItem("Restore note", () => restoreNote(note.id))
             : createDropdownItem("Archive note", () => archiveNote(note.id));
@@ -223,11 +223,16 @@ function startEditing(card, note) {
     titleInput.style.minHeight = "auto";
     titleInput.style.resize = "none";
 
-    const bodyInput = document.createElement("textarea");
-    bodyInput.className = "edit-note-area";
-    bodyInput.value = note.text || "";
-    bodyInput.placeholder = "Your note...";
-    bodyInput.rows = 5;
+    const bodyInput = document.createElement("div");
+    bodyInput.className = "edit-note-area edit-note-rich";
+    bodyInput.contentEditable = "true";
+    bodyInput.setAttribute("role", "textbox");
+    bodyInput.setAttribute("aria-multiline", "true");
+    bodyInput.innerHTML = sanitizeNoteHtml(note.html || "");
+    if (!bodyInput.innerHTML.trim()) {
+        bodyInput.textContent = note.text || "";
+    }
+    bodyInput.dataset.placeholder = "Your note...";
 
     const actions = document.createElement("div");
     actions.className = "edit-save-row";
@@ -250,7 +255,8 @@ function startEditing(card, note) {
     cancelButton.addEventListener("click", () => renderNotes());
     saveButton.addEventListener("click", () => {
         const title = titleInput.value.trim();
-        const body = bodyInput.value.trim();
+        const body = bodyInput.innerText.replace(/\r/g, "").trim();
+        const html = sanitizeNoteHtml(bodyInput.innerHTML);
 
         if (!title && !body) {
             showToast("Note can't be empty.", "warning");
@@ -272,10 +278,7 @@ function startEditing(card, note) {
             ...previous,
             title,
             text: body,
-            html: body
-                .split("\n")
-                .map(line => line ? "<p>" + line.replace(/[&<>]/g, char => ({ "&":"&amp;","<":"&lt;",">":"&gt;" }[char])) + "</p>" : "<br>")
-                .join(""),
+            html: html || "",
             updatedAt
         };
 
