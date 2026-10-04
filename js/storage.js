@@ -21,12 +21,14 @@ async function saveNotes() {
     // which could make a later cloud load restore the old version of a note.
     if (typeof window.syncToCloud === "function") {
         try {
-            await window.syncToCloud();
+            return await window.syncToCloud();
         } catch (error) {
             console.error("Cloud save failed after local save:", error);
+            return false;
         }
     }
-}
+
+    return false;
 
 // =========================
 // LOAD NOTES FROM LOCALSTORAGE
