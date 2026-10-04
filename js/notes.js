@@ -142,7 +142,7 @@ function createNoteElement(note) {
     if (note.html && typeof window.sanitizeNoteHtml === "function") {
         body.innerHTML = getNoteBodyHtml(note);
     } else {
-        body.textContent = note.text || "";
+        body.textContent = getNoteBodyText(note);
     }
 
     content.appendChild(title);
@@ -257,7 +257,7 @@ function startEditing(card, note) {
     bodyInput.setAttribute("aria-multiline", "true");
     bodyInput.innerHTML = getNoteBodyHtml(note);
     if (!bodyInput.innerHTML.trim()) {
-        bodyInput.textContent = note.text || "";
+        bodyInput.textContent = getNoteBodyText(note);
     }
 
     const actions = document.createElement("div");
@@ -482,6 +482,24 @@ function getNoteBodyHtml(note) {
     return template.innerHTML;
 }
 
+function getNoteBodyText(note) {
+    const text = typeof note?.text === "string" ? note.text : "";
+    const lines = text.replace(/\r/g, "").split("\n");
+    const firstNonEmptyIndex = lines.findIndex(line => line.trim() !== "");
+    const title = (note?.title || "").trim();
+
+    if (firstNonEmptyIndex === -1 || !title) return text.trim();
+
+    const firstLine = lines[firstNonEmptyIndex].trim();
+    const headingMatch = firstLine.match(/^##\s*(.*?)\s*#*$/);
+
+    if (headingMatch && headingMatch[1].trim() === title) {
+        lines.splice(firstNonEmptyIndex, 1);
+    }
+
+    return lines.join("\n").trim();
+}
+
 function sanitizeNoteHtml(html) {
     const template = document.createElement("div");
     template.innerHTML = html || "";
@@ -529,9 +547,10 @@ function formatDate(dateValue) {
 // =========================
 
 async function shareNote(note) {
+    const bodyText = getNoteBodyText(note);
     const text = note.title
-        ? `${note.title}${note.text ? "\n\n" + note.text : ""}`
-        : note.text || "";
+        ? `${note.title}${bodyText ? "\\n\\n" + bodyText : ""}`
+        : bodyText;
 
     const shareTemplate = document.getElementById("shareTemplate");
     const shareTimestamp = document.getElementById("shareTimestamp");
@@ -544,7 +563,7 @@ async function shareNote(note) {
     const shareTitle = document.getElementById("shareTitle");
     const shareBody = document.getElementById("shareBody");
     shareTitle.textContent = note.title || "Untitled note";
-    shareBody.textContent = note.text || "";
+    shareBody.textContent = bodyText;
     shareTimestamp.textContent = note.time || "";
 
     try {
