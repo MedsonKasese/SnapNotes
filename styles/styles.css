@@ -519,6 +519,10 @@
     text-align: center;
 }
 
+.settings-link-button + .settings-link-button {
+    margin-top: 6px;
+}
+
 .settings-link-button:hover {
     color: var(--primary-color);
 }
