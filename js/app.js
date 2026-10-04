@@ -625,10 +625,25 @@ function updateEditorTimestamp() {
 function updateNavigationCounts() {
     const notes = Array.isArray(window.notes) ? window.notes : [];
     const activeNotes = notes.filter(note => !note.deletedAt);
-    const currentCount = activeNotes.filter(note => !note.archived).length;
 
-    document.getElementById("notesCount").textContent =
-        `${currentCount} ${currentCount === 1 ? "note" : "notes"}`;
+    let currentNotes;
+    if (activeView === "trash") {
+        currentNotes = notes.filter(note => note.deletedAt);
+    } else if (activeView === "archive") {
+        currentNotes = activeNotes.filter(note => note.archived);
+    } else {
+        currentNotes = activeNotes.filter(note => !note.archived);
+        if (activeCategory !== "all") {
+            currentNotes = currentNotes.filter(note => note.category === activeCategory);
+        }
+    }
+
+    const currentCount = currentNotes.length;
+    const countEl = document.getElementById("notesCount");
+    if (countEl) {
+        countEl.textContent =
+            `${currentCount} ${currentCount === 1 ? "note" : "notes"}`;
+    }
 
     document.querySelectorAll("[data-count-for]").forEach(element => {
         const key = element.dataset.countFor;
