@@ -780,7 +780,6 @@ function closeNoteMenus() {
 
 window.openNewNoteView = openNewNoteView;
 window.openNotesView = openNotesView;
-window.openNoteDetail = openNoteDetail;
 window.applyNoteFilters = applyNoteFilters;
 window.updateNavigationCounts = updateNavigationCounts;
 window.closeNoteMenus = closeNoteMenus;
