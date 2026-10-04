@@ -85,6 +85,7 @@ googleSignInBtn.addEventListener("click", async () => {
         }
 
         await signInWithPopup(auth, provider);
+        resetGoogleButton();
         window.showToast("Signed in with Google", "success");
         closeModal();
     } catch (error) {
@@ -201,7 +202,7 @@ getRedirectResult(auth)
         closeModal();
     })
     .catch(error => {
-        googleSignInBtn.disabled = false;
+        resetGoogleButton();
         handleAuthError(error);
     });
 
