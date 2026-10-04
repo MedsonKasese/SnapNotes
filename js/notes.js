@@ -190,6 +190,7 @@ function createNoteElement(note) {
     const dropdown = document.createElement("div");
     dropdown.className = "note-dropdown";
 
+    const duplicateButton = createDropdownItem("Duplicate note", () => duplicateNote(note.id));
     const shareButton = createDropdownItem("Share note", () => shareNote(note));
     const editButton = createDropdownItem("Edit note", () => startEditing(card, note));
     const noteView = viewForNote(note);
@@ -397,6 +398,32 @@ function togglePin(id) {
     saveNotes();
     renderNotes();
     showToast(note.pinned ? "Note pinned" : "Note unpinned", note.pinned ? "update" : "warning");
+}
+
+function duplicateNote(id) {
+    const source = window.notes.find(item => item.id === id);
+    if (!source) return;
+
+    const now = new Date().toISOString();
+    const duplicate = {
+        ...structuredClone(source),
+        id: crypto.randomUUID(),
+        title: source.title ? `Copy of ${source.title}` : "Copy of Untitled note",
+        createdAt: now,
+        updatedAt: now,
+        time: new Date(now).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        pinned: false,
+        archived: false,
+        deletedAt: null
+    };
+
+    window.notes.unshift(duplicate);
+    window.recordNoteCreation?.(duplicate);
+    saveNotes().then(() => {
+        renderNotes();
+        if (typeof window.updateNavigationCounts === "function") window.updateNavigationCounts();
+        showToast("Note duplicated", "success");
+    });
 }
 
 function updateNotesCount() {
