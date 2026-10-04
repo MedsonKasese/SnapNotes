@@ -566,3 +566,17 @@
         gap: 10px;
     }
 }
+
+/* Keep settings info actions readable in every interaction state. */
+.settings-sheet .settings-link-button,
+.settings-sheet .settings-link-button:focus,
+.settings-sheet .settings-link-button:focus-visible,
+.settings-sheet .settings-link-button:active {
+    color: var(--text-color);
+    background: transparent;
+}
+
+.settings-sheet .settings-link-button:hover {
+    color: var(--primary-color);
+    background: var(--surface-soft);
+}
