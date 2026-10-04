@@ -669,9 +669,37 @@ function openSettings() {
     if (!settingsModal) return;
 
     if (settingsAccount) {
-        settingsAccount.textContent = user
-            ? (user.displayName || user.email || "Signed in")
-            : "Using SnapNotes locally";
+        if (user) {
+            const initials = user.displayName
+                ? user.displayName.trim().split(/\\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase()
+                : user.email
+                    ? user.email.substring(0, 2).toUpperCase()
+                    : "U";
+            const provider = user.providerData?.some(item => item.providerId === "google.com")
+                ? "Google account"
+                : "Email account";
+
+            settingsAccount.innerHTML = `
+                <div class="settings-account-avatar">
+                    ${user.photoURL
+                        ? `<img src="${user.photoURL}" alt="" referrerpolicy="no-referrer">`
+                        : `<span>${initials}</span>`}
+                </div>
+                <div class="settings-account-details">
+                    <strong>${user.displayName || "SnapNotes user"}</strong>
+                    <span>${user.email || provider}</span>
+                    <small>${provider}</small>
+                </div>
+            `;
+        } else {
+            settingsAccount.innerHTML = `
+                <div class="settings-account-avatar"><span><i class="fa-solid fa-user"></i></span></div>
+                <div class="settings-account-details">
+                    <strong>Local mode</strong>
+                    <span>Your notes are stored on this device</span>
+                </div>
+            `;
+        }
     }
 
     if (settingsTheme) {

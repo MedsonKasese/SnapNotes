@@ -21,6 +21,8 @@ const resendVerificationBtn = document.getElementById("resendVerificationBtn");
 const verificationStatus = document.getElementById("verificationStatus");
 const loginBtn = document.getElementById("loginBtn");
 const userAvatar = document.getElementById("userAvatar");
+const userAvatarImage = document.getElementById("userAvatarImage");
+const userAvatarInitials = document.getElementById("userAvatarInitials");
 const authModal = document.getElementById("authModal");
 const closeModalBtn = document.getElementById("closeModalBtn");
 
@@ -202,12 +204,24 @@ onAuthStateChanged(auth, user => {
 
     if (user) {
         const initials = user.displayName
-            ? user.displayName.slice(0, 2).toUpperCase()
+            ? user.displayName.trim().split(/\\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase()
             : user.email
                 ? user.email.substring(0, 2).toUpperCase()
                 : "U";
 
-        userAvatar.textContent = initials;
+        if (userAvatarInitials) {
+            userAvatarInitials.textContent = initials;
+            userAvatarInitials.hidden = Boolean(user.photoURL);
+        }
+
+        if (userAvatarImage) {
+            userAvatarImage.hidden = !user.photoURL;
+            userAvatarImage.src = user.photoURL || "";
+            userAvatarImage.alt = user.displayName
+                ? `${user.displayName} profile picture`
+                : "Profile picture";
+        }
+
         userAvatar.title = `Signed in as ${user.displayName || user.email || "user"}`;
         userAvatar.hidden = false;
         loginBtn.hidden = true;
@@ -225,6 +239,11 @@ onAuthStateChanged(auth, user => {
         loadFromCloud(user.uid);
     } else {
         userAvatar.hidden = true;
+        if (userAvatarImage) {
+            userAvatarImage.hidden = true;
+            userAvatarImage.removeAttribute("src");
+        }
+        if (userAvatarInitials) userAvatarInitials.hidden = false;
         loginBtn.hidden = false;
         loginBtn.querySelector("span").textContent = "Sign In";
         clearVerificationState();
