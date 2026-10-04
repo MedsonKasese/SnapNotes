@@ -35,6 +35,9 @@ function setupEventListeners() {
     const closeSettingsBtn = document.getElementById("closeSettingsBtn");
     const signOutSettingsBtn = document.getElementById("signOutSettingsBtn");
     const settingsTheme = document.getElementById("settingsTheme");
+    const settingsThemeToggle = document.getElementById("settingsThemeToggle");
+    const privacyPolicyBtn = document.getElementById("privacyPolicyBtn");
+    const feedbackBtn = document.getElementById("feedbackBtn");
     const confirmDeleteSetting = document.getElementById("confirmDeleteSetting");
     const settingsAccount = document.getElementById("settingsAccount");
     document.getElementById("closeDetailBtn").addEventListener("click", closeNoteDetail);
@@ -79,10 +82,31 @@ function setupEventListeners() {
     settingsBtn.addEventListener("click", openSettings);
     closeSettingsBtn.addEventListener("click", closeSettings);
     signOutSettingsBtn.addEventListener("click", () => document.getElementById("userAvatar").click());
-    settingsTheme.addEventListener("change", () => {
-        applyTheme(settingsTheme.value);
-        localStorage.setItem("theme", settingsTheme.value);
+    function syncThemeControl() {
+        const isDark = document.body.classList.contains("dark-mode");
+        settingsTheme.value = isDark ? "dark" : "light";
+        settingsThemeToggle.setAttribute("aria-checked", String(isDark));
+        settingsThemeToggle.classList.toggle("active", isDark);
+        document.getElementById("themeStatusLabel").textContent = isDark ? "Dark mode" : "Light mode";
+        document.getElementById("themeStatusText").textContent = isDark
+            ? "Dark mode is enabled"
+            : "Dark mode is disabled";
+    }
+
+    settingsThemeToggle.addEventListener("click", () => {
+        const nextTheme = document.body.classList.contains("dark-mode") ? "light" : "dark";
+        applyTheme(nextTheme);
+        localStorage.setItem("theme", nextTheme);
+        syncThemeControl();
     });
+    privacyPolicyBtn.addEventListener("click", () => {
+        alert("SnapNotes stores your notes locally on your device and, when you sign in, syncs your notes with Firebase so you can access them across supported devices. Your account information is handled by Firebase Authentication. We do not sell your personal information. A dedicated privacy policy will be added later with full details.");
+    });
+
+    feedbackBtn.addEventListener("click", () => {
+        window.location.href = "mailto:medsonkasese@yahoo.com?subject=SnapNotes%20Feedback";
+    });
+
     confirmDeleteSetting.addEventListener("change", () => {
         localStorage.setItem("SnapNotesConfirmDelete", String(confirmDeleteSetting.checked));
     });
@@ -703,7 +727,14 @@ function openSettings() {
     }
 
     if (settingsTheme) {
-        settingsTheme.value = localStorage.getItem("theme") === "dark" ? "dark" : "light";
+        const isDark = localStorage.getItem("theme") === "dark";
+        settingsTheme.value = isDark ? "dark" : "light";
+        settingsThemeToggle.setAttribute("aria-checked", String(isDark));
+        settingsThemeToggle.classList.toggle("active", isDark);
+        document.getElementById("themeStatusLabel").textContent = isDark ? "Dark mode" : "Light mode";
+        document.getElementById("themeStatusText").textContent = isDark
+            ? "Dark mode is enabled"
+            : "Dark mode is disabled";
     }
 
     if (confirmDeleteSetting) {
