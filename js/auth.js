@@ -204,7 +204,7 @@ getRedirectResult(auth)
     });
 
 onAuthStateChanged(auth, user => {
-    googleSignInBtn.disabled = false;
+    setGoogleLoading(false);
 
     if (user) {
         const initials = user.displayName
