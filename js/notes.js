@@ -223,11 +223,17 @@ function startEditing(card, note) {
     titleInput.style.minHeight = "auto";
     titleInput.style.resize = "none";
 
-    const bodyInput = document.createElement("textarea");
-    bodyInput.className = "edit-note-area";
-    bodyInput.value = note.text || "";
-    bodyInput.placeholder = "Your note...";
-    bodyInput.rows = 5;
+    const bodyInput = document.createElement("div");
+    bodyInput.className = "edit-note-area edit-note-editor";
+    bodyInput.contentEditable = "true";
+    bodyInput.setAttribute("role", "textbox");
+    bodyInput.setAttribute("aria-multiline", "true");
+    bodyInput.innerHTML = typeof window.sanitizeNoteHtml === "function"
+        ? window.sanitizeNoteHtml(note.html || "")
+        : "";
+    if (!bodyInput.innerHTML.trim()) {
+        bodyInput.textContent = note.text || "";
+    }
 
     const actions = document.createElement("div");
     actions.className = "edit-save-row";
@@ -250,7 +256,10 @@ function startEditing(card, note) {
     cancelButton.addEventListener("click", () => renderNotes());
     saveButton.addEventListener("click", () => {
         const title = titleInput.value.trim();
-        const body = bodyInput.value.trim();
+        const body = bodyInput.innerText.replace(/\r/g, "").trim();
+        const html = typeof window.sanitizeNoteHtml === "function"
+            ? window.sanitizeNoteHtml(bodyInput.innerHTML)
+            : body;
 
         if (!title && !body) {
             showToast("Note can't be empty.", "warning");
@@ -272,10 +281,7 @@ function startEditing(card, note) {
             ...previous,
             title,
             text: body,
-            html: body
-                .split("\n")
-                .map(line => line ? "<p>" + line.replace(/[&<>]/g, char => ({ "&":"&amp;","<":"&lt;",">":"&gt;" }[char])) + "</p>" : "<br>")
-                .join(""),
+            html,
             updatedAt
         };
 
