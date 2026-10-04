@@ -239,7 +239,6 @@ function startEditing(card, note) {
     closeNoteMenus();
 
     const content = card.querySelector(".note-card-content");
-    const top = card.querySelector(".note-card-top");
     const meta = card.querySelector(".note-card-meta");
 
     const titleInput = document.createElement("input");
@@ -275,7 +274,7 @@ function startEditing(card, note) {
     actions.append(cancelButton, saveButton);
 
     content.replaceChildren(titleInput, bodyInput, actions);
-    top.querySelector(".note-card-actions").hidden = true;
+    meta.querySelector(".note-card-actions").hidden = true;
     meta.hidden = true;
 
     cancelButton.addEventListener("click", () => renderNotes());

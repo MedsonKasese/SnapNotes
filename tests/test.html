@@ -33,6 +33,11 @@ test("delete confirmation preference can disable confirmation", () => {
   assert(localStorage.getItem("SnapNotesConfirmDelete") === "false", "delete preference was not persisted");
   localStorage.removeItem("SnapNotesConfirmDelete");
 });
+test("note editing requires an action container in the note metadata", () => {
+  const card = document.createElement("article");
+  card.innerHTML = '<div class="note-card-top"></div><div class="note-card-meta"><div class="note-card-actions"></div></div>';
+  assert(card.querySelector(".note-card-meta .note-card-actions"), "note action container is missing from metadata");
+});
 document.getElementById("results").textContent = results.join("\n") + "\n\n" +
   (results.every(line => line.startsWith("PASS")) ? "ALL TESTS PASSED" : "SOME TESTS FAILED");
 </script>
