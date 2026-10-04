@@ -34,7 +34,8 @@ function setupEventListeners() {
     const settingsModal = document.getElementById("settingsModal");
     const closeSettingsBtn = document.getElementById("closeSettingsBtn");
     const signOutSettingsBtn = document.getElementById("signOutSettingsBtn");
-    const settingsTheme = document.getElementById("settingsTheme");
+    const settingsThemeToggle = document.getElementById("settingsThemeToggle");
+    const themeStatus = document.getElementById("themeStatus");
     const confirmDeleteSetting = document.getElementById("confirmDeleteSetting");
     const settingsAccount = document.getElementById("settingsAccount");
     document.getElementById("closeDetailBtn").addEventListener("click", closeNoteDetail);
@@ -702,9 +703,7 @@ function openSettings() {
         }
     }
 
-    if (settingsTheme) {
-        settingsTheme.value = localStorage.getItem("theme") === "dark" ? "dark" : "light";
-    }
+    updateSettingsThemeToggle();
 
     if (confirmDeleteSetting) {
         confirmDeleteSetting.checked =
@@ -713,6 +712,27 @@ function openSettings() {
 
     settingsModal.classList.add("show");
     settingsModal.setAttribute("aria-hidden", "false");
+}
+
+function updateSettingsThemeToggle() {
+    const toggle = document.getElementById("settingsThemeToggle");
+    const status = document.getElementById("themeStatus");
+    if (!toggle) return;
+
+    const dark = document.body.classList.contains("dark-mode");
+    toggle.setAttribute("aria-checked", String(dark));
+    toggle.classList.toggle("active", dark);
+
+    if (status) {
+        status.textContent = dark ? "Dark mode enabled" : "Dark mode disabled";
+    }
+}
+
+function toggleSettingsTheme() {
+    const nextTheme = document.body.classList.contains("dark-mode") ? "light" : "dark";
+    localStorage.setItem("theme", nextTheme);
+    applyTheme(nextTheme);
+    updateSettingsThemeToggle();
 }
 
 function closeSettings() {
@@ -726,6 +746,7 @@ function closeSettings() {
 function applyTheme(theme) {
     document.body.classList.toggle("dark-mode", theme === "dark");
     updateThemeIcon();
+    updateSettingsThemeToggle();
 }
 
 function setupTheme() {
@@ -738,6 +759,24 @@ function setupTheme() {
 function updateThemeIcon() {
     return;
 }
+
+const settingsThemeToggle = document.getElementById("settingsThemeToggle");
+const aboutSnapNotesBtn = document.getElementById("aboutSnapNotesBtn");
+const privacyPolicyBtn = document.getElementById("privacyPolicyBtn");
+
+settingsThemeToggle?.addEventListener("click", toggleSettingsTheme);
+
+aboutSnapNotesBtn?.addEventListener("click", () => {
+    alert(
+        "SnapNotes is a simple note-taking app designed to help you capture, organise, and access your notes with ease. Your notes can be used locally and synced to your account when you sign in."
+    );
+});
+
+privacyPolicyBtn?.addEventListener("click", () => {
+    alert(
+        "Privacy Policy: SnapNotes stores your local notes on your device and, when you sign in, can sync your notes with Firebase so they are available across your devices. Authentication information is handled by Firebase. A dedicated privacy policy with full details will be added later."
+    );
+});
 
 function closeNoteMenus() {
     document.querySelectorAll(".note-dropdown.show").forEach(menu => {
