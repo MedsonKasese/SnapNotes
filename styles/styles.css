@@ -277,6 +277,40 @@
 
 .settings-sheet {
     gap: 14px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    scroll-padding-bottom: 20px;
+}
+
+.settings-heading {
+    display: grid;
+    gap: 3px;
+}
+
+.settings-heading p:last-child {
+    margin: 0;
+    color: var(--muted-color);
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+.settings-account {
+    margin-bottom: 0;
+}
+
+.settings-section {
+    margin: 0;
+}
+
+.settings-section + .settings-section {
+    margin-top: 0;
+}
+
+.settings-actions {
+    padding-top: 2px;
+    padding-bottom: 2px;
 }
 
 .settings-account {
