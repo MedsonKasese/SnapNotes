@@ -120,7 +120,7 @@ function createNoteElement(note) {
     card.tabIndex = 0;
     card.addEventListener("click", event => {
         if (event.target.closest("button, a, .note-dropdown")) return;
-        window.openNoteDetail?.(note.id);
+        startEditing(card, note);
     });
 
     if (note.pinned) {
@@ -235,6 +235,28 @@ function createDropdownItem(text, action, className = "") {
     return button;
 }
 
+function stripLeadingTitleFromHtml(html, title) {
+    const template = document.createElement("div");
+    template.innerHTML = html || "";
+
+    const expectedTitle = `## ${String(title || "").trim()}`.trim();
+    if (!expectedTitle) return template.innerHTML;
+
+    const walker = document.createTreeWalker(template, NodeFilter.SHOW_TEXT);
+    const firstText = walker.nextNode();
+
+    if (!firstText || !firstText.textContent.trim().startsWith(expectedTitle)) {
+        return template.innerHTML;
+    }
+
+    firstText.textContent = firstText.textContent.replace(expectedTitle, "").replace(/^\s*\n/, "");
+    if (!firstText.textContent.trim() && firstText.parentElement) {
+        firstText.parentElement.remove();
+    }
+
+    return template.innerHTML;
+}
+
 function startEditing(card, note) {
     closeNoteMenus();
 
@@ -256,7 +278,7 @@ function startEditing(card, note) {
     bodyInput.setAttribute("role", "textbox");
     bodyInput.setAttribute("aria-multiline", "true");
     bodyInput.innerHTML = typeof window.sanitizeNoteHtml === "function"
-        ? window.sanitizeNoteHtml(note.html || "")
+        ? stripLeadingTitleFromHtml(note.html || "", note.title || "")
         : "";
     if (!bodyInput.innerHTML.trim()) {
         bodyInput.textContent = note.text || "";
@@ -512,15 +534,17 @@ async function shareNote(note) {
         : note.text || "";
 
     const shareTemplate = document.getElementById("shareTemplate");
-    const shareContent = document.getElementById("shareContent");
+    const shareTitle = document.getElementById("shareTitle");
+    const shareBody = document.getElementById("shareBody");
     const shareTimestamp = document.getElementById("shareTimestamp");
 
-    if (!shareTemplate || !shareContent || !shareTimestamp || typeof html2canvas === "undefined") {
+    if (!shareTemplate || !shareTitle || !shareBody || !shareTimestamp || typeof html2canvas === "undefined") {
         fallbackShare(text);
         return;
     }
 
-    shareContent.textContent = text;
+    shareTitle.textContent = note.title || "";
+    shareBody.textContent = note.text || "";
     shareTimestamp.textContent = note.time || "";
 
     try {
