@@ -120,7 +120,7 @@ function createNoteElement(note) {
     card.tabIndex = 0;
     card.addEventListener("click", event => {
         if (event.target.closest("button, a, .note-dropdown")) return;
-        window.openNoteDetail?.(note.id);
+        startEditing(card, note);
     });
 
     if (note.pinned) {
@@ -255,9 +255,7 @@ function startEditing(card, note) {
     bodyInput.contentEditable = "true";
     bodyInput.setAttribute("role", "textbox");
     bodyInput.setAttribute("aria-multiline", "true");
-    bodyInput.innerHTML = typeof window.sanitizeNoteHtml === "function"
-        ? window.sanitizeNoteHtml(note.html || "")
-        : "";
+    bodyInput.innerHTML = getNoteBodyHtml(note);
     if (!bodyInput.innerHTML.trim()) {
         bodyInput.textContent = note.text || "";
     }
@@ -460,6 +458,30 @@ function updateEmptyState(filteredCount, totalCount, invalidCategory = "") {
     emptyState.style.display = "none";
 }
 
+function getNoteBodyHtml(note) {
+    if (!note?.html) return "";
+
+    const sanitized = typeof window.sanitizeNoteHtml === "function"
+        ? window.sanitizeNoteHtml(note.html)
+        : note.html;
+
+    const template = document.createElement("div");
+    template.innerHTML = sanitized;
+
+    const firstBlock = template.firstElementChild;
+    if (firstBlock) {
+        const firstText = firstBlock.textContent.trim();
+        const title = (note.title || "").trim();
+        if (firstText === `## ${title}` || firstText === `##${title}`) {
+            firstBlock.remove();
+        }
+    } else if (template.textContent.trim() === `## ${(note.title || "").trim()}`) {
+        template.textContent = "";
+    }
+
+    return template.innerHTML;
+}
+
 function sanitizeNoteHtml(html) {
     const template = document.createElement("div");
     template.innerHTML = html || "";
@@ -508,7 +530,7 @@ function formatDate(dateValue) {
 
 async function shareNote(note) {
     const text = note.title
-        ? `## ${note.title}${note.text ? "\n\n" + note.text : ""}`
+        ? `${note.title}${note.text ? "\n\n" + note.text : ""}`
         : note.text || "";
 
     const shareTemplate = document.getElementById("shareTemplate");
@@ -520,7 +542,11 @@ async function shareNote(note) {
         return;
     }
 
-    shareContent.textContent = text;
+    const shareTitle = document.getElementById("shareTitle");
+    const shareBody = document.getElementById("shareBody");
+    shareTitle.textContent = note.title || "Untitled note";
+    shareBody.textContent = note.text || "";
+    shareContent.textContent = "";
     shareTimestamp.textContent = note.time || "";
 
     try {
