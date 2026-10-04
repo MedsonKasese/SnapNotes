@@ -402,3 +402,119 @@
     font-size: 10px;
     font-weight: 800;
 }
+
+/* Settings experience v14 */
+.settings-section-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.settings-section-heading h4 {
+    margin: 0;
+    font-size: 13px;
+}
+
+.settings-section-heading p {
+    margin: 3px 0 0;
+    color: var(--muted-color);
+    font-size: 11px;
+}
+
+.settings-toggle-row {
+    align-items: center;
+}
+
+.settings-toggle-row > div {
+    display: grid;
+    gap: 3px;
+}
+
+.settings-toggle-row > div > span {
+    color: var(--text-color);
+    font-weight: 700;
+}
+
+.settings-toggle-row small {
+    color: var(--muted-color);
+    font-size: 11px;
+}
+
+.settings-toggle {
+    width: 48px;
+    height: 28px;
+    flex: 0 0 auto;
+    position: relative;
+    padding: 3px;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background: var(--surface-soft);
+    cursor: pointer;
+    transition: background .2s ease, border-color .2s ease;
+}
+
+.settings-toggle.active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.settings-toggle-knob {
+    display: block;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--surface-color);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .18);
+    transform: translateX(0);
+    transition: transform .2s ease;
+}
+
+.settings-toggle.active .settings-toggle-knob {
+    transform: translateX(20px);
+}
+
+.settings-link-button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 0;
+    border: 0;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-color);
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.settings-link-button:last-child {
+    border-bottom: 0;
+}
+
+.settings-link-button span {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.settings-link-button span i {
+    width: 16px;
+    color: var(--primary-color);
+    text-align: center;
+}
+
+.settings-link-button > i {
+    color: var(--muted-color);
+    font-size: 11px;
+}
+
+.settings-toggle:focus-visible,
+.settings-link-button:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
