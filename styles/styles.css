@@ -257,3 +257,95 @@
 .edit-note-editor div {
     margin: 0 0 5px;
 }
+
+
+/* Account avatar + settings polish */
+.avatar-button {
+    position: relative;
+    overflow: hidden;
+    padding: 0;
+    border: 2px solid var(--surface-color);
+}
+
+.avatar-button img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.settings-sheet {
+    gap: 14px;
+}
+
+.settings-account {
+    display: flex;
+    align-items: center;
+    min-height: 58px;
+    margin-bottom: 2px;
+    padding: 12px 14px;
+    color: var(--text-color);
+    background: var(--surface-soft);
+    border: 1px solid var(--border-color);
+    font-weight: 700;
+}
+
+.settings-section {
+    padding: 12px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 13px;
+    background: var(--surface-color);
+}
+
+.settings-section-title {
+    margin: 0 0 8px;
+    color: var(--muted-color);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.settings-option {
+    padding: 8px 0;
+}
+
+.settings-option span {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+}
+
+.settings-option span i {
+    width: 16px;
+    color: var(--primary-color);
+    text-align: center;
+}
+
+.settings-option select {
+    min-width: 105px;
+}
+
+.settings-actions {
+    display: grid;
+    gap: 8px;
+    margin-top: 2px;
+}
+
+.settings-actions .cancel-button {
+    border: 1px solid var(--border-color);
+    color: var(--muted-color);
+}
+
+@media (max-width: 680px) {
+    .settings-sheet {
+        width: min(100%, 430px);
+        padding: 20px;
+    }
+
+    .settings-option {
+        gap: 10px;
+    }
+}
