@@ -140,7 +140,7 @@ function createNoteElement(note) {
     const body = document.createElement("div");
     body.className = "note-card-body";
     if (note.html && typeof window.sanitizeNoteHtml === "function") {
-        body.innerHTML = window.sanitizeNoteHtml(note.html);
+        body.innerHTML = getNoteBodyHtml(note);
     } else {
         body.textContent = note.text || "";
     }
@@ -534,10 +534,9 @@ async function shareNote(note) {
         : note.text || "";
 
     const shareTemplate = document.getElementById("shareTemplate");
-    const shareContent = document.getElementById("shareContent");
     const shareTimestamp = document.getElementById("shareTimestamp");
 
-    if (!shareTemplate || !shareContent || !shareTimestamp || typeof html2canvas === "undefined") {
+    if (!shareTemplate || !shareTimestamp || typeof html2canvas === "undefined") {
         fallbackShare(text);
         return;
     }
@@ -546,7 +545,6 @@ async function shareNote(note) {
     const shareBody = document.getElementById("shareBody");
     shareTitle.textContent = note.title || "Untitled note";
     shareBody.textContent = note.text || "";
-    shareContent.textContent = "";
     shareTimestamp.textContent = note.time || "";
 
     try {
