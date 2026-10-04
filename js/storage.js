@@ -17,8 +17,7 @@ async function saveNotes() {
     localStorage.setItem("SnapNotes", JSON.stringify(notesSnapshot));
 
     // If the user is signed in, wait for Firestore persistence to finish.
-    // The previous implementation started the async sync without awaiting it,
-    // which could make a later cloud load restore the old version of a note.
+    // This prevents a later cloud load from restoring an older version.
     if (typeof window.syncToCloud === "function") {
         try {
             return await window.syncToCloud();
@@ -29,6 +28,7 @@ async function saveNotes() {
     }
 
     return false;
+}
 
 // =========================
 // LOAD NOTES FROM LOCALSTORAGE
