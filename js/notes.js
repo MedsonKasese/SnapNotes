@@ -66,13 +66,29 @@ function recordHistory(id) {
     redoStack.length = 0;
 }
 
+function recordCreatedNoteHistory(id) {
+    historyStack.push({ id, snapshot: null });
+    redoStack.length = 0;
+}
+
+function applyHistoryChange(change, targetStack) {
+    const index = window.notes.findIndex(note => note.id === change.id);
+    const current = index >= 0 ? structuredClone(window.notes[index]) : null;
+    targetStack.push({ id: change.id, snapshot: current });
+
+    if (change.snapshot === null) {
+        if (index >= 0) window.notes.splice(index, 1);
+    } else if (index >= 0) {
+        window.notes[index] = structuredClone(change.snapshot);
+    } else {
+        window.notes.push(structuredClone(change.snapshot));
+    }
+}
+
 function undoLastNoteChange() {
     const change = historyStack.pop();
     if (!change) return showToast("Nothing to undo", "warning");
-    const index = window.notes.findIndex(note => note.id === change.id);
-    if (index === -1) return;
-    redoStack.push({ id: change.id, snapshot: structuredClone(window.notes[index]) });
-    window.notes[index] = change.snapshot;
+    applyHistoryChange(change, redoStack);
     saveNotes();
     renderNotes();
     showToast("Change undone", "update");
@@ -81,10 +97,7 @@ function undoLastNoteChange() {
 function redoLastNoteChange() {
     const change = redoStack.pop();
     if (!change) return showToast("Nothing to redo", "warning");
-    const index = window.notes.findIndex(note => note.id === change.id);
-    if (index === -1) return;
-    historyStack.push({ id: change.id, snapshot: structuredClone(window.notes[index]) });
-    window.notes[index] = change.snapshot;
+    applyHistoryChange(change, historyStack);
     saveNotes();
     renderNotes();
     showToast("Change redone", "update");
@@ -541,3 +554,4 @@ window.startNoteEditing = startEditing;
 window.updateNotesCount = updateNotesCount;
 window.undoLastNoteChange = undoLastNoteChange;
 window.redoLastNoteChange = redoLastNoteChange;
+window.recordCreatedNoteHistory = recordCreatedNoteHistory;
