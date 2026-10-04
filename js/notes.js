@@ -555,6 +555,11 @@ window.renderNotes = renderNotes;
 window.shareNote = shareNote;
 window.updateEmptyState = updateEmptyState;
 window.startNoteEditing = startEditing;
+window.recordNoteCreation = note => {
+    if (!note?.id) return;
+    historyStack.push({ id: note.id, action: "create", snapshot: structuredClone(note) });
+    redoStack.length = 0;
+};
 window.updateNotesCount = updateNotesCount;
 window.undoLastNoteChange = undoLastNoteChange;
 window.redoLastNoteChange = redoLastNoteChange;
