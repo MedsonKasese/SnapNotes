@@ -447,6 +447,7 @@ async function saveEditorNote() {
     };
 
     window.notes.unshift(newNote);
+    window.recordNoteCreation?.(newNote);
     const saveResult = await saveNotes();
 
     clearDraft();
