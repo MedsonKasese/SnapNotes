@@ -53,7 +53,7 @@ function renderNotes(filterText = "", filterCategory = "all", view = window.getA
         notesContainer.appendChild(createNoteElement(note));
     });
 
-    updateEmptyState(filteredNotes.length, notes.length, hasInvalidCategory);
+    updateEmptyState(filteredNotes.length, notes.length, hasInvalidCategory ? requestedCategory : "");
     updateNotesCount(filteredNotes.length);
 }
 
@@ -389,7 +389,7 @@ function updateNotesCount(visibleCount = null) {
     }
 }
 
-function updateEmptyState(filteredCount, totalCount, hasInvalidCategory = false) {
+function updateEmptyState(filteredCount, totalCount, invalidCategory = "") {
     const emptyState = document.getElementById("emptyState");
     if (!emptyState) return;
 
@@ -400,8 +400,8 @@ function updateEmptyState(filteredCount, totalCount, hasInvalidCategory = false)
     }
 
     if (filteredCount === 0) {
-        emptyState.textContent = hasInvalidCategory
-            ? "Unknown category filter: " + requestedCategory
+        emptyState.textContent = invalidCategory
+            ? "Unknown category filter: " + invalidCategory
             : "No notes match your search or category.";
         emptyState.style.display = "block";
         return;
