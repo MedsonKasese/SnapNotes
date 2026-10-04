@@ -363,7 +363,7 @@ function restoreNote(id) {
 }
 
 function deleteNote(id) {
-    if (!confirm("Move this note to Trash?")) return;
+    if (localStorage.getItem("SnapNotesConfirmDelete") !== "false" && !confirm("Move this note to Trash?")) return;
     const note = window.notes.find(item => item.id === id);
     if (!note) return;
     recordHistory(id);
@@ -377,7 +377,7 @@ function deleteNote(id) {
 }
 
 function permanentlyDeleteNote(id) {
-    if (!confirm("Delete this note permanently? This cannot be undone.")) return;
+    if (localStorage.getItem("SnapNotesConfirmDelete") !== "false" && !confirm("Delete this note permanently? This cannot be undone.")) return;
     const deleted = window.notes.find(note => note.id === id);
     if (deleted) historyStack.push({ id, snapshot: structuredClone(deleted) });
     window.notes = window.notes.filter(note => note.id !== id);
@@ -549,7 +549,7 @@ function formatDate(dateValue) {
 async function shareNote(note) {
     const bodyText = getNoteBodyText(note);
     const text = note.title
-        ? `${note.title}${bodyText ? "\\n\\n" + bodyText : ""}`
+        ? `${note.title}${bodyText ? "\n\n" + bodyText : ""}`
         : bodyText;
 
     const shareTemplate = document.getElementById("shareTemplate");
