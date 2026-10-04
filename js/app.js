@@ -386,7 +386,7 @@ function setDraftStatus(message) {
     if (status) status.querySelector("span").textContent = message;
 }
 
-function saveEditorNote() {
+async function saveEditorNote() {
     const editor = document.getElementById("noteEditor");
     const rawText = editor.innerText.replace(/\r/g, "").trim();
 
@@ -439,12 +439,19 @@ function saveEditorNote() {
     };
 
     window.notes.unshift(newNote);
-    saveNotes();
+
+    const cloudSynced = await saveNotes();
     clearDraft();
     editor.innerHTML = "";
     renderNotes("", activeCategory);
     updateNavigationCounts();
-    showToast("Note saved", "success");
+
+    if (cloudSynced) {
+        showToast("Note saved and synced", "success");
+    } else {
+        showToast("Note saved locally. Cloud sync pending.", "warning");
+    }
+
     openNotesView("all");
 }
 
