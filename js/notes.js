@@ -12,6 +12,11 @@ function renderNotes(filterText = "", filterCategory = "all", view = window.getA
     const tokens = rawQuery.split(/\s+/).filter(Boolean);
     const categoryToken = tokens.find(token => token.startsWith("category:"));
     const pinnedToken = tokens.find(token => token === "is:pinned");
+    const validCategories = ["all", "general", "work", "personal", "ideas", "important"];
+    const requestedCategory = categoryToken
+        ? categoryToken.replace("category:", "")
+        : filterCategory;
+    const hasInvalidCategory = !validCategories.includes(requestedCategory);
     if (tokens.includes("sort:oldest")) sortMode = "oldest";
     const searchTerms = tokens.filter(token => !token.startsWith("category:") && token !== "is:pinned" && !token.startsWith("sort:"));
     const query = searchTerms.join(" ");
@@ -30,7 +35,6 @@ function renderNotes(filterText = "", filterCategory = "all", view = window.getA
         ].join(" ").toLowerCase();
 
         const matchesSearch = !query || searchTerms.every(term => searchableText.includes(term));
-        const requestedCategory = categoryToken ? categoryToken.replace("category:", "") : filterCategory;
         const matchesCategory = requestedCategory === "all" || note.category === requestedCategory;
         const matchesPinned = !pinnedToken || note.pinned;
         return matchesSearch && matchesCategory && matchesPinned;
@@ -49,8 +53,8 @@ function renderNotes(filterText = "", filterCategory = "all", view = window.getA
         notesContainer.appendChild(createNoteElement(note));
     });
 
-    updateEmptyState(filteredNotes.length, notes.length);
-    updateNotesCount();
+    updateEmptyState(filteredNotes.length, notes.length, hasInvalidCategory ? requestedCategory : "");
+    updateNotesCount(filteredNotes.length);
 }
 
 const historyStack = [];
@@ -408,7 +412,7 @@ function updateNotesCount() {
     }
 }
 
-function updateEmptyState(filteredCount, totalCount) {
+function updateEmptyState(filteredCount, totalCount, invalidCategory = "") {
     const emptyState = document.getElementById("emptyState");
     if (!emptyState) return;
 
@@ -419,7 +423,9 @@ function updateEmptyState(filteredCount, totalCount) {
     }
 
     if (filteredCount === 0) {
-        emptyState.textContent = "No notes match your search or category.";
+        emptyState.textContent = invalidCategory
+            ? "Unknown category filter: " + invalidCategory
+            : "No notes match your search or category.";
         emptyState.style.display = "block";
         return;
     }
