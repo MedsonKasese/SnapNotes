@@ -439,6 +439,7 @@ async function saveEditorNote() {
     };
 
     window.notes.unshift(newNote);
+    window.recordCreatedNoteHistory?.(newNote.id);
 
     const cloudSynced = await saveNotes();
     clearDraft();
