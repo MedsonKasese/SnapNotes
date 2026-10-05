@@ -806,3 +806,149 @@
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
+
+
+/* Settings refinement: compact sections, no oversized cards or social labels */
+.settings-sheet {
+    width: min(430px, 100%);
+    gap: 12px;
+    padding: 20px;
+}
+
+.settings-heading {
+    gap: 4px;
+    margin-bottom: 2px;
+}
+
+.settings-heading h3 {
+    margin: 0;
+    font-size: 28px;
+    line-height: 1.2;
+}
+
+.settings-heading p:last-child {
+    font-size: 13px;
+}
+
+.settings-section {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    overflow: visible;
+}
+
+.settings-section-heading {
+    padding: 0;
+    margin: 0 0 10px;
+}
+
+.settings-section-title {
+    font-size: 16px;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.settings-section-description {
+    display: none;
+}
+
+.settings-account-section {
+    order: -10;
+}
+
+.settings-account {
+    min-height: 54px;
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+}
+
+.settings-appearance-section,
+.settings-info-section,
+.settings-support-section,
+.settings-social-section {
+    border: 0;
+}
+
+.settings-theme-option {
+    min-height: 54px;
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--surface-soft);
+}
+
+.settings-info-section > p {
+    margin: 0;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.settings-support-links {
+    display: grid;
+    gap: 8px;
+    padding: 0;
+}
+
+.settings-support-link {
+    min-height: 54px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--surface-soft);
+    font-size: 13px;
+}
+
+.settings-support-link-leading {
+    gap: 10px;
+}
+
+.settings-support-link .settings-option-icon {
+    width: 30px;
+    height: 30px;
+}
+
+.settings-social-links {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 6px;
+    padding: 0;
+}
+
+.settings-social-links a {
+    min-height: 48px;
+    aspect-ratio: auto;
+    flex-direction: row;
+    border: 1px solid var(--border-color);
+    border-radius: 9px;
+    font-size: 18px;
+}
+
+.settings-social-links a span {
+    display: none;
+}
+
+.settings-actions {
+    margin-top: 0;
+}
+
+@media (max-width: 520px) {
+    .settings-sheet {
+        width: min(100%, 430px);
+        padding: 18px;
+    }
+
+    .settings-social-links {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 360px) {
+    .settings-sheet {
+        padding: 16px;
+    }
+}
