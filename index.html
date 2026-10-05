@@ -87,6 +87,12 @@
                     <span id="selectedCategoryLabel">General</span>
                     <i class="fa-solid fa-chevron-down"></i>
                 </button>
+                <!-- Markdown preview: Write / Preview tabs -->
+                <div class="editor-mode-toggle" role="group" aria-label="Editor mode">
+                    <button id="writeTabBtn" class="mode-btn active" type="button" aria-pressed="true" aria-controls="noteEditor">Write</button>
+                    <button id="previewTabBtn" class="mode-btn" type="button" aria-pressed="false" aria-controls="notePreview">Preview</button>
+                </div>
+
                 <time id="editorTimestamp" class="editor-timestamp"></time>
             </div>
 
@@ -110,11 +116,14 @@ Then write your notes below..."
                 spellcheck="true"
             ></div>
 
+            <!-- Markdown preview: filled by js/preview.js while the Preview tab is active -->
+            <div id="notePreview" class="note-preview" role="region" aria-label="Rendered note preview" hidden></div>
+
             <div class="editor-footer">
                 <div class="editor-status" id="draftStatus" aria-live="polite"><i class="fa-regular fa-floppy-disk"></i><span>Drafts save automatically</span></div>
                 <p class="editor-hint">
                     <i class="fa-solid fa-lightbulb"></i>
-                    Start the first line with <strong>##</strong> to make it your note title.
+                    Start the first line with <strong>##</strong> to make it your note title. Switch to <strong>Preview</strong> to see it rendered.
                 </p>
                 <button id="saveNoteBtn" class="primary-action" type="button">
                     <i class="fa-solid fa-check"></i>
@@ -370,12 +379,14 @@ Then write your notes below..."
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="js/markdown.js"></script>
     <script src="js/storage.js"></script>
     <script src="js/notes.js"></script>
     <script type="module" src="js/firebaseConfig.js"></script>
     <script type="module" src="js/firestore.js"></script>
     <script type="module" src="js/auth.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/preview.js"></script>
     <script>
         window.addEventListener("offline", () => window.showToast?.("You're offline. Local changes are still available.", "warning"));
         window.addEventListener("online", () => window.showToast?.("You're back online. Syncing changes...", "success"));
