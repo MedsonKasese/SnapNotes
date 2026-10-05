@@ -975,3 +975,28 @@
 .settings-account-section .settings-section-heading {
     display: none;
 }
+
+
+/* Final settings heading order */
+.settings-heading .settings-account-heading {
+    display: none;
+}
+
+.settings-heading .settings-description {
+    margin-top: 4px;
+}
+
+.settings-account-section {
+    margin-top: 2px;
+}
+
+.settings-account-section .settings-section-heading {
+    display: block;
+    padding: 0;
+    margin: 0 0 8px;
+}
+
+.settings-account-section .settings-section-title {
+    font-size: 16px;
+    font-weight: 700;
+}
