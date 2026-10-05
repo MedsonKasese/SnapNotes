@@ -952,3 +952,26 @@
         padding: 16px;
     }
 }
+
+
+/* Settings heading refinement */
+.settings-heading .settings-account-heading {
+    display: block;
+    margin: 2px 0 0;
+    color: var(--text-color);
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+.settings-heading > p:last-child {
+    margin-top: 2px;
+}
+
+.settings-account-section {
+    margin-top: -4px;
+}
+
+.settings-account-section .settings-section-heading {
+    display: none;
+}
