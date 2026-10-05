@@ -78,10 +78,10 @@ function setupEventListeners() {
         settingsTheme.value = isDark ? "dark" : "light";
         settingsThemeToggle.setAttribute("aria-checked", String(isDark));
         settingsThemeToggle.classList.toggle("active", isDark);
-        document.getElementById("themeStatusLabel").textContent = isDark ? "Dark mode" : "Light mode";
+        document.getElementById("themeStatusLabel").textContent = "Dark Mode";
         document.getElementById("themeStatusText").textContent = isDark
-            ? "Dark mode is enabled"
-            : "Dark mode is disabled";
+            ? "Enabled"
+            : "Disabled";
     }
 
     settingsThemeToggle.addEventListener("click", () => {
