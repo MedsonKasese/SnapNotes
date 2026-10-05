@@ -1000,3 +1000,504 @@
     font-size: 16px;
     font-weight: 700;
 }
+
+/* ==========================================================================
+   Markdown preview styles - appended to styles/styles.css by the helper.
+   Nothing above this block is modified.
+   ========================================================================== */
+
+/* ---------- 1. `hidden` is authoritative for both panes ----------
+   Your stylesheet styles .note-editor / .note-preview with display
+   rules, which silently overrides the [hidden] attribute the markup
+   and app.js rely on. This restores it for both panes. */
+.note-editor[hidden],
+.note-preview[hidden] {
+    display: none !important;
+}
+
+/* ---------- 2. Write / Preview toggle ----------
+   Skip this part if your existing .editor-mode-toggle rules already
+   look right - nothing here conflicts, it just fills them in. */
+.editor-mode-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--surface-soft);
+}
+
+.editor-mode-toggle .mode-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 4px 12px;
+    border: 0;
+    border-radius: 8px;
+    color: var(--muted-color);
+    background: transparent;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: color .2s ease, background .2s ease, box-shadow .2s ease;
+}
+
+.editor-mode-toggle .mode-btn:hover {
+    color: var(--text-color);
+}
+
+.editor-mode-toggle .mode-btn.active {
+    color: var(--primary-color);
+    background: var(--surface-color);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .08);
+}
+
+[data-theme="dark"] .editor-mode-toggle .mode-btn.active,
+body.dark-mode .editor-mode-toggle .mode-btn.active {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
+}
+
+.editor-mode-toggle .mode-btn:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 1px;
+}
+
+.editor-mode-toggle .mode-btn[disabled] {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+/* The formatting toolbar only makes sense while writing. */
+body.editor-preview-mode .format-toolbar {
+    display: none;
+}
+
+/* ---------- 3. Preview pane ---------- */
+#notePreview.note-preview {
+    display: block;
+    width: 100%;
+    padding: 18px 20px 22px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md, 12px);
+    background: var(--surface-color);
+    color: var(--text-color);
+    overflow-wrap: anywhere;
+}
+
+/* Small header: "Preview" + live word count. */
+.note-preview .preview-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 0 0 16px;
+    padding-bottom: 11px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.note-preview .preview-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--primary-color);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.note-preview .preview-badge i {
+    font-size: 11px;
+}
+
+.note-preview .preview-stats {
+    color: var(--muted-color);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* ---------- 4. Empty state ---------- */
+.note-preview .preview-empty {
+    display: grid;
+    justify-items: center;
+    gap: 5px;
+    padding: 34px 20px;
+    border: 1px dashed var(--border-color);
+    border-radius: var(--radius-md, 12px);
+    background: var(--surface-soft);
+    text-align: center;
+}
+
+.note-preview .preview-empty i {
+    margin-bottom: 4px;
+    color: var(--muted-color);
+    font-size: 20px;
+}
+
+.note-preview .preview-empty p {
+    margin: 0;
+    color: var(--text-color);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.note-preview .preview-empty span {
+    max-width: 30ch;
+    color: var(--muted-color);
+    font-size: 11.5px;
+    line-height: 1.55;
+}
+
+/* ---------- 5. Rendered markdown ----------
+   Typography mirrors .note-card (17px titles, 14px body, muted
+   meta) so a preview reads like the note it will become. */
+.note-preview .md-body {
+    font-size: 15px;
+    line-height: 1.75;
+}
+
+.note-preview .md-body > :first-child {
+    margin-top: 0;
+}
+
+.note-preview .md-body > :last-child {
+    margin-bottom: 0;
+}
+
+.note-preview .md-body p {
+    margin: 0 0 12px;
+}
+
+/* SnapNotes convention: a leading "## " line is the note title. */
+.note-preview .md-body > h2:first-child {
+    margin: 0 0 14px;
+    padding-bottom: 11px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 23px;
+    font-weight: 800;
+    line-height: 1.3;
+    letter-spacing: -.01em;
+}
+
+.note-preview .md-body h1 {
+    margin: 0 0 12px;
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1.25;
+    letter-spacing: -.015em;
+}
+
+.note-preview .md-body h2 {
+    margin: 22px 0 10px;
+    font-size: 20px;
+    font-weight: 800;
+    line-height: 1.3;
+}
+
+.note-preview .md-body h3 {
+    margin: 20px 0 8px;
+    font-size: 16.5px;
+    font-weight: 800;
+    line-height: 1.35;
+}
+
+.note-preview .md-body h4,
+.note-preview .md-body h5,
+.note-preview .md-body h6 {
+    margin: 18px 0 7px;
+    color: var(--muted-color);
+    font-size: 12.5px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+/* ---------- 6. Inline formatting ---------- */
+.note-preview .md-body strong,
+.note-preview .md-body b {
+    font-weight: 800;
+}
+
+.note-preview .md-body em,
+.note-preview .md-body i {
+    font-style: italic;
+}
+
+.note-preview .md-body del {
+    color: var(--muted-color);
+    text-decoration: line-through;
+}
+
+.note-preview .md-body mark {
+    padding: 0 3px;
+    border-radius: 4px;
+    color: inherit;
+    background: rgba(255, 200, 0, .35);
+}
+
+[data-theme="dark"] .note-preview .md-body mark,
+body.dark-mode .note-preview .md-body mark {
+    background: rgba(255, 215, 0, .22);
+}
+
+.note-preview .md-body a {
+    color: var(--primary-color);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.note-preview .md-body a:hover {
+    text-decoration-thickness: 2px;
+}
+
+.note-preview .md-body a:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+    border-radius: 3px;
+}
+
+.note-preview .md-body code {
+    padding: 1px 5px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background: var(--surface-soft);
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: .88em;
+    overflow-wrap: anywhere;
+}
+
+/* ---------- 7. Block elements ---------- */
+.note-preview .md-body ul,
+.note-preview .md-body ol {
+    margin: 0 0 12px;
+    padding-left: 22px;
+}
+
+.note-preview .md-body li {
+    margin: 0 0 5px;
+}
+
+.note-preview .md-body li::marker {
+    color: var(--muted-color);
+}
+
+/* Checklists: the toolbar's "checkbox" lines and "- [x] done" both land here. */
+.note-preview .md-body .md-task-list {
+    padding-left: 0;
+    list-style: none;
+}
+
+.note-preview .md-body .md-task {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+}
+
+/* Drawn by hand instead of relying on accent-color: the native
+   rendering differs per platform and looks muddy in dark mode. */
+.note-preview .md-body .md-task input[type="checkbox"] {
+    position: relative;
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    margin: 3px 0 0;
+    -webkit-appearance: none;
+    appearance: none;
+    border: 1.5px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--surface-color);
+    pointer-events: none;
+}
+
+.note-preview .md-body .md-task input[type="checkbox"]:checked {
+    border-color: var(--primary-color);
+    background: var(--primary-color);
+}
+
+.note-preview .md-body .md-task input[type="checkbox"]:checked::after {
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 1px;
+    width: 3px;
+    height: 7px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.note-preview .md-body blockquote {
+    margin: 0 0 12px;
+    padding: 9px 14px;
+    border-left: 3px solid var(--primary-color);
+    border-radius: 0 var(--radius-md, 12px) var(--radius-md, 12px) 0;
+    background: var(--surface-soft);
+    color: var(--text-color);
+}
+
+.note-preview .md-body blockquote > :last-child {
+    margin-bottom: 0;
+}
+
+.note-preview .md-body hr {
+    margin: 18px 0;
+    border: 0;
+    border-top: 1px solid var(--border-color);
+}
+
+.note-preview .md-body pre.md-code {
+    margin: 0 0 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md, 12px);
+    background: var(--surface-soft);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.note-preview .md-body pre.md-code code {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-size: 12.5px;
+    line-height: 1.65;
+    white-space: pre;
+}
+
+.note-preview .md-body pre.md-code[data-language]::before {
+    content: attr(data-language);
+    display: block;
+    margin-bottom: 7px;
+    color: var(--muted-color);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.note-preview .md-body img {
+    max-width: 100%;
+    height: auto;
+    margin: 0 0 12px;
+    border-radius: var(--radius-md, 12px);
+}
+
+/* ---------- 8. Tables ---------- */
+.note-preview .md-body .md-table-wrap {
+    margin: 0 0 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md, 12px);
+}
+
+.note-preview .md-body table {
+    width: 100%;
+    min-width: 320px;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.note-preview .md-body th,
+.note-preview .md-body td {
+    padding: 8px 11px;
+    border-bottom: 1px solid var(--border-color);
+    text-align: left;
+    vertical-align: top;
+}
+
+.note-preview .md-body th {
+    background: var(--surface-soft);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.note-preview .md-body tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+/* ---------- 9. Responsive ---------- */
+@media (max-width: 680px) {
+    #notePreview.note-preview {
+        padding: 15px 16px 18px;
+    }
+
+    /* Narrow screens: simple tables fit without scrolling, wide ones
+       still scroll inside .md-table-wrap. */
+    .note-preview .md-body table {
+        min-width: 0;
+    }
+
+    .note-preview .md-body th,
+    .note-preview .md-body td {
+        padding: 7px 9px;
+    }
+
+    .note-preview .md-body {
+        font-size: 14.5px;
+        line-height: 1.7;
+    }
+
+    .note-preview .md-body > h2:first-child {
+        font-size: 20px;
+    }
+
+    .note-preview .md-body h1 {
+        font-size: 22px;
+    }
+
+    .note-preview .md-body h2 {
+        font-size: 18px;
+    }
+
+    .note-preview .md-body pre.md-code code {
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 380px) {
+    .editor-mode-toggle .mode-btn {
+        padding: 4px 9px;
+    }
+
+    .note-preview .preview-stats {
+        display: none;
+    }
+}
+
+/* ---------- 10. Accessibility / motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+    .editor-mode-toggle .mode-btn {
+        transition: none;
+    }
+}
+
+/* ---------- 11. Print: paper shows the rendered note, not the toolbars ---------- */
+@media print {
+    .app-header,
+    .search-panel,
+    .search-trigger,
+    .floating-add,
+    .notes-drawer,
+    .drawer-backdrop,
+    .editor-toolbar,
+    .format-toolbar,
+    .editor-footer,
+    .preview-banner {
+        display: none !important;
+    }
+
+    .note-editor {
+        display: none !important;
+    }
+
+    #notePreview.note-preview {
+        display: block !important;
+        padding: 0;
+        border: 0;
+    }
+}
