@@ -14,6 +14,7 @@ import { loadFromCloud } from "./firestore.js";
 
 const emailInput = document.getElementById("emailInput");
 const passwordInput = document.getElementById("passwordInput");
+const togglePasswordBtn = document.getElementById("togglePasswordBtn");
 const signupBtn = document.getElementById("signupBtn");
 const signinBtn = document.getElementById("signinBtn");
 const googleSignInBtn = document.getElementById("googleSignInBtn");
@@ -29,6 +30,15 @@ const closeModalBtn = document.getElementById("closeModalBtn");
 // Keep Firebase Auth persistent across page reloads and PWA sessions.
 const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch(error => {
     console.warn("Could not enable persistent authentication:", error);
+});
+
+togglePasswordBtn?.addEventListener("click", () => {
+    const isVisible = passwordInput.type === "text";
+    passwordInput.type = isVisible ? "password" : "text";
+    togglePasswordBtn.setAttribute("aria-pressed", String(!isVisible));
+    togglePasswordBtn.setAttribute("aria-label", isVisible ? "Show password" : "Hide password");
+    togglePasswordBtn.innerHTML = `<i class="fa-regular fa-${isVisible ? "eye" : "eye-slash"}" aria-hidden="true"></i>`;
+    passwordInput.focus();
 });
 
 signupBtn.addEventListener("click", async () => {
@@ -177,6 +187,12 @@ function closeModal() {
     authModal.setAttribute("aria-hidden", "true");
     emailInput.value = "";
     passwordInput.value = "";
+    passwordInput.type = "password";
+    togglePasswordBtn?.setAttribute("aria-pressed", "false");
+    togglePasswordBtn?.setAttribute("aria-label", "Show password");
+    if (togglePasswordBtn) {
+        togglePasswordBtn.innerHTML = '<i class="fa-regular fa-eye" aria-hidden="true"></i>';
+    }
     clearVerificationState();
 }
 
@@ -255,7 +271,7 @@ onAuthStateChanged(auth, user => {
 
 function resetGoogleButton() {
     googleSignInBtn.disabled = false;
-    googleSignInBtn.textContent = "Continue with Google";
+    googleSignInBtn.innerHTML = '<i class="fa-brands fa-google" aria-hidden="true"></i> Continue with Google';
 }
 
 function handleAuthError(error) {

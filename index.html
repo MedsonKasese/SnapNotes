@@ -346,7 +346,12 @@ Then write your notes below..."
                 <h3 id="authTitle">Sign in to sync notes</h3>
             </div>
             <input type="email" id="emailInput" placeholder="Email" autocomplete="email" required>
-            <input type="password" id="passwordInput" placeholder="Password" autocomplete="current-password" required>
+            <div class="password-field">
+                <input type="password" id="passwordInput" placeholder="Password" autocomplete="current-password" required>
+                <button id="togglePasswordBtn" class="password-toggle" type="button" aria-label="Show password" aria-pressed="false">
+                    <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                </button>
+            </div>
             <button id="googleSignInBtn" type="button" class="google-auth">
                 <i class="fa-brands fa-google"></i>
                 Continue with Google

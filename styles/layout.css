@@ -608,6 +608,36 @@
     color: var(--text-color);
 }
 
+.password-field {
+    position: relative;
+}
+
+.password-field input {
+    padding-right: 46px;
+}
+
+.password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    width: 34px;
+    min-height: 34px !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 !important;
+    border-radius: 8px !important;
+    color: var(--muted-color) !important;
+    background: transparent !important;
+    transform: translateY(-50%);
+}
+
+.password-toggle:hover,
+.password-toggle:focus-visible {
+    color: var(--text-color) !important;
+    background: var(--surface-soft) !important;
+}
+
 .auth-sheet button {
     min-height: 42px;
     padding: 10px;

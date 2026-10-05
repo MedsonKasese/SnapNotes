@@ -1000,3 +1000,38 @@
     font-size: 16px;
     font-weight: 700;
 }
+
+/* Keep the account block directly below the Settings heading and subtitle. */
+.settings-heading {
+    order: 0;
+}
+
+.settings-account-section {
+    order: 1;
+}
+
+.settings-sheet > .settings-section:not(.settings-account-section) {
+    order: 2;
+}
+
+.settings-sheet > .settings-actions {
+    order: 3;
+}
+
+/* Compact icon-only social links so they do not dominate the settings sheet. */
+.settings-social-links {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 5px;
+}
+
+.settings-social-links a {
+    min-height: 38px;
+    border-radius: 8px;
+    font-size: 16px;
+}
+
+@media (max-width: 520px) {
+    .settings-social-links {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+}
