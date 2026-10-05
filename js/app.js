@@ -208,7 +208,10 @@ function setupEventListeners() {
         }
     });
 
-    document.getElementById("noteEditor").addEventListener("input", scheduleDraftSave);
+    document.getElementById("noteEditor").addEventListener("input", () => {
+        updateCharacterCount();
+        scheduleDraftSave();
+    });
 
     document.getElementById("noteEditor").addEventListener("keydown", (event) => {
         if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
@@ -222,6 +225,7 @@ function openNewNoteView() {
     document.getElementById("newNoteView").hidden = false;
     document.getElementById("notesView").hidden = true;
     document.getElementById("addBtn").hidden = true;
+    updateCharacterCount();
     document.getElementById("noteEditor").focus();
     closeSearchPanel();
     closeDrawer();
@@ -385,6 +389,7 @@ function restoreDraft() {
         if (!draft.content) return;
         editor.innerHTML = draft.content;
         setEditorCategory(draft.category || "general");
+        updateCharacterCount();
         setDraftStatus("Draft restored");
     } catch (error) {
         localStorage.removeItem(DRAFT_KEY);
@@ -395,6 +400,7 @@ function restoreDraft() {
 function clearDraft() {
     clearTimeout(draftTimer);
     localStorage.removeItem(DRAFT_KEY);
+    updateCharacterCount();
     setDraftStatus("Drafts save automatically");
 }
 
@@ -403,12 +409,30 @@ function setDraftStatus(message) {
     if (status) status.querySelector("span").textContent = message;
 }
 
+function updateCharacterCount() {
+    const editor = document.getElementById("noteEditor");
+    const counter = document.getElementById("editorCharacterCount");
+    if (!editor || !counter) return;
+
+    const count = (editor.innerText || "").replace(/\r/g, "").trim().length;
+    const limit = window.SNAPNOTES_MAX_CHARACTERS || 1000;
+    counter.textContent = `${count}/${limit}`;
+    counter.classList.toggle("over-limit", count > limit);
+}
+
 async function saveEditorNote() {
     const editor = document.getElementById("noteEditor");
     const rawText = editor.innerText.replace(/\r/g, "").trim();
+    const maxCharacters = window.SNAPNOTES_MAX_CHARACTERS || 1000;
 
     if (!rawText) {
         showToast("Write something before saving.", "warning");
+        editor.focus();
+        return;
+    }
+
+    if (rawText.length > maxCharacters) {
+        showToast(`Note is too long. Keep it under ${maxCharacters} characters.`, "warning");
         editor.focus();
         return;
     }

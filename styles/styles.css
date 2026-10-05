@@ -48,6 +48,34 @@
     display: none;
 }
 
+.note-card-body-clamped {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 5;
+}
+
+.note-card-body-expanded {
+    display: block;
+    overflow: visible;
+}
+
+.note-preview-toggle {
+    margin-top: 7px;
+    padding: 0;
+    border: 0;
+    color: var(--primary-color);
+    background: transparent;
+    font-size: 12px;
+    font-weight: 800;
+    text-decoration: underline;
+}
+
+.note-preview-toggle:hover,
+.note-preview-toggle:focus-visible {
+    color: var(--primary-dark);
+}
+
 .note-card-meta {
     display: flex;
     align-items: center;

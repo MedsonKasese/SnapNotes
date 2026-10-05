@@ -1,6 +1,8 @@
 // =========================
 // NOTE LIST + NOTE ACTIONS
 // =========================
+const MAX_NOTE_CHARACTERS = 1000;
+window.SNAPNOTES_MAX_CHARACTERS = MAX_NOTE_CHARACTERS;
 
 function renderNotes(filterText = "", filterCategory = "all", view = window.getActiveNotesView ? window.getActiveNotesView() : "all") {
     const notesContainer = document.getElementById("notesContainer");
@@ -117,11 +119,6 @@ function createNoteElement(note) {
     card.className = "note-card";
     card.dataset.id = note.id;
     card.dataset.category = note.category || "general";
-    card.tabIndex = 0;
-    card.addEventListener("click", event => {
-        if (event.target.closest("button, a, .note-dropdown")) return;
-        startEditing(card, note);
-    });
 
     if (note.pinned) {
         card.classList.add("pinned");
@@ -139,14 +136,33 @@ function createNoteElement(note) {
 
     const body = document.createElement("div");
     body.className = "note-card-body";
+    const bodyText = getNoteBodyText(note);
     if (note.html && typeof window.sanitizeNoteHtml === "function") {
         body.innerHTML = getNoteBodyHtml(note);
     } else {
-        body.textContent = getNoteBodyText(note);
+        body.textContent = bodyText;
     }
 
     content.appendChild(title);
     content.appendChild(body);
+
+    if (bodyText.split("\n").length > 5) {
+        body.classList.add("note-card-body-clamped");
+
+        const expandButton = document.createElement("button");
+        expandButton.type = "button";
+        expandButton.className = "note-preview-toggle";
+        expandButton.textContent = "View full note";
+        expandButton.setAttribute("aria-expanded", "false");
+        expandButton.addEventListener("click", event => {
+            event.stopPropagation();
+            const expanded = body.classList.toggle("note-card-body-expanded");
+            body.classList.toggle("note-card-body-clamped", !expanded);
+            expandButton.textContent = expanded ? "Show less" : "View full note";
+            expandButton.setAttribute("aria-expanded", String(expanded));
+        });
+        content.appendChild(expandButton);
+    }
 
     top.appendChild(content);
 
@@ -287,6 +303,12 @@ function startEditing(card, note) {
 
         if (!title && !body) {
             showToast("Note can't be empty.", "warning");
+            return;
+        }
+
+        const characterCount = `${title ? `## ${title}\n` : ""}${body}`.length;
+        if (characterCount > MAX_NOTE_CHARACTERS) {
+            showToast(`Note is too long. Keep it under ${MAX_NOTE_CHARACTERS} characters.`, "warning");
             return;
         }
 
@@ -572,6 +594,9 @@ function formatDate(dateValue) {
 
 async function shareNote(note) {
     const bodyText = getNoteBodyText(note);
+    const bodyHtml = note.html && typeof window.sanitizeNoteHtml === "function"
+        ? getNoteBodyHtml(note)
+        : "";
     const text = note.title
         ? `${note.title}${bodyText ? "\n\n" + bodyText : ""}`
         : bodyText;
@@ -587,7 +612,11 @@ async function shareNote(note) {
     const shareTitle = document.getElementById("shareTitle");
     const shareBody = document.getElementById("shareBody");
     shareTitle.textContent = note.title || "Untitled note";
-    shareBody.textContent = bodyText;
+    if (bodyHtml) {
+        shareBody.innerHTML = bodyHtml;
+    } else {
+        shareBody.textContent = bodyText;
+    }
     shareTimestamp.textContent = note.time || "";
 
     try {

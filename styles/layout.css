@@ -345,6 +345,17 @@
     white-space: nowrap;
 }
 
+.editor-character-count {
+    margin-left: 8px;
+    color: var(--muted-color);
+    font-variant-numeric: tabular-nums;
+}
+
+.editor-character-count.over-limit {
+    color: var(--danger-color);
+    font-weight: 800;
+}
+
 .editor-hint {
     grid-column: 1;
     grid-row: 2;
@@ -857,7 +868,7 @@
     background: var(--surface-soft);
 }
 
-.note-card { cursor: pointer; }
+.note-card { cursor: default; }
 .note-card:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 3px; }
 .note-detail-content { padding: 22px 0; line-height: 1.7; white-space: normal; }
 .note-detail-content p, .note-detail-content div { margin-bottom: 12px; }
