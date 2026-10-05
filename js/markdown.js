@@ -346,6 +346,7 @@
             RE_LIST.test(line) ||
             RE_HR.test(line.trim()) ||
             /^ {0,3}(\*\s*){3,}$/.test(line) ||
+            (options.taskLists && !!taskMarkerOf(line)) ||
             (options.tables && line.indexOf("|") !== -1) ||
             (RE_SETEXT.test(line) && index > 0 && !isBlank(lines[index - 1]));
     }
