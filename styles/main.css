@@ -137,6 +137,25 @@ body.dark-mode .category-menu {
     word-break: break-word;
 }
 
+#shareBody p,
+#shareBody div {
+    margin: 0 0 8px;
+}
+
+#shareBody ol,
+#shareBody ul {
+    margin: 8px 0 14px;
+    padding-left: 28px;
+}
+
+#shareBody ol {
+    list-style-type: decimal;
+}
+
+#shareBody ul {
+    list-style-type: disc;
+}
+
 #shareContent {
     display: none;
 }

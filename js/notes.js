@@ -572,6 +572,9 @@ function formatDate(dateValue) {
 
 async function shareNote(note) {
     const bodyText = getNoteBodyText(note);
+    const bodyHtml = note.html && typeof window.sanitizeNoteHtml === "function"
+        ? getNoteBodyHtml(note)
+        : "";
     const text = note.title
         ? `${note.title}${bodyText ? "\n\n" + bodyText : ""}`
         : bodyText;
@@ -587,7 +590,11 @@ async function shareNote(note) {
     const shareTitle = document.getElementById("shareTitle");
     const shareBody = document.getElementById("shareBody");
     shareTitle.textContent = note.title || "Untitled note";
-    shareBody.textContent = bodyText;
+    if (bodyHtml) {
+        shareBody.innerHTML = bodyHtml;
+    } else {
+        shareBody.textContent = bodyText;
+    }
     shareTimestamp.textContent = note.time || "";
 
     try {
