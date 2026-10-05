@@ -1,4 +1,4 @@
-const CACHE_NAME = "snapnotes-v25";
+const CACHE_NAME = "snapnotes-v26";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -51,24 +51,30 @@ self.addEventListener("fetch", event => {
   }
 
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached;
-
-      return fetch(event.request).then(response => {
+    fetch(event.request)
+      .then(response => {
         if (!response || response.status !== 200) return response;
 
+        // Always refresh same-origin app files from the network first.
+        // This prevents an installed PWA from serving an older HTML/CSS/JS
+        // version after a deployment. The response is still cached for offline use.
         const responseClone = response.clone();
         caches.open(CACHE_NAME).then(cache => {
           cache.put(event.request, responseClone);
         });
 
         return response;
-      }).catch(() => {
-        if (event.request.mode === "navigate") {
-          return caches.match("./index.html");
-        }
-        return new Response("", { status: 503, statusText: "Offline" });
-      });
-    })
+      })
+      .catch(() => {
+        return caches.match(event.request).then(cached => {
+          if (cached) return cached;
+
+          if (event.request.mode === "navigate") {
+            return caches.match("./index.html");
+          }
+
+          return new Response("", { status: 503, statusText: "Offline" });
+        });
+      })
   );
 });
