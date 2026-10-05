@@ -1,6 +1,8 @@
 // =========================
 // NOTE LIST + NOTE ACTIONS
 // =========================
+const MAX_NOTE_CHARACTERS = 1000;
+window.SNAPNOTES_MAX_CHARACTERS = MAX_NOTE_CHARACTERS;
 
 function renderNotes(filterText = "", filterCategory = "all", view = window.getActiveNotesView ? window.getActiveNotesView() : "all") {
     const notesContainer = document.getElementById("notesContainer");
@@ -287,6 +289,12 @@ function startEditing(card, note) {
 
         if (!title && !body) {
             showToast("Note can't be empty.", "warning");
+            return;
+        }
+
+        const characterCount = `${title ? `## ${title}\n` : ""}${body}`.length;
+        if (characterCount > MAX_NOTE_CHARACTERS) {
+            showToast(`Note is too long. Keep it under ${MAX_NOTE_CHARACTERS} characters.`, "warning");
             return;
         }
 

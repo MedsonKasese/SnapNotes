@@ -345,6 +345,17 @@
     white-space: nowrap;
 }
 
+.editor-character-count {
+    margin-left: 8px;
+    color: var(--muted-color);
+    font-variant-numeric: tabular-nums;
+}
+
+.editor-character-count.over-limit {
+    color: var(--danger-color);
+    font-weight: 800;
+}
+
 .editor-hint {
     grid-column: 1;
     grid-row: 2;
