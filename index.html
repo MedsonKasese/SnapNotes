@@ -214,12 +214,16 @@ Then write your notes below..."
     <div id="settingsModal" class="auth-modal" aria-hidden="true">
         <div class="auth-sheet settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
             <div class="modal-heading settings-heading">
-                <p class="eyebrow">SnapNotes</p>
                 <h3 id="settingsTitle">Settings</h3>
-                <p>Customise your SnapNotes experience</p>
+                <p class="settings-description">Customise your SnapNotes experience</p>
             </div>
 
-            <div class="settings-account" id="settingsAccount"></div>
+            <section class="settings-section settings-account-section" aria-labelledby="accountSettingsTitle">
+                <div class="settings-section-heading">
+                    <p class="settings-section-title" id="accountSettingsTitle">Account</p>
+                </div>
+                <div class="settings-account" id="settingsAccount"></div>
+            </section>
 
             <section class="settings-section settings-appearance-section" aria-labelledby="appearanceTitle">
                 <div class="settings-section-heading">
@@ -262,6 +266,41 @@ Then write your notes below..."
                 </label>
             </section>
 
+            <section class="settings-section settings-info-section" aria-labelledby="aboutTitle">
+                <div class="settings-section-heading">
+                    <div>
+                        <p class="settings-section-title" id="aboutTitle">About</p>
+                        <p class="settings-section-description">Learn what SnapNotes is built to help you do.</p>
+                    </div>
+                </div>
+                <p>SnapNotes helps you capture ideas quickly, organise notes with categories, pin important notes, search across your library, and keep working offline.</p>
+            </section>
+
+            <section class="settings-section settings-support-section" aria-labelledby="supportTitle">
+                <div class="settings-section-heading">
+                    <div>
+                        <p class="settings-section-title" id="supportTitle">Support</p>
+                        <p class="settings-section-description">Need help or want to share feedback?</p>
+                    </div>
+                </div>
+                <div class="settings-support-links">
+                    <button id="feedbackBtn" class="settings-support-link" type="button">
+                        <span class="settings-support-link-leading">
+                            <span class="settings-option-icon"><i class="fa-regular fa-message"></i></span>
+                            <span>Send Feedback</span>
+                        </span>
+                        <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                    </button>
+                    <button id="privacyPolicyBtn" class="settings-support-link" type="button">
+                        <span class="settings-support-link-leading">
+                            <span class="settings-option-icon"><i class="fa-solid fa-shield-halved"></i></span>
+                            <span>Privacy Policy</span>
+                        </span>
+                        <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </section>
+
             <section class="settings-section settings-social-section" aria-labelledby="socialTitle">
                 <div class="settings-section-heading">
                     <div>
@@ -288,20 +327,6 @@ Then write your notes below..."
                     <a href="https://wa.me/qr/KIHFJRE2RQJZF1" title="WhatsApp" target="_blank" rel="noopener noreferrer" aria-label="Contact Medson on WhatsApp">
                         <i class="fab fa-whatsapp" aria-hidden="true"></i>
                     </a>
-                </div>
-            </section>
-
-            <section class="settings-section settings-info-section" aria-labelledby="aboutTitle">
-                <div class="settings-section-heading">
-                    <div>
-                        <p class="settings-section-title" id="aboutTitle">About SnapNotes</p>
-                        <p class="settings-section-description">A simple place to capture, organise, and find your ideas.</p>
-                    </div>
-                </div>
-                <p>SnapNotes helps you capture ideas quickly, organise notes with categories, pin important notes, search across your library, and keep working offline.</p>
-                <div class="settings-info-actions">
-                    <button id="privacyPolicyBtn" class="settings-link-button" type="button"><i class="fa-solid fa-shield-halved"></i> Privacy Policy</button>
-                    <button id="feedbackBtn" class="settings-link-button" type="button"><i class="fa-regular fa-message"></i> Send Feedback</button>
                 </div>
             </section>
 
