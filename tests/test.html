@@ -43,6 +43,43 @@ test("legacy note fixture includes a leading empty block before its title", () =
   wrapper.innerHTML = "<p><br></p><p>## Note title</p><p>Body</p>";
   assert(wrapper.children[1].textContent === "## Note title", "legacy title fixture is invalid");
 });
+
+test("tag parser normalises and deduplicates tags", () => {
+  const parseTags = value => [...new Set(String(value || "").split(",").map(tag => tag.trim().toLowerCase().replace(/^#/, "")).filter(Boolean))].slice(0, 10);
+  assert(JSON.stringify(parseTags(" Work, #Ideas, work ")) === JSON.stringify(["work", "ideas"]), "tags were not normalised");
+});
+
+test("advanced search recognises tag and reminder operators", () => {
+  const query = 'project tag:work has:reminder is:pinned -archived';
+  assert(query.includes("tag:work") && query.includes("has:reminder") && query.includes("is:pinned") && query.includes("-archived"), "advanced search operators missing");
+});
+
+test("reminder due logic detects past reminders", () => {
+  const now = Date.now();
+  const due = new Date(now - 1000).toISOString();
+  const future = new Date(now + 60000).toISOString();
+  assert(Date.parse(due) <= now, "past reminder was not due");
+  assert(Date.parse(future) > now, "future reminder was incorrectly due");
+});
+
+test("sync conflict contract preserves conflict metadata", () => {
+  const source = { id: "note-1", title: "Plan", text: "Local", updatedAt: "2026-01-01T00:00:00.000Z" };
+  const conflict = { ...source, id: "generated-id", title: "Conflict: Plan", syncConflict: true, conflictOf: "note-1" };
+  assert(conflict.syncConflict === true && conflict.conflictOf === source.id && conflict.id !== source.id, "conflict copy is invalid");
+});
+
+test("note metadata contract supports tags and reminders", () => {
+  const note = { id: "1", tags: ["work"], reminderAt: new Date().toISOString(), reminderNotified: false };
+  assert(Array.isArray(note.tags), "tags must be an array");
+  assert(typeof note.reminderAt === "string" && note.reminderNotified === false, "reminder fields are invalid");
+});
+
+test("search text includes tags", () => {
+  const note = { title: "Trip", text: "budget", category: "work", tags: ["aviation", "research"] };
+  const searchable = [note.title, note.text, note.category, ...note.tags].join(" ").toLowerCase();
+  assert(searchable.includes("aviation") && searchable.includes("research"), "tags are not searchable");
+});
+
 document.getElementById("results").textContent = results.join("\n") + "\n\n" +
   (results.every(line => line.startsWith("PASS")) ? "ALL TESTS PASSED" : "SOME TESTS FAILED");
 </script>

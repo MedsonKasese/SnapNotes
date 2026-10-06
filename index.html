@@ -55,7 +55,7 @@
         <div class="search-row">
             <div class="search-input-wrap">
                 <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-                <input type="search" id="searchInput" placeholder="Search notes, category:work, is:pinned..." autocomplete="off">
+                <input type="search" id="searchInput" placeholder="Search notes, tag:work, is:pinned, has:reminder..." autocomplete="off">
                 <button id="closeSearch" class="search-close" type="button" aria-label="Close search">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
@@ -109,6 +109,17 @@
 Then write your notes below..."
                 spellcheck="true"
             ></div>
+
+            <div class="editor-metadata">
+                <label class="editor-metadata-field">
+                    <span><i class="fa-solid fa-tags"></i> Tags</span>
+                    <input id="noteTagsInput" type="text" maxlength="200" placeholder="work, ideas, urgent" autocomplete="off">
+                </label>
+                <label class="editor-metadata-field">
+                    <span><i class="fa-regular fa-bell"></i> Reminder</span>
+                    <input id="noteReminderInput" type="datetime-local">
+                </label>
+            </div>
 
             <div class="editor-footer">
                 <div class="editor-status" id="draftStatus" aria-live="polite"><i class="fa-regular fa-floppy-disk"></i><span>Drafts save automatically</span><span id="editorCharacterCount" class="editor-character-count">0/1500</span></div>
@@ -365,6 +376,8 @@ Then write your notes below..."
             </div>
         </div>
     </div>
+
+    <div id="noteDetailModal" class="note-detail-modal" aria-hidden="true"></div>
 
     <div id="toast" role="status" aria-live="polite"></div>
 

@@ -23,6 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
     restoreDraft();
     setupTheme();
     setupTimestamp();
+    setupReminderChecks();
     openNewNoteView();
     updateNavigationCounts();
 });
@@ -200,6 +201,7 @@ function setupEventListeners() {
             return;
         }
         if (event.key === "Escape") {
+            closeNoteDetail?.();
             closeDrawer();
             closeCategoryMenu();
             closeNoteMenus();
@@ -381,6 +383,8 @@ function saveDraft() {
     localStorage.setItem(DRAFT_KEY, JSON.stringify({
         content,
         category: selectedEditorCategory,
+        tags: parseTags(document.getElementById("noteTagsInput")?.value || ""),
+        reminderAt: document.getElementById("noteReminderInput")?.value || "",
         savedAt: new Date().toISOString()
     }));
     setDraftStatus("Draft saved");
@@ -397,6 +401,10 @@ function restoreDraft() {
         if (!draft.content) return;
         editor.innerHTML = draft.content;
         setEditorCategory(draft.category || "general");
+        const tagsInput = document.getElementById("noteTagsInput");
+        const reminderInput = document.getElementById("noteReminderInput");
+        if (tagsInput) tagsInput.value = Array.isArray(draft.tags) ? draft.tags.join(", ") : "";
+        if (reminderInput) reminderInput.value = draft.reminderAt ? String(draft.reminderAt).slice(0, 16) : "";
         updateCharacterCount();
         setDraftStatus("Draft restored");
     } catch (error) {
@@ -490,17 +498,25 @@ async function saveEditorNote() {
         text: body,
         html: extractNoteBodyHtml(editor.innerHTML, title),
         category: selectedEditorCategory,
+        tags: parseTags(document.getElementById("noteTagsInput")?.value || ""),
+        reminderAt: document.getElementById("noteReminderInput")?.value ? new Date(document.getElementById("noteReminderInput").value).toISOString() : null,
+        reminderNotified: false,
         pinned: false,
         time: `Created: ${formattedDate} • ${formattedTime}`,
         createdAt: now.toISOString()
     };
 
     window.notes.unshift(newNote);
+    if (newNote.reminderAt) await requestReminderPermission();
     window.recordNoteCreation?.(newNote);
     const saveResult = await saveNotes();
 
     clearDraft();
     editor.innerHTML = "";
+    const tagsInput = document.getElementById("noteTagsInput");
+    const reminderInput = document.getElementById("noteReminderInput");
+    if (tagsInput) tagsInput.value = "";
+    if (reminderInput) reminderInput.value = "";
     renderNotes("", activeCategory);
     updateNavigationCounts();
     openNotesView("all");
@@ -638,6 +654,9 @@ async function importNotes(event) {
                 html: typeof note.html === "string" ? note.html : "",
                 category: CATEGORIES[note.category] ? note.category : "general",
                 pinned: Boolean(note.pinned),
+                tags: typeof window.parseTags === "function" ? window.parseTags(Array.isArray(note.tags) ? note.tags.join(",") : String(note.tags || "")) : [],
+                reminderAt: note.reminderAt || null,
+                reminderNotified: Boolean(note.reminderNotified),
                 archived: Boolean(note.archived),
                 deletedAt: note.deletedAt || null,
                 time: String(note.time || ""),
@@ -661,6 +680,49 @@ async function importNotes(event) {
         showToast("Could not import that file. Use a SnapNotes JSON export.", "warning");
     }
 }
+
+function parseTags(value) {
+    return [...new Set(String(value || "").split(",").map(tag => tag.trim().toLowerCase().replace(/^#/, "")).filter(Boolean))].slice(0, 10);
+}
+
+function setupReminderChecks() {
+    clearInterval(window.snapNotesReminderTimer);
+    window.snapNotesReminderTimer = setInterval(checkDueReminders, 30000);
+    checkDueReminders();
+}
+
+async function checkDueReminders() {
+    const notes = Array.isArray(window.notes) ? window.notes : [];
+    const now = Date.now();
+    let changed = false;
+    for (const note of notes) {
+        if (!note.reminderAt || note.reminderNotified || note.deletedAt) continue;
+        const due = Date.parse(note.reminderAt);
+        if (!Number.isNaN(due) && due <= now) {
+            note.reminderNotified = true;
+            changed = true;
+            if ("Notification" in window && Notification.permission === "granted") {
+                new Notification(note.title || "SnapNotes reminder", { body: note.text || "You set a reminder for this note." });
+            } else {
+                showToast(`Reminder: ${note.title || "Untitled note"}`, "update");
+            }
+        }
+    }
+    if (changed) {
+        await saveNotes();
+        renderNotes();
+    }
+}
+
+async function requestReminderPermission() {
+    if (!("Notification" in window)) return false;
+    if (Notification.permission === "granted") return true;
+    if (Notification.permission === "denied") return false;
+    return (await Notification.requestPermission()) === "granted";
+}
+
+window.parseTags = parseTags;
+window.requestReminderPermission = requestReminderPermission;
 
 function setupTimestamp() {
     updateEditorTimestamp();

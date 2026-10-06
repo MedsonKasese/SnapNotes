@@ -35,12 +35,40 @@ function clearSyncPending() {
     }));
 }
 
+function noteSignature(note) {
+    return JSON.stringify({
+        title: note?.title || "",
+        text: note?.text || "",
+        html: note?.html || "",
+        category: note?.category || "general",
+        tags: Array.isArray(note?.tags) ? [...note.tags].sort() : [],
+        pinned: Boolean(note?.pinned),
+        archived: Boolean(note?.archived),
+        deletedAt: note?.deletedAt || null,
+        reminderAt: note?.reminderAt || null
+    });
+}
+
+function createConflictCopy(note) {
+    const now = new Date().toISOString();
+    return {
+        ...structuredClone(note),
+        id: crypto.randomUUID(),
+        title: `Conflict: ${note.title || "Untitled note"}`,
+        createdAt: now,
+        updatedAt: now,
+        pinned: false,
+        syncConflict: true,
+        conflictOf: note.id
+    };
+}
+
 function mergeNotes(localNotes = [], cloudNotes = []) {
     const merged = new Map();
+    const conflicts = [];
 
     [...cloudNotes, ...localNotes].forEach(note => {
         if (!note?.id) return;
-
         const existing = merged.get(note.id);
         if (!existing) {
             merged.set(note.id, note);
@@ -50,12 +78,20 @@ function mergeNotes(localNotes = [], cloudNotes = []) {
         const existingTime = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
         const incomingTime = new Date(note.updatedAt || note.createdAt || 0).getTime();
 
-        if (incomingTime >= existingTime) {
+        if (incomingTime === existingTime && noteSignature(existing) !== noteSignature(note)) {
+            // Both devices changed the same note at the same timestamp. Keep the
+            // local-first winner but preserve the other version as a conflict copy.
+            const localVersion = localNotes.some(item => item?.id === note.id && noteSignature(item) === noteSignature(note));
+            const winner = localVersion ? note : existing;
+            const loser = localVersion ? existing : note;
+            merged.set(note.id, winner);
+            conflicts.push(createConflictCopy(loser));
+        } else if (incomingTime > existingTime) {
             merged.set(note.id, note);
         }
     });
 
-    return Array.from(merged.values());
+    return [...merged.values(), ...conflicts];
 }
 
 export async function syncToCloud() {
@@ -73,6 +109,8 @@ export async function syncToCloud() {
         await setDoc(userDocRef, {
             notes: Array.isArray(window.notes) ? window.notes : [],
             lastSynced: new Date().toISOString(),
+            syncVersion: 1,
+            lastSyncedBy: getDeviceId(),
             devices: {
                 [getDeviceId()]: {
                     name: getDeviceName(),
