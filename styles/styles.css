@@ -1126,6 +1126,29 @@
 }
 
 
+/* Notes productivity suite */
+.editor-metadata{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 10px}
+.editor-metadata-field{display:grid;gap:5px;color:var(--muted-color);font-size:11px;font-weight:700}
+.editor-metadata-field span{display:flex;align-items:center;gap:6px}
+.editor-metadata-field input{width:100%;min-height:38px;padding:8px 10px;border:1px solid var(--border-color);border-radius:9px;color:var(--text-color);background:var(--surface-soft);font:inherit;font-weight:500}
+.editor-metadata-field input:focus{outline:2px solid color-mix(in srgb,var(--primary-color) 35%,transparent);border-color:var(--primary-color)}
+.note-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.note-tag{display:inline-flex;align-items:center;padding:3px 7px;border-radius:999px;background:var(--surface-soft);color:var(--primary-color);font-size:10px;font-weight:700}
+.note-reminder{display:inline-flex;align-items:center;gap:4px;margin-top:8px;color:var(--muted-color);font-size:10px;font-weight:700}
+.note-detail-modal{position:fixed;inset:0;z-index:160;display:none;align-items:flex-end;justify-content:center;padding:16px;background:rgba(0,0,0,.45)}
+.note-detail-modal.show{display:flex}
+.note-detail-sheet{width:min(720px,100%);max-height:min(88vh,760px);overflow:auto;padding:20px;border:1px solid var(--border-color);border-radius:18px;color:var(--text-color);background:var(--surface-color);box-shadow:var(--shadow)}
+.note-detail-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.note-detail-heading h2{margin:0;font-size:24px;line-height:1.25}
+.note-detail-body{margin:18px 0;color:var(--text-color);line-height:1.65;overflow-wrap:anywhere}
+.note-detail-body p:first-child{margin-top:0}.note-detail-body p:last-child{margin-bottom:0}
+.note-detail-meta{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px;color:var(--muted-color);font-size:11px}
+.note-detail-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;padding-top:14px;border-top:1px solid var(--border-color)}
+.note-detail-actions button{min-height:38px;padding:8px 12px;border-radius:9px}
+.note-detail-editor{display:grid;gap:10px;margin:16px 0}
+.note-detail-editor input{width:100%;box-sizing:border-box;min-height:40px;padding:9px;border:1px solid var(--border-color);border-radius:9px;background:var(--surface-soft);color:var(--text-color)}
+@media(max-width:600px){.editor-metadata{grid-template-columns:1fr}.note-detail-sheet{padding:16px;border-radius:16px}.note-detail-heading h2{font-size:21px}}
+
 /* PWA install and update prompt */
 .pwa-prompt {
     position: fixed;
