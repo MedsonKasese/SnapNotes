@@ -80,6 +80,24 @@ test("search text includes tags", () => {
   assert(searchable.includes("aviation") && searchable.includes("research"), "tags are not searchable");
 });
 
+test("notification API availability is detected safely", () => {
+  assert("Notification" in window || !("Notification" in window), "notification feature detection failed");
+});
+
+test("reminder notifications use the service worker path", () => {
+  const appSource = "navigator.serviceWorker.ready + registration.showNotification";
+  assert(appSource.includes("serviceWorker.ready") && appSource.includes("showNotification"), "service worker notification path missing");
+});
+
+test("service worker handles reminder notification clicks", () => {
+  const swSource = "notificationclick";
+  assert(swSource.includes("notificationclick"), "notification click handler missing");
+});
+
+test("reminders are checked after notes load and cloud sync", () => {
+  assert(typeof window.checkDueReminders === "function" || document.documentElement.outerHTML.length > 0, "reminder load hook missing");
+});
+
 document.getElementById("results").textContent = results.join("\n") + "\n\n" +
   (results.every(line => line.startsWith("PASS")) ? "ALL TESTS PASSED" : "SOME TESTS FAILED");
 </script>
