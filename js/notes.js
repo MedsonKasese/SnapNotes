@@ -165,7 +165,7 @@ function createNoteElement(note) {
     content.appendChild(title);
     content.appendChild(body);
 
-    if (bodyText.split("\n").length > 5) {
+    if (noteHasMoreThanFiveLines(note, bodyText)) {
         body.classList.add("note-card-body-clamped");
 
         const expandButton = document.createElement("button");
@@ -567,7 +567,10 @@ window.stripMarkdownTitleFromHtml = stripMarkdownTitleFromHtml;
 window.purgeExpiredTrash = purgeExpiredTrash;
 
 function getNoteBodyText(note) {
-    const text = typeof note?.text === "string" ? note.text : "";
+    let text = typeof note?.text === "string" ? note.text : "";
+    if (!text.trim() && note?.html) {
+        text = htmlToPlainText(getNoteBodyHtml(note));
+    }
     const lines = text.replace(/\r/g, "").split("\n");
     const firstNonEmptyIndex = lines.findIndex(line => line.trim() !== "");
     const title = (note?.title || "").trim();
@@ -582,6 +585,41 @@ function getNoteBodyText(note) {
     }
 
     return lines.join("\n").trim();
+}
+
+function htmlToPlainText(html) {
+    const template = document.createElement("div");
+    template.innerHTML = html || "";
+    const blockTags = new Set(["ADDRESS", "ARTICLE", "DIV", "LI", "P", "PRE", "SECTION"]);
+    let output = "";
+
+    const visit = node => {
+        if (node.nodeType === Node.TEXT_NODE) {
+            output += node.nodeValue;
+            return;
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE) return;
+        if (node.tagName === "BR") {
+            output += "\n";
+            return;
+        }
+        const isBlock = blockTags.has(node.tagName);
+        if (isBlock && output && !output.endsWith("\n")) output += "\n";
+        node.childNodes.forEach(visit);
+        if (isBlock && !output.endsWith("\n")) output += "\n";
+    };
+
+    template.childNodes.forEach(visit);
+    return output.replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function noteHasMoreThanFiveLines(note, bodyText) {
+    if (bodyText.split("\n").length > 5) return true;
+    if (!note?.html) return false;
+    const template = document.createElement("div");
+    template.innerHTML = getNoteBodyHtml(note);
+    const blockCount = template.querySelectorAll("br, address, article, div, li, p, pre, section").length;
+    return blockCount > 5;
 }
 
 function sanitizeNoteHtml(html) {
