@@ -506,6 +506,7 @@ async function saveEditorNote() {
     };
 
     window.notes.unshift(newNote);
+    if (newNote.reminderAt) await requestReminderPermission();
     window.recordNoteCreation?.(newNote);
     const saveResult = await saveNotes();
 
@@ -652,6 +653,9 @@ async function importNotes(event) {
                 html: typeof note.html === "string" ? note.html : "",
                 category: CATEGORIES[note.category] ? note.category : "general",
                 pinned: Boolean(note.pinned),
+                tags: typeof window.parseTags === "function" ? window.parseTags(Array.isArray(note.tags) ? note.tags.join(",") : String(note.tags || "")) : [],
+                reminderAt: note.reminderAt || null,
+                reminderNotified: Boolean(note.reminderNotified),
                 archived: Boolean(note.archived),
                 deletedAt: note.deletedAt || null,
                 time: String(note.time || ""),
