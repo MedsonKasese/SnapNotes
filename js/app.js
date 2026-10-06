@@ -744,6 +744,7 @@ async function requestReminderPermission() {
 
 window.parseTags = parseTags;
 window.requestReminderPermission = requestReminderPermission;
+window.checkDueReminders = checkDueReminders;
 
 function setupTimestamp() {
     updateEditorTimestamp();
