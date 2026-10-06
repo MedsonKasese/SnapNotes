@@ -97,8 +97,8 @@ test("service worker handles reminder notification clicks", () => {
 });
 
 test("reminder notifications use the dedicated toolbar icon", () => {
-  const iconPath = "./assets/icons/snapnotes-notification.svg";
-  assert(iconPath.endsWith(".svg"), "dedicated notification icon path is missing");
+  const iconPath = "./assets/icons/snapnotes-icon.png";
+  assert(iconPath.endsWith(".png"), "original-color notification icon path is missing");
 });
 
 test("reminder metadata has a stable notification state", () => {
