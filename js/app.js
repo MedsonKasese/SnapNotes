@@ -426,8 +426,16 @@ function updateCharacterCount() {
 
 async function saveEditorNote() {
     const editor = document.getElementById("noteEditor");
-    const rawText = editor.innerText.replace(/\r/g, "").trim();
-    const maxCharacters = window.SNAPNOTES_MAX_CHARACTERS || 1000;
+    const saveButton = document.getElementById("saveNoteBtn");
+    if (saveButton?.disabled) return;
+    if (saveButton) {
+        saveButton.disabled = true;
+        saveButton.setAttribute("aria-busy", "true");
+    }
+
+    try {
+        const rawText = editor.innerText.replace(/\r/g, "").trim();
+        const maxCharacters = window.SNAPNOTES_MAX_CHARACTERS || 1000;
 
     if (!rawText) {
         showToast("Write something before saving.", "warning");
@@ -493,12 +501,18 @@ async function saveEditorNote() {
     updateNavigationCounts();
     openNotesView("all");
 
-    if (saveResult.cloudEnabled && !saveResult.synced) {
-        showToast("Note saved locally. Cloud sync pending.", "warning");
-    } else if (saveResult.cloudEnabled) {
-        showToast("Note saved and synced", "success");
-    } else {
-        showToast("Note saved", "success");
+        if (saveResult.cloudEnabled && !saveResult.synced) {
+            showToast("Note saved locally. Cloud sync pending.", "warning");
+        } else if (saveResult.cloudEnabled) {
+            showToast("Note saved and synced", "success");
+        } else {
+            showToast("Note saved", "success");
+        }
+    } finally {
+        if (saveButton) {
+            saveButton.disabled = false;
+            saveButton.removeAttribute("aria-busy");
+        }
     }
 }
 

@@ -395,6 +395,11 @@
     background: var(--primary-color);
 }
 
+.primary-action:disabled {
+    cursor: wait;
+    opacity: 0.65;
+}
+
 .secondary-action {
     color: var(--text-color);
     background: var(--surface-soft);
