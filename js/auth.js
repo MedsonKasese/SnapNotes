@@ -7,6 +7,7 @@ import {
     setPersistence,
     browserLocalPersistence,
     sendEmailVerification,
+    sendPasswordResetEmail,
     signOut,
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
@@ -15,6 +16,7 @@ import { loadFromCloud } from "./firestore.js";
 const emailInput = document.getElementById("emailInput");
 const passwordInput = document.getElementById("passwordInput");
 const togglePasswordBtn = document.getElementById("togglePasswordBtn");
+const resetPasswordBtn = document.getElementById("resetPasswordBtn");
 const signupBtn = document.getElementById("signupBtn");
 const signinBtn = document.getElementById("signinBtn");
 const googleSignInBtn = document.getElementById("googleSignInBtn");
@@ -39,6 +41,29 @@ togglePasswordBtn?.addEventListener("click", () => {
     togglePasswordBtn.setAttribute("aria-label", isVisible ? "Show password" : "Hide password");
     togglePasswordBtn.innerHTML = `<i class="fa-regular fa-${isVisible ? "eye" : "eye-slash"}" aria-hidden="true"></i>`;
     passwordInput.focus();
+});
+
+resetPasswordBtn?.addEventListener("click", async () => {
+    const email = emailInput.value.trim();
+    if (!email) {
+        window.showToast("Enter your email address first.", "warning");
+        emailInput.focus();
+        return;
+    }
+
+    try {
+        resetPasswordBtn.disabled = true;
+        await sendPasswordResetEmail(auth, email);
+        window.showToast("Password reset link sent. Check your email.", "success");
+    } catch (error) {
+        if (error.code === "auth/user-not-found") {
+            window.showToast("No account was found for that email address.", "warning");
+        } else {
+            handleAuthError(error);
+        }
+    } finally {
+        resetPasswordBtn.disabled = false;
+    }
 });
 
 signupBtn.addEventListener("click", async () => {

@@ -665,6 +665,22 @@
     background: var(--surface-soft) !important;
 }
 
+.password-reset-button {
+    align-self: flex-end;
+    min-height: 0 !important;
+    margin-top: -4px;
+    padding: 0 2px !important;
+    color: var(--primary-color) !important;
+    background: transparent !important;
+    font-size: 12px;
+    text-decoration: underline;
+}
+
+.password-reset-button:disabled {
+    cursor: wait;
+    opacity: 0.6;
+}
+
 .auth-sheet button {
     min-height: 42px;
     padding: 10px;
