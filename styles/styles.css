@@ -535,6 +535,11 @@
     display: block;
 }
 
+.settings-sheet .theme-toggle {
+    min-height: 22px;
+    padding: 2px;
+}
+
 .settings-social-links {
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));
