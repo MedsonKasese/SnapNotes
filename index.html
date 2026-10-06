@@ -340,6 +340,17 @@ Then write your notes below..."
                 <button id="signOutSettingsBtn" type="button" class="secondary-auth"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
                 <button id="closeSettingsBtn" type="button" class="cancel-button">Close</button>
             </div>
+            <section id="accountDangerZone" class="account-danger-zone" aria-labelledby="dangerZoneTitle" hidden>
+                <div class="danger-zone-heading">
+                    <p class="settings-section-title" id="dangerZoneTitle">Danger zone</p>
+                    <p>Account deletion is permanent and cannot be undone.</p>
+                </div>
+                <p id="accountDeletionStatus" class="account-deletion-status"></p>
+                <div class="danger-zone-actions">
+                    <button id="deleteAccountBtn" type="button" class="delete-account-button">Delete account</button>
+                    <button id="cancelAccountDeletionBtn" type="button" class="cancel-account-deletion-button" hidden>Cancel deletion</button>
+                </div>
+            </section>
         </div>
     </div>
 

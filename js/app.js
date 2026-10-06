@@ -34,6 +34,8 @@ function setupEventListeners() {
     const settingsModal = document.getElementById("settingsModal");
     const closeSettingsBtn = document.getElementById("closeSettingsBtn");
     const signOutSettingsBtn = document.getElementById("signOutSettingsBtn");
+    const deleteAccountBtn = document.getElementById("deleteAccountBtn");
+    const cancelAccountDeletionBtn = document.getElementById("cancelAccountDeletionBtn");
     const settingsTheme = document.getElementById("settingsTheme");
     const settingsThemeToggle = document.getElementById("settingsThemeToggle");
     const privacyPolicyBtn = document.getElementById("privacyPolicyBtn");
@@ -74,6 +76,8 @@ function setupEventListeners() {
     settingsBtn.addEventListener("click", openSettings);
     closeSettingsBtn.addEventListener("click", closeSettings);
     signOutSettingsBtn.addEventListener("click", () => document.getElementById("userAvatar").click());
+    deleteAccountBtn.addEventListener("click", requestAccountDeletion);
+    cancelAccountDeletionBtn.addEventListener("click", cancelScheduledAccountDeletion);
     function syncThemeControl() {
         const isDark = document.body.classList.contains("dark-mode");
         settingsTheme.value = isDark ? "dark" : "light";
@@ -773,8 +777,85 @@ function openSettings() {
             localStorage.getItem("SnapNotesConfirmDelete") !== "false";
     }
 
+    refreshAccountDeletionStatus(user);
+
     settingsModal.classList.add("show");
     settingsModal.setAttribute("aria-hidden", "false");
+}
+
+async function refreshAccountDeletionStatus(user = window.firebaseAuth?.currentUser) {
+    const zone = document.getElementById("accountDangerZone");
+    const status = document.getElementById("accountDeletionStatus");
+    const deleteButton = document.getElementById("deleteAccountBtn");
+    const cancelButton = document.getElementById("cancelAccountDeletionBtn");
+    if (!zone || !status || !deleteButton || !cancelButton) return;
+
+    if (!user || typeof window.getAccountDeletionStatus !== "function") {
+        zone.hidden = true;
+        return;
+    }
+
+    zone.hidden = false;
+    status.textContent = "Checking account deletion status...";
+    try {
+        const deletion = await window.getAccountDeletionStatus(user.uid);
+        if (!deletion?.scheduledFor) {
+            status.textContent = "Your account is active and is not scheduled for deletion.";
+            deleteButton.hidden = false;
+            cancelButton.hidden = true;
+            return;
+        }
+
+        const remainingDays = Math.max(0, Math.ceil((Date.parse(deletion.scheduledFor) - Date.now()) / (24 * 60 * 60 * 1000)));
+        status.textContent = remainingDays > 0
+            ? `Your account is scheduled for permanent deletion in ${remainingDays} ${remainingDays === 1 ? "day" : "days"}.`
+            : "Your account deletion is due and will be processed shortly.";
+        deleteButton.hidden = true;
+        cancelButton.hidden = false;
+    } catch (error) {
+        console.error("Could not load account deletion status:", error);
+        status.textContent = "Account deletion status is temporarily unavailable.";
+    }
+}
+
+async function requestAccountDeletion() {
+    const user = window.firebaseAuth?.currentUser;
+    if (!user || typeof window.scheduleAccountDeletion !== "function") {
+        showToast("Sign in to manage account deletion.", "warning");
+        return;
+    }
+    if (!confirm("Schedule this account for permanent deletion in 10 days? You can cancel before then.")) return;
+
+    const button = document.getElementById("deleteAccountBtn");
+    try {
+        button.disabled = true;
+        await window.scheduleAccountDeletion(user.uid);
+        showToast("Account deletion scheduled for 10 days from now.", "warning");
+        await refreshAccountDeletionStatus(user);
+    } catch (error) {
+        console.error("Could not schedule account deletion:", error);
+        showToast("Could not schedule account deletion. Try again.", "warning");
+    } finally {
+        button.disabled = false;
+    }
+}
+
+async function cancelScheduledAccountDeletion() {
+    const user = window.firebaseAuth?.currentUser;
+    if (!user || typeof window.cancelAccountDeletion !== "function") return;
+
+    const button = document.getElementById("cancelAccountDeletionBtn");
+    try {
+        button.disabled = true;
+        await window.cancelAccountDeletion(user.uid);
+        showToast("Account deletion cancelled.", "success");
+        await refreshAccountDeletionStatus(user);
+    } catch (error) {
+        console.error("Could not cancel account deletion:", error);
+        showToast("Could not cancel account deletion. Try again.", "warning");
+    } finally {
+        button.disabled = false;
+    }
 }
 
 function closeSettings() {

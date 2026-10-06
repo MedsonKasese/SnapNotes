@@ -4,6 +4,7 @@ import {
     signInWithEmailAndPassword,
     signInWithPopup,
     GoogleAuthProvider,
+    deleteUser,
     setPersistence,
     browserLocalPersistence,
     sendEmailVerification,
@@ -11,7 +12,7 @@ import {
     signOut,
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
-import { loadFromCloud } from "./firestore.js";
+import { getAccountDeletionStatus, loadFromCloud } from "./firestore.js";
 
 const emailInput = document.getElementById("emailInput");
 const passwordInput = document.getElementById("passwordInput");
@@ -28,6 +29,7 @@ const userAvatarImage = document.getElementById("userAvatarImage");
 const userAvatarInitials = document.getElementById("userAvatarInitials");
 const authModal = document.getElementById("authModal");
 const closeModalBtn = document.getElementById("closeModalBtn");
+let accountDeletionTimer = null;
 
 // Keep Firebase Auth persistent across page reloads and PWA sessions.
 const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch(error => {
@@ -243,10 +245,45 @@ function isMobileAuthEnvironment() {
         window.matchMedia("(display-mode: standalone)").matches;
 }
 
+function clearAccountDeletionTimer() {
+    if (accountDeletionTimer) {
+        clearTimeout(accountDeletionTimer);
+        accountDeletionTimer = null;
+    }
+}
+
+async function processScheduledAccountDeletion(user) {
+    clearAccountDeletionTimer();
+    try {
+        const deletion = await getAccountDeletionStatus(user.uid);
+        if (auth.currentUser?.uid !== user.uid || !deletion?.scheduledFor) return;
+
+        const delay = Date.parse(deletion.scheduledFor) - Date.now();
+        if (delay > 0) {
+            accountDeletionTimer = setTimeout(() => processScheduledAccountDeletion(user), Math.min(delay, 2_147_000_000));
+            return;
+        }
+
+        await deleteUser(user);
+        localStorage.removeItem("SnapNotes");
+        window.notes = [];
+        window.renderNotes?.("", "all");
+        window.updateNavigationCounts?.();
+        window.showToast("Your account has been permanently deleted.", "warning");
+    } catch (error) {
+        if (error.code === "auth/requires-recent-login") {
+            window.showToast("Your account is due for deletion. Sign in again to complete it.", "warning");
+        } else {
+            console.error("Scheduled account deletion failed:", error);
+        }
+    }
+}
+
 onAuthStateChanged(auth, user => {
     resetGoogleButton();
 
     if (user) {
+        processScheduledAccountDeletion(user);
         const initials = user.displayName
             ? user.displayName.trim().split(/\\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase()
             : user.email
@@ -282,6 +319,7 @@ onAuthStateChanged(auth, user => {
 
         loadFromCloud(user.uid);
     } else {
+        clearAccountDeletionTimer();
         userAvatar.hidden = true;
         if (userAvatarImage) {
             userAvatarImage.hidden = true;

@@ -125,6 +125,29 @@ export async function loadFromCloud(uid) {
     }
 }
 
+export async function getAccountDeletionStatus(uid) {
+    if (!uid) return null;
+    const snapshot = await getDoc(doc(db, "users", uid));
+    return snapshot.exists() ? snapshot.data().accountDeletion || null : null;
+}
+
+export async function scheduleAccountDeletion(uid) {
+    if (!uid) throw new Error("A signed-in account is required.");
+    const requestedAt = new Date();
+    const scheduledFor = new Date(requestedAt.getTime() + 10 * 24 * 60 * 60 * 1000);
+    const accountDeletion = {
+        requestedAt: requestedAt.toISOString(),
+        scheduledFor: scheduledFor.toISOString()
+    };
+    await setDoc(doc(db, "users", uid), { accountDeletion }, { merge: true });
+    return accountDeletion;
+}
+
+export async function cancelAccountDeletion(uid) {
+    if (!uid) throw new Error("A signed-in account is required.");
+    await setDoc(doc(db, "users", uid), { accountDeletion: null }, { merge: true });
+}
+
 async function syncPendingChanges() {
     if (localStorage.getItem(PENDING_KEY) !== "true") return;
     if (!navigator.onLine || !auth?.currentUser) return;
@@ -133,5 +156,8 @@ async function syncPendingChanges() {
 }
 
 window.syncToCloud = syncToCloud;
+window.getAccountDeletionStatus = getAccountDeletionStatus;
+window.scheduleAccountDeletion = scheduleAccountDeletion;
+window.cancelAccountDeletion = cancelAccountDeletion;
 window.addEventListener("online", syncPendingChanges);
 window.addEventListener("snapnotes:auth-ready", syncPendingChanges);
