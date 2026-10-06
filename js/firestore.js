@@ -148,6 +148,7 @@ export async function loadFromCloud(uid) {
         localStorage.setItem("SnapNotes", JSON.stringify(merged));
 
         window.renderNotes();
+        window.checkDueReminders?.();
         if (typeof window.updateNavigationCounts === "function") {
             window.updateNavigationCounts();
         }
