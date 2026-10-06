@@ -201,6 +201,7 @@ function setupEventListeners() {
             return;
         }
         if (event.key === "Escape") {
+            closeNoteDetail?.();
             closeDrawer();
             closeCategoryMenu();
             closeNoteMenus();
