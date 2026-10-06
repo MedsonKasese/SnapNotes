@@ -31,7 +31,9 @@ jobs:
           grep -q 'function parseTags' js/app.js
           grep -q 'function openNoteDetail' js/notes.js
           grep -q 'syncConflict' js/firestore.js
-          grep -q 'snapnotes-v33' sw.js
+          grep -q 'CACHE_NAME = "snapnotes-v' sw.js
+          grep -q 'showNotification' js/app.js
+          grep -q 'notificationclick' sw.js
 
       - name: Validate test harness
         run: test -f tests/test.html
