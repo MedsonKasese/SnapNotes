@@ -702,7 +702,8 @@ async function checkDueReminders() {
             note.reminderNotified = true;
             changed = true;
             if ("Notification" in window && Notification.permission === "granted") {
-                new Notification(note.title || "SnapNotes reminder", { body: note.text || "You set a reminder for this note." });
+                const shown = await showReminderNotification(note);
+                if (!shown) showToast(`Reminder: ${note.title || "Untitled note"}`, "update");
             } else {
                 showToast(`Reminder: ${note.title || "Untitled note"}`, "update");
             }
@@ -712,6 +713,26 @@ async function checkDueReminders() {
         await saveNotes();
         renderNotes();
     }
+}
+
+async function showReminderNotification(note) {
+    try {
+        const registration = await navigator.serviceWorker?.ready;
+        if (registration?.showNotification) {
+            await registration.showNotification(note.title || "SnapNotes reminder", {
+                body: note.text || "You set a reminder for this note.",
+                icon: "./assets/icons/snapnotes-icon.png",
+                badge: "./assets/icons/snapnotes-icon.png",
+                tag: `snapnotes-reminder-${note.id}`,
+                renotify: true,
+                data: { noteId: note.id }
+            });
+            return true;
+        }
+    } catch (error) {
+        console.warn("SnapNotes could not show a service-worker notification:", error);
+    }
+    return false;
 }
 
 async function requestReminderPermission() {
