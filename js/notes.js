@@ -1,7 +1,7 @@
 // =========================
 // NOTE LIST + NOTE ACTIONS
 // =========================
-const MAX_NOTE_CHARACTERS = 1000;
+const MAX_NOTE_CHARACTERS = 1500;
 window.SNAPNOTES_MAX_CHARACTERS = MAX_NOTE_CHARACTERS;
 
 function renderNotes(filterText = "", filterCategory = "all", view = window.getActiveNotesView ? window.getActiveNotesView() : "all") {

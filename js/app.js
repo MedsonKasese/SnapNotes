@@ -419,7 +419,7 @@ function updateCharacterCount() {
     if (!editor || !counter) return;
 
     const count = (editor.innerText || "").replace(/\r/g, "").trim().length;
-    const limit = window.SNAPNOTES_MAX_CHARACTERS || 1000;
+    const limit = window.SNAPNOTES_MAX_CHARACTERS || 1500;
     counter.textContent = `${count}/${limit}`;
     counter.classList.toggle("over-limit", count > limit);
 }
@@ -435,7 +435,7 @@ async function saveEditorNote() {
 
     try {
         const rawText = editor.innerText.replace(/\r/g, "").trim();
-        const maxCharacters = window.SNAPNOTES_MAX_CHARACTERS || 1000;
+        const maxCharacters = window.SNAPNOTES_MAX_CHARACTERS || 1500;
 
     if (!rawText) {
         showToast("Write something before saving.", "warning");
