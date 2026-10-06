@@ -33,13 +33,24 @@ function renderNotes(filterText = "", filterCategory = "all", view = window.getA
     const tokens = rawQuery.split(/\s+/).filter(Boolean);
     const categoryToken = tokens.find(token => token.startsWith("category:"));
     const pinnedToken = tokens.find(token => token === "is:pinned");
+    const archivedToken = tokens.find(token => token === "is:archived");
+    const trashToken = tokens.find(token => token === "is:trash" || token === "is:trashed");
+    const reminderToken = tokens.find(token => token === "has:reminder");
+    const tagTokens = tokens.filter(token => token.startsWith("tag:")).map(token => token.slice(4).trim()).filter(Boolean);
+    const positiveTerms = [];
+    const negativeTerms = [];
+    const searchTokens = rawQuery.match(/"[^"]+"|\S+/g) || [];
+    searchTokens.forEach(token => {
+        if (token.startsWith("-") && token.length > 1) negativeTerms.push(token.slice(1).replace(/^"|"$/g, ""));
+        else if (!token.startsWith("category:") && token !== "is:pinned" && token !== "is:archived" && token !== "is:trash" && token !== "is:trashed" && token !== "has:reminder" && !token.startsWith("tag:") && !token.startsWith("sort:")) positiveTerms.push(token.replace(/^"|"$/g, ""));
+    });
     const validCategories = ["all", "general", "work", "personal", "ideas", "important"];
     const requestedCategory = categoryToken
         ? categoryToken.replace("category:", "")
         : filterCategory;
     const hasInvalidCategory = !validCategories.includes(requestedCategory);
     if (tokens.includes("sort:oldest")) sortMode = "oldest";
-    const searchTerms = tokens.filter(token => !token.startsWith("category:") && token !== "is:pinned" && !token.startsWith("sort:"));
+    const searchTerms = positiveTerms;
     const query = searchTerms.join(" ");
 
     const visibleNotes = notes.filter(note => {
@@ -52,13 +63,19 @@ function renderNotes(filterText = "", filterCategory = "all", view = window.getA
         const searchableText = [
             note.title || "",
             note.text || "",
-            note.category || ""
+            note.category || "",
+            ...(Array.isArray(note.tags) ? note.tags : [])
         ].join(" ").toLowerCase();
 
-        const matchesSearch = !query || searchTerms.every(term => searchableText.includes(term));
+        const matchesSearch = !query || searchTerms.every(term => searchableText.includes(term.toLowerCase()));
+        const matchesExcluded = negativeTerms.every(term => !searchableText.includes(term.toLowerCase()));
         const matchesCategory = requestedCategory === "all" || note.category === requestedCategory;
         const matchesPinned = !pinnedToken || note.pinned;
-        return matchesSearch && matchesCategory && matchesPinned;
+        const matchesArchived = !archivedToken || Boolean(note.archived);
+        const matchesTrash = !trashToken || Boolean(note.deletedAt);
+        const matchesReminder = !reminderToken || Boolean(note.reminderAt);
+        const matchesTags = !tagTokens.length || tagTokens.every(tag => (note.tags || []).map(value => value.toLowerCase()).includes(tag.toLowerCase()));
+        return matchesSearch && matchesExcluded && matchesCategory && matchesPinned && matchesArchived && matchesTrash && matchesReminder && matchesTags;
     });
 
     filteredNotes.sort((a, b) => {
@@ -201,6 +218,24 @@ function createNoteElement(note) {
 
     metaLeft.append(category, time);
 
+    const tags = document.createElement("div");
+    tags.className = "note-tags";
+    (Array.isArray(note.tags) ? note.tags : []).forEach(tag => {
+        const chip = document.createElement("span");
+        chip.className = "note-tag";
+        chip.textContent = "#" + tag;
+        tags.appendChild(chip);
+    });
+    if (tags.childElementCount) content.appendChild(tags);
+
+    if (note.reminderAt) {
+        const reminder = document.createElement("div");
+        reminder.className = "note-reminder";
+        reminder.innerHTML = '<i class="fa-regular fa-bell"></i>';
+        reminder.append(document.createTextNode(formatReminder(note.reminderAt)));
+        content.appendChild(reminder);
+    }
+
     const actions = document.createElement("div");
     actions.className = "note-card-actions";
 
@@ -225,6 +260,7 @@ function createNoteElement(note) {
     const dropdown = document.createElement("div");
     dropdown.className = "note-dropdown";
 
+    const detailButton = createDropdownItem("Open note", () => openNoteDetail(note.id));
     const duplicateButton = createDropdownItem("Duplicate note", () => duplicateNote(note.id));
     const shareButton = createDropdownItem("Share note", () => shareNote(note));
     const editButton = createDropdownItem("Edit note", () => startEditing(card, note));
@@ -239,7 +275,7 @@ function createNoteElement(note) {
             ? createDropdownItem("Restore note", () => restoreNote(note.id))
             : createDropdownItem("Archive note", () => archiveNote(note.id));
         const deleteButton = createDropdownItem("Move to trash", () => deleteNote(note.id), "delete-action");
-        dropdown.append(duplicateButton, shareButton, editButton, archiveButton, deleteButton);
+        dropdown.append(detailButton, duplicateButton, shareButton, editButton, archiveButton, deleteButton);
     }
 
     menuButton.addEventListener("click", event => {
@@ -294,6 +330,16 @@ function startEditing(card, note) {
         bodyInput.textContent = getNoteBodyText(note);
     }
 
+    const metadata = document.createElement("div");
+    metadata.className = "note-detail-editor";
+    const tagsInput = document.createElement("input");
+    tagsInput.value = (note.tags || []).join(", ");
+    tagsInput.placeholder = "Tags: work, ideas, urgent";
+    const reminderInput = document.createElement("input");
+    reminderInput.type = "datetime-local";
+    reminderInput.value = note.reminderAt ? String(note.reminderAt).slice(0, 16) : "";
+    metadata.append(tagsInput, reminderInput);
+
     const actions = document.createElement("div");
     actions.className = "edit-save-row";
 
@@ -308,7 +354,7 @@ function startEditing(card, note) {
 
     actions.append(cancelButton, saveButton);
 
-    content.replaceChildren(titleInput, bodyInput, actions);
+    content.replaceChildren(titleInput, bodyInput, metadata, actions);
     meta.querySelector(".note-card-actions").hidden = true;
     meta.hidden = true;
 
@@ -347,6 +393,9 @@ function startEditing(card, note) {
             title,
             text: body,
             html,
+            tags: typeof window.parseTags === "function" ? window.parseTags(tagsInput.value) : [],
+            reminderAt: reminderInput.value ? new Date(reminderInput.value).toISOString() : null,
+            reminderNotified: reminderInput.value === (note.reminderAt ? String(note.reminderAt).slice(0, 16) : "") ? Boolean(previous.reminderNotified) : false,
             updatedAt
         };
 
@@ -371,6 +420,63 @@ function startEditing(card, note) {
 
     titleInput.focus();
 }
+function formatReminder(value) {
+    const time = Date.parse(value);
+    if (Number.isNaN(time)) return "Reminder set";
+    return "Reminder " + new Date(time).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+}
+
+function openNoteDetail(id) {
+    const note = window.notes.find(item => item.id === id);
+    const modal = document.getElementById("noteDetailModal");
+    if (!note || !modal) return;
+
+    const bodyHtml = note.html && typeof window.sanitizeNoteHtml === "function"
+        ? getNoteBodyHtml(note)
+        : String(note.text || "").replace(/\n/g, "<br>");
+    const tags = (note.tags || []).map(tag => `<span class="note-tag">#${escapeHtml(tag)}</span>`).join("");
+    modal.innerHTML = `
+        <div class="note-detail-sheet" role="dialog" aria-modal="true" aria-labelledby="noteDetailTitle">
+            <div class="note-detail-heading">
+                <div>
+                    <h2 id="noteDetailTitle">${escapeHtml(note.title || "Untitled note")}</h2>
+                    <div class="note-detail-meta"><span>${escapeHtml(formatCategory(note.category))}</span><span>${escapeHtml(note.time || formatDate(note.createdAt))}</span></div>
+                </div>
+                <button type="button" class="icon-button" data-detail-close aria-label="Close note"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="note-tags">${tags}</div>
+            ${note.reminderAt ? `<div class="note-reminder"><i class="fa-regular fa-bell"></i>${escapeHtml(formatReminder(note.reminderAt))}</div>` : ""}
+            <div class="note-detail-body">${bodyHtml || "<em>No note body.</em>"}</div>
+            <div class="note-detail-actions">
+                <button type="button" class="secondary-action" data-detail-edit>Edit note</button>
+                <button type="button" class="primary-action" data-detail-close>Close</button>
+            </div>
+        </div>`;
+    modal.classList.add("show");
+    modal.setAttribute("aria-hidden", "false");
+    modal.querySelectorAll("[data-detail-close]").forEach(button => button.addEventListener("click", closeNoteDetail));
+    modal.querySelector("[data-detail-edit]").addEventListener("click", () => {
+        closeNoteDetail();
+        const card = document.querySelector(`.note-card[data-id="${CSS.escape(id)}"]`);
+        if (card) startEditing(card, note);
+    });
+}
+
+function closeNoteDetail() {
+    const modal = document.getElementById("noteDetailModal");
+    if (!modal) return;
+    modal.classList.remove("show");
+    modal.setAttribute("aria-hidden", "true");
+    modal.innerHTML = "";
+}
+
+function escapeHtml(value) {
+    return String(value || "").replace(/[&<>"']/g, character => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[character]));
+}
+
+window.openNoteDetail = openNoteDetail;
+window.closeNoteDetail = closeNoteDetail;
+
 function viewForNote(note) {
     if (note.deletedAt) return "trash";
     if (note.archived) return "archive";
