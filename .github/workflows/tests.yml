@@ -34,6 +34,8 @@ jobs:
           grep -q 'CACHE_NAME = "snapnotes-v' sw.js
           grep -q 'showNotification' js/app.js
           grep -q 'notificationclick' sw.js
+          test -f assets/icons/snapnotes-notification.svg
+          grep -q 'snapnotes-notification.svg' js/app.js
 
       - name: Validate test harness
         run: test -f tests/test.html

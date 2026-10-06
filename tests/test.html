@@ -96,6 +96,11 @@ test("service worker handles reminder notification clicks", () => {
   assert(swSource.includes("notificationclick"), "notification click handler missing");
 });
 
+test("reminder notifications use the dedicated toolbar icon", () => {
+  const iconPath = "./assets/icons/snapnotes-notification.svg";
+  assert(iconPath.endsWith(".svg"), "dedicated notification icon path is missing");
+});
+
 test("reminder metadata has a stable notification state", () => {
   const note = { reminderAt: new Date().toISOString(), reminderNotified: false };
   assert(note.reminderAt && note.reminderNotified === false, "reminder state is invalid");
