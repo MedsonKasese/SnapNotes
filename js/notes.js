@@ -54,6 +54,8 @@ function renderNotes(filterText = "", filterCategory = "all", view = window.getA
     const query = searchTerms.join(" ");
 
     const visibleNotes = notes.filter(note => {
+        if (trashToken) return Boolean(note.deletedAt);
+        if (archivedToken) return Boolean(note.archived) && !note.deletedAt;
         if (view === "trash") return Boolean(note.deletedAt);
         if (view === "archive") return Boolean(note.archived) && !note.deletedAt;
         return !note.archived && !note.deletedAt;
