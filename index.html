@@ -145,6 +145,18 @@ Then write your notes below..."
         </section>
     </main>
 
+    <div id="pwaPrompt" class="pwa-prompt" role="status" aria-live="polite" hidden>
+        <div class="pwa-prompt-icon" aria-hidden="true"><i class="fa-solid fa-mobile-screen-button"></i></div>
+        <div class="pwa-prompt-copy">
+            <strong id="pwaPromptTitle">Install SnapNotes</strong>
+            <span id="pwaPromptText">Get a faster app-like experience on your device.</span>
+        </div>
+        <div class="pwa-prompt-actions">
+            <button id="pwaPromptAction" type="button" class="primary-action">Install</button>
+            <button id="pwaPromptClose" type="button" class="pwa-prompt-close" aria-label="Dismiss"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+    </div>
+
     <button id="addBtn" class="floating-add" type="button" aria-label="Create a new note">
         <i class="fa-solid fa-plus"></i>
     </button>
@@ -403,16 +415,81 @@ Then write your notes below..."
         window.addEventListener("offline", () => window.showToast?.("You're offline. Local changes are still available.", "warning"));
         window.addEventListener("online", () => window.showToast?.("You're back online. Syncing changes...", "success"));
 
+        let deferredInstallPrompt = null;
+        const pwaPrompt = document.getElementById("pwaPrompt");
+        const pwaPromptTitle = document.getElementById("pwaPromptTitle");
+        const pwaPromptText = document.getElementById("pwaPromptText");
+        const pwaPromptAction = document.getElementById("pwaPromptAction");
+        const pwaPromptClose = document.getElementById("pwaPromptClose");
+
+        function isSnapNotesInstalled() {
+            return window.matchMedia("(display-mode: standalone)").matches ||
+                window.navigator.standalone === true;
+        }
+
+        function showPwaPrompt(type) {
+            if (!pwaPrompt || isSnapNotesInstalled()) return;
+
+            if (type === "update") {
+                pwaPromptTitle.textContent = "SnapNotes update ready";
+                pwaPromptText.textContent = "A newer version is ready. Refresh to use the latest version.";
+                pwaPromptAction.textContent = "Update now";
+                pwaPromptAction.dataset.action = "update";
+            } else {
+                pwaPromptTitle.textContent = "Install SnapNotes";
+                pwaPromptText.textContent = "Get a faster app-like experience on your device.";
+                pwaPromptAction.textContent = "Install";
+                pwaPromptAction.dataset.action = "install";
+            }
+
+            pwaPrompt.hidden = false;
+        }
+
+        pwaPromptClose?.addEventListener("click", () => {
+            pwaPrompt.hidden = true;
+        });
+
+        pwaPromptAction?.addEventListener("click", async () => {
+            if (pwaPromptAction.dataset.action === "update") {
+                window.location.reload();
+                return;
+            }
+
+            if (!deferredInstallPrompt) return;
+
+            deferredInstallPrompt.prompt();
+            const choice = await deferredInstallPrompt.userChoice;
+            deferredInstallPrompt = null;
+
+            if (choice.outcome === "accepted") {
+                pwaPrompt.hidden = true;
+            }
+        });
+
+        window.addEventListener("beforeinstallprompt", event => {
+            event.preventDefault();
+            deferredInstallPrompt = event;
+            showPwaPrompt("install");
+        });
+
+        window.addEventListener("appinstalled", () => {
+            deferredInstallPrompt = null;
+            if (pwaPrompt) pwaPrompt.hidden = true;
+        });
+
         if ("serviceWorker" in navigator) {
             window.addEventListener("load", () => {
+                const hadController = Boolean(navigator.serviceWorker.controller);
+
                 navigator.serviceWorker.register("./sw.js").then(registration => {
-                registration.update();
-                navigator.serviceWorker.addEventListener("message", event => {
-                    if (event.data?.type === "SNAPNOTES_UPDATED") {
-                        window.showToast?.("SnapNotes has been updated. Refresh to use the latest version.", "success");
-                    }
-                });
-            }).catch(error => {
+                    registration.update();
+
+                    navigator.serviceWorker.addEventListener("message", event => {
+                        if (event.data?.type === "SNAPNOTES_UPDATED" && hadController) {
+                            showPwaPrompt("update");
+                        }
+                    });
+                }).catch(error => {
                     console.warn("SnapNotes offline support could not start:", error);
                 });
             });
