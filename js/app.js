@@ -48,6 +48,7 @@ function setupEventListeners() {
     const saveNoteBtn = document.getElementById("saveNoteBtn");
     const addBtn = document.getElementById("addBtn");
     const newNoteBtn = document.getElementById("newNoteBtn");
+    const emptyTrashBtn = document.getElementById("emptyTrashBtn");
     const logoButton = document.getElementById("logoButton");
     const editorCategory = document.getElementById("editorCategory");
     const drawerNav = document.getElementById("drawerNav");
@@ -117,6 +118,7 @@ function setupEventListeners() {
     saveNoteBtn.addEventListener("click", saveEditorNote);
     addBtn.addEventListener("click", openNewNoteView);
     newNoteBtn.addEventListener("click", openNewNoteView);
+    emptyTrashBtn.addEventListener("click", () => window.emptyTrash?.());
 
     exportNotesBtn.addEventListener("click", exportNotes);
     importNotesBtn.addEventListener("click", () => importNotesInput.click());
@@ -238,6 +240,7 @@ function openNotesView(category = activeCategory) {
     document.getElementById("newNoteView").hidden = true;
     document.getElementById("notesView").hidden = false;
     document.getElementById("addBtn").hidden = false;
+    document.getElementById("emptyTrashBtn").hidden = true;
 
     const title = category === "all" ? "All notes" : CATEGORIES[category];
     document.getElementById("notesViewTitle").textContent = title;
@@ -255,6 +258,7 @@ function selectView(view) {
     document.getElementById("newNoteView").hidden = true;
     document.getElementById("notesView").hidden = false;
     document.getElementById("addBtn").hidden = view !== "all";
+    document.getElementById("emptyTrashBtn").hidden = view !== "trash";
     document.getElementById("notesViewTitle").textContent = view === "archive" ? "Archived" : "Trash";
     document.getElementById("notesViewEyebrow").textContent = "Library";
     applyNoteFilters();

@@ -408,6 +408,24 @@ function permanentlyDeleteNote(id) {
     showToast("Note permanently deleted", "delete");
 }
 
+function emptyTrash() {
+    const trashCount = (window.notes || []).filter(note => note.deletedAt).length;
+    if (!trashCount) {
+        showToast("Trash is already empty", "warning");
+        return;
+    }
+
+    if (!confirm(`Empty Trash and permanently delete ${trashCount} ${trashCount === 1 ? "note" : "notes"}? This cannot be undone.`)) {
+        return;
+    }
+
+    window.notes = (window.notes || []).filter(note => !note.deletedAt);
+    saveNotes();
+    renderNotes("", "all", "trash");
+    updateNavigationCounts();
+    showToast("Trash emptied", "delete");
+}
+
 function togglePin(id) {
     const note = window.notes.find(item => item.id === id);
     if (!note) return;
@@ -682,6 +700,7 @@ function addNote() {
 window.addNote = addNote;
 window.renderNotes = renderNotes;
 window.shareNote = shareNote;
+window.emptyTrash = emptyTrash;
 window.updateEmptyState = updateEmptyState;
 window.startNoteEditing = startEditing;
 window.recordNoteCreation = note => {

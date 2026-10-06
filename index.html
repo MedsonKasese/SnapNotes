@@ -129,10 +129,16 @@ Then write your notes below..."
                     <p class="eyebrow" id="notesViewEyebrow">Your notes</p>
                     <h1 id="notesViewTitle">All notes</h1>
                 </div>
-                <button id="newNoteBtn" class="secondary-action" type="button">
-                    <i class="fa-solid fa-plus"></i>
-                    New note
-                </button>
+                <div class="notes-view-actions">
+                    <button id="emptyTrashBtn" class="secondary-action danger-action" type="button" hidden>
+                        <i class="fa-solid fa-trash-can"></i>
+                        Empty Trash
+                    </button>
+                    <button id="newNoteBtn" class="secondary-action" type="button">
+                        <i class="fa-solid fa-plus"></i>
+                        New note
+                    </button>
+                </div>
             </div>
             <p id="emptyState" class="empty-state">No notes yet. Create your first one.</p>
             <div id="notesContainer" class="notesContainer"></div>

@@ -401,6 +401,17 @@
     border: 1px solid var(--border-color);
 }
 
+.notes-view-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.danger-action {
+    color: var(--danger-color);
+}
+
 .notes-view {
     padding-top: 8px;
 }
