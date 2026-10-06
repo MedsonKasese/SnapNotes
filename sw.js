@@ -1,3 +1,22 @@
+
+self.addEventListener("notificationclick", event => {
+  const noteId = event.notification?.data?.noteId;
+  event.notification.close();
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(clientList => {
+      const target = clientList.find(client => "focus" in client);
+      if (target) {
+        return target.focus();
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow("./");
+      }
+      return undefined;
+    })
+  );
+});
+
 const CACHE_NAME = "snapnotes-v33";
 const APP_SHELL = [
   "./",
