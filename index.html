@@ -111,7 +111,7 @@ Then write your notes below..."
             ></div>
 
             <div class="editor-footer">
-                <div class="editor-status" id="draftStatus" aria-live="polite"><i class="fa-regular fa-floppy-disk"></i><span>Drafts save automatically</span><span id="editorCharacterCount" class="editor-character-count">0/1000</span></div>
+                <div class="editor-status" id="draftStatus" aria-live="polite"><i class="fa-regular fa-floppy-disk"></i><span>Drafts save automatically</span><span id="editorCharacterCount" class="editor-character-count">0/1500</span></div>
                 <p class="editor-hint">
                     <i class="fa-solid fa-lightbulb"></i>
                     Start the first line with <strong>##</strong> to make it your note title.
@@ -129,10 +129,16 @@ Then write your notes below..."
                     <p class="eyebrow" id="notesViewEyebrow">Your notes</p>
                     <h1 id="notesViewTitle">All notes</h1>
                 </div>
-                <button id="newNoteBtn" class="secondary-action" type="button">
-                    <i class="fa-solid fa-plus"></i>
-                    New note
-                </button>
+                <div class="notes-view-actions">
+                    <button id="emptyTrashBtn" class="secondary-action danger-action" type="button" hidden>
+                        <i class="fa-solid fa-trash-can"></i>
+                        Empty Trash
+                    </button>
+                    <button id="newNoteBtn" class="secondary-action" type="button">
+                        <i class="fa-solid fa-plus"></i>
+                        New note
+                    </button>
+                </div>
             </div>
             <p id="emptyState" class="empty-state">No notes yet. Create your first one.</p>
             <div id="notesContainer" class="notesContainer"></div>

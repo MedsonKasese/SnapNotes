@@ -48,6 +48,7 @@ function setupEventListeners() {
     const saveNoteBtn = document.getElementById("saveNoteBtn");
     const addBtn = document.getElementById("addBtn");
     const newNoteBtn = document.getElementById("newNoteBtn");
+    const emptyTrashBtn = document.getElementById("emptyTrashBtn");
     const logoButton = document.getElementById("logoButton");
     const editorCategory = document.getElementById("editorCategory");
     const drawerNav = document.getElementById("drawerNav");
@@ -117,6 +118,7 @@ function setupEventListeners() {
     saveNoteBtn.addEventListener("click", saveEditorNote);
     addBtn.addEventListener("click", openNewNoteView);
     newNoteBtn.addEventListener("click", openNewNoteView);
+    emptyTrashBtn.addEventListener("click", () => window.emptyTrash?.());
 
     exportNotesBtn.addEventListener("click", exportNotes);
     importNotesBtn.addEventListener("click", () => importNotesInput.click());
@@ -238,6 +240,7 @@ function openNotesView(category = activeCategory) {
     document.getElementById("newNoteView").hidden = true;
     document.getElementById("notesView").hidden = false;
     document.getElementById("addBtn").hidden = false;
+    document.getElementById("emptyTrashBtn").hidden = true;
 
     const title = category === "all" ? "All notes" : CATEGORIES[category];
     document.getElementById("notesViewTitle").textContent = title;
@@ -255,6 +258,7 @@ function selectView(view) {
     document.getElementById("newNoteView").hidden = true;
     document.getElementById("notesView").hidden = false;
     document.getElementById("addBtn").hidden = view !== "all";
+    document.getElementById("emptyTrashBtn").hidden = view !== "trash";
     document.getElementById("notesViewTitle").textContent = view === "archive" ? "Archived" : "Trash";
     document.getElementById("notesViewEyebrow").textContent = "Library";
     applyNoteFilters();
@@ -415,15 +419,23 @@ function updateCharacterCount() {
     if (!editor || !counter) return;
 
     const count = (editor.innerText || "").replace(/\r/g, "").trim().length;
-    const limit = window.SNAPNOTES_MAX_CHARACTERS || 1000;
+    const limit = window.SNAPNOTES_MAX_CHARACTERS || 1500;
     counter.textContent = `${count}/${limit}`;
     counter.classList.toggle("over-limit", count > limit);
 }
 
 async function saveEditorNote() {
     const editor = document.getElementById("noteEditor");
-    const rawText = editor.innerText.replace(/\r/g, "").trim();
-    const maxCharacters = window.SNAPNOTES_MAX_CHARACTERS || 1000;
+    const saveButton = document.getElementById("saveNoteBtn");
+    if (saveButton?.disabled) return;
+    if (saveButton) {
+        saveButton.disabled = true;
+        saveButton.setAttribute("aria-busy", "true");
+    }
+
+    try {
+        const rawText = editor.innerText.replace(/\r/g, "").trim();
+        const maxCharacters = window.SNAPNOTES_MAX_CHARACTERS || 1500;
 
     if (!rawText) {
         showToast("Write something before saving.", "warning");
@@ -489,12 +501,18 @@ async function saveEditorNote() {
     updateNavigationCounts();
     openNotesView("all");
 
-    if (saveResult.cloudEnabled && !saveResult.synced) {
-        showToast("Note saved locally. Cloud sync pending.", "warning");
-    } else if (saveResult.cloudEnabled) {
-        showToast("Note saved and synced", "success");
-    } else {
-        showToast("Note saved", "success");
+        if (saveResult.cloudEnabled && !saveResult.synced) {
+            showToast("Note saved locally. Cloud sync pending.", "warning");
+        } else if (saveResult.cloudEnabled) {
+            showToast("Note saved and synced", "success");
+        } else {
+            showToast("Note saved", "success");
+        }
+    } finally {
+        if (saveButton) {
+            saveButton.disabled = false;
+            saveButton.removeAttribute("aria-busy");
+        }
     }
 }
 

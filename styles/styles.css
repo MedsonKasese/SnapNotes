@@ -487,12 +487,12 @@
 
 .theme-toggle {
     position: relative;
-    width: 48px;
-    height: 26px;
+    width: 40px;
+    height: 22px;
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
-    padding: 3px;
+    padding: 2px;
     border: 1px solid var(--border-color);
     border-radius: 999px;
     background: var(--surface-soft);
@@ -502,8 +502,8 @@
 }
 
 .theme-toggle-knob {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
@@ -528,11 +528,16 @@
 
 .theme-toggle.active .theme-toggle-knob {
     color: var(--primary-color);
-    transform: translateX(22px);
+    transform: translateX(18px);
 }
 
 .theme-toggle.active .theme-toggle-knob i {
     display: block;
+}
+
+.settings-sheet .theme-toggle {
+    min-height: 22px;
+    padding: 2px;
 }
 
 .settings-social-links {
