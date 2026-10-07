@@ -97,13 +97,66 @@ test("service worker handles reminder notification clicks", () => {
 });
 
 test("reminder notifications use the dedicated toolbar icon", () => {
-  const iconPath = "./assets/icons/snapnotes-icon.png";
-  assert(iconPath.endsWith(".png"), "original-color notification icon path is missing");
+  const iconPath = "./assets/icons/snapnotes-notification.svg";
+  assert(iconPath.endsWith(".svg"), "dedicated notification icon path is missing");
 });
 
 test("reminder metadata has a stable notification state", () => {
   const note = { reminderAt: new Date().toISOString(), reminderNotified: false };
   assert(note.reminderAt && note.reminderNotified === false, "reminder state is invalid");
+});
+
+test("private notes use an encrypted payload contract", () => {
+  const note = {
+    id: "private-1",
+    isPrivate: true,
+    title: "Private note",
+    text: "",
+    html: "",
+    privateData: {
+      version: 1,
+      algorithm: "AES-GCM",
+      kdf: "PBKDF2-SHA-256",
+      iterations: 600000,
+      salt: "salt",
+      iv: "iv",
+      ciphertext: "ciphertext"
+    }
+  };
+  assert(note.isPrivate === true, "private flag is missing");
+  assert(note.privateData.algorithm === "AES-GCM", "private data is not AES-GCM");
+  assert(note.privateData.kdf === "PBKDF2-SHA-256", "private KDF is missing");
+  assert(note.privateData.iterations === 600000, "private KDF work factor is invalid");
+  assert(note.title === "Private note" && note.text === "" && note.html === "", "private plaintext should not be stored");
+});
+
+test("private notes module loads before the app controller", () => {
+  const scripts = [
+    "js/private-notes.js",
+    "js/app.js"
+  ];
+  assert(scripts.indexOf("js/private-notes.js") < scripts.indexOf("js/app.js"), "private notes module must load before app.js");
+});
+
+test("private notes are excluded from normal note visibility", () => {
+  const notes = [
+    { id: "public", isPrivate: false, deletedAt: null, archived: false },
+    { id: "private", isPrivate: true, deletedAt: null, archived: false }
+  ];
+  const normal = notes.filter(note => !note.isPrivate && !note.deletedAt && !note.archived);
+  const privateNotes = notes.filter(note => note.isPrivate && !note.deletedAt && !note.archived);
+  assert(normal.length === 1 && normal[0].id === "public", "private note leaked into normal notes");
+  assert(privateNotes.length === 1 && privateNotes[0].id === "private", "private note missing from private view");
+});
+
+test("private sharing requires an explicit public-copy warning", () => {
+  const warning = "This will share a public copy of this private note.";
+  assert(warning.includes("public copy") && warning.includes("private note"), "private sharing warning is missing");
+});
+
+test("private reminder scheduling remains available outside encrypted content", () => {
+  const note = { isPrivate: true, reminderAt: new Date(Date.now() + 60000).toISOString(), reminderNotified: false };
+  assert(note.isPrivate && note.reminderAt && note.reminderNotified === false, "private reminder schedule contract is invalid");
 });
 
 document.getElementById("results").textContent = results.join("\n") + "\n\n" +

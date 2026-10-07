@@ -218,6 +218,11 @@ Then write your notes below..."
                 <span>Archived</span>
                 <span class="drawer-count" data-count-for="archive">0</span>
             </button>
+            <button class="drawer-item" type="button" data-view="private" aria-label="Open private notes">
+                <i class="fa-solid fa-lock"></i>
+                <span>Private</span>
+                <span class="drawer-count" data-count-for="private">0</span>
+            </button>
             <button class="drawer-item" type="button" data-view="trash">
                 <i class="fa-solid fa-trash"></i>
                 <span>Trash</span>
@@ -418,6 +423,7 @@ Then write your notes below..."
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="js/private-notes.js"></script>
     <script src="js/storage.js"></script>
     <script src="js/notes.js"></script>
     <script type="module" src="js/firebaseConfig.js"></script>
