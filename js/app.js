@@ -557,9 +557,11 @@ async function saveEditorNote() {
         tags: parseTags(document.getElementById("noteTagsInput")?.value || ""),
         reminderAt: document.getElementById("noteReminderInput")?.value ? new Date(document.getElementById("noteReminderInput").value).toISOString() : null,
         reminderNotified: false,
+        versions: [],
         pinned: false,
         time: `Created: ${formattedDate} • ${formattedTime}`,
-        createdAt: now.toISOString()
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString()
     };
 
     window.notes.unshift(newNote);
