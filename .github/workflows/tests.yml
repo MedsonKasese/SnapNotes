@@ -35,7 +35,8 @@ jobs:
           grep -q 'showNotification' js/app.js
           grep -q 'notificationclick' sw.js
           test -f assets/icons/snapnotes-notification.svg
-          grep -q 'snapnotes-notification.svg' js/app.js
+          test -f assets/icons/snapnotes-icon.png
+          grep -q 'snapnotes-icon.png' js/app.js
 
       - name: Validate test harness
         run: test -f tests/test.html
