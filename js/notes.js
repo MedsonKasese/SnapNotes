@@ -57,16 +57,18 @@ function renderNotes(filterText = "", filterCategory = "all", view = window.getA
         if (trashToken) return Boolean(note.deletedAt);
         if (archivedToken) return Boolean(note.archived) && !note.deletedAt;
         if (view === "trash") return Boolean(note.deletedAt);
-        if (view === "archive") return Boolean(note.archived) && !note.deletedAt;
-        return !note.archived && !note.deletedAt;
+        if (view === "archive") return Boolean(note.archived) && !note.deletedAt && !note.isPrivate;
+        if (view === "private") return Boolean(note.isPrivate) && !note.deletedAt && !note.archived;
+        return !note.archived && !note.deletedAt && !note.isPrivate;
     });
 
     const filteredNotes = visibleNotes.filter(note => {
+        const searchableNote = window.getReadablePrivateNote?.(note) || note;
         const searchableText = [
-            note.title || "",
-            note.text || "",
-            note.category || "",
-            ...(Array.isArray(note.tags) ? note.tags : [])
+            searchableNote.title || "",
+            searchableNote.text || "",
+            searchableNote.category || "",
+            ...(Array.isArray(searchableNote.tags) ? searchableNote.tags : [])
         ].join(" ").toLowerCase();
 
         const matchesSearch = !query || searchTerms.every(term => searchableText.includes(term.toLowerCase()));
@@ -153,6 +155,7 @@ function redoLastNoteChange() {
 }
 
 function createNoteElement(note) {
+    note = window.getReadablePrivateNote?.(note) || note;
     const card = document.createElement("article");
     card.className = "note-card";
     card.dataset.id = note.id;
@@ -266,6 +269,9 @@ function createNoteElement(note) {
     const duplicateButton = createDropdownItem("Duplicate note", () => duplicateNote(note.id));
     const shareButton = createDropdownItem("Share note", () => shareNote(note));
     const editButton = createDropdownItem("Edit note", () => startEditing(card, note));
+    const privateButton = note.isPrivate
+        ? createDropdownItem("Move out of private", () => window.moveNoteFromPrivate?.(note.id))
+        : createDropdownItem("Move to private", () => window.moveNoteToPrivate?.(note.id));
     const noteView = viewForNote(note);
     if (noteView === "trash") {
         dropdown.append(
@@ -277,7 +283,7 @@ function createNoteElement(note) {
             ? createDropdownItem("Restore note", () => restoreNote(note.id))
             : createDropdownItem("Archive note", () => archiveNote(note.id));
         const deleteButton = createDropdownItem("Move to trash", () => deleteNote(note.id), "delete-action");
-        dropdown.append(detailButton, duplicateButton, shareButton, editButton, archiveButton, deleteButton);
+        dropdown.append(detailButton, duplicateButton, shareButton, editButton, privateButton, archiveButton, deleteButton);
     }
 
     menuButton.addEventListener("click", event => {
@@ -361,7 +367,7 @@ function startEditing(card, note) {
     meta.hidden = true;
 
     cancelButton.addEventListener("click", () => renderNotes());
-    saveButton.addEventListener("click", () => {
+    saveButton.addEventListener("click", async () => {
         const title = titleInput.value.trim();
         const body = bodyInput.innerText.replace(/\r/g, "").trim();
         const html = typeof window.sanitizeNoteHtml === "function"
@@ -383,6 +389,28 @@ function startEditing(card, note) {
 
         if (noteIndex === -1) {
             showToast("Could not find this note. Please refresh and try again.", "warning");
+            return;
+        }
+
+        if (note.isPrivate && typeof window.updatePrivateNote === "function") {
+            const updated = await window.updatePrivateNote(note.id, {
+                title,
+                text: body,
+                html,
+                tags: typeof window.parseTags === "function" ? window.parseTags(tagsInput.value) : [],
+                reminderAt: reminderInput.value ? new Date(reminderInput.value).toISOString() : null,
+                reminderNotified: reminderInput.value === (note.reminderAt ? String(note.reminderAt).slice(0, 16) : "")
+                    ? Boolean(note.reminderNotified)
+                    : false
+            });
+
+            if (updated) {
+                renderNotes();
+                if (typeof window.updateNavigationCounts === "function") {
+                    window.updateNavigationCounts();
+                }
+                showToast("Private note updated successfully", "success");
+            }
             return;
         }
 
@@ -429,7 +457,8 @@ function formatReminder(value) {
 }
 
 function openNoteDetail(id) {
-    const note = window.notes.find(item => item.id === id);
+    const rawNote = window.notes.find(item => item.id === id);
+    const note = window.getReadablePrivateNote?.(rawNote) || rawNote;
     const modal = document.getElementById("noteDetailModal");
     if (!note || !modal) return;
 
@@ -564,9 +593,24 @@ function togglePin(id) {
     showToast(note.pinned ? "Note pinned" : "Note unpinned", note.pinned ? "update" : "warning");
 }
 
-function duplicateNote(id) {
+async function duplicateNote(id) {
     const source = window.notes.find(item => item.id === id);
     if (!source) return;
+
+    if (source.isPrivate && typeof window.duplicatePrivateNote === "function") {
+        try {
+            const duplicated = await window.duplicatePrivateNote(id);
+            if (duplicated) {
+                renderNotes();
+                if (typeof window.updateNavigationCounts === "function") window.updateNavigationCounts();
+                showToast("Private note duplicated", "success");
+            }
+        } catch (error) {
+            console.error("Could not duplicate private note:", error);
+            showToast("Could not duplicate the private note.", "warning");
+        }
+        return;
+    }
 
     const now = new Date().toISOString();
     const duplicate = {
@@ -777,6 +821,16 @@ function formatDate(dateValue) {
 // =========================
 
 async function shareNote(note) {
+    if (note.isPrivate) {
+        if (!window.isPrivateNotesUnlocked?.()) {
+            showToast("Unlock Private Notes before sharing.", "warning");
+            return;
+        }
+
+        const confirmed = confirm("This will share a public copy of this private note. The private lock will not protect the shared copy. Continue?");
+        if (!confirmed) return;
+    }
+
     const bodyText = getNoteBodyText(note);
     const bodyHtml = note.html && typeof window.sanitizeNoteHtml === "function"
         ? getNoteBodyHtml(note)
