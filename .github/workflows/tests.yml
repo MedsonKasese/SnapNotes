@@ -44,9 +44,11 @@ jobs:
           grep -q 'appendVersion' js/version-history.js
           grep -q 'edit history' js/notes.js
           grep -q 'history' js/private-notes.js
-          grep -q 'snapnotes-v40' sw.js
+          grep -q 'snapnotes-v41' sw.js
           test -f assets/icons/snapnotes-notification.png
-          grep -q 'snapnotes-notification.png' js/app.js
+          test -f assets/icons/snapnotes-notification-badge.svg
+          grep -q 'icon: "./assets/icons/snapnotes-notification.png"' js/app.js
+          grep -q 'badge: "./assets/icons/snapnotes-notification-badge.svg"' js/app.js
           grep -q 'data-view="private"' index.html
           grep -q 'isPrivate' js/notes.js
           grep -q 'AES-GCM' js/private-notes.js
