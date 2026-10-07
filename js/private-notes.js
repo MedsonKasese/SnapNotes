@@ -294,8 +294,6 @@ async function moveNoteToPrivate(id) {
             html: note.html || "",
             category: note.category || "general",
             tags: Array.isArray(note.tags) ? note.tags : [],
-            reminderAt: note.reminderAt || null,
-            reminderNotified: Boolean(note.reminderNotified),
             time: note.time || "",
         };
 
@@ -306,8 +304,6 @@ async function moveNoteToPrivate(id) {
         note.html = "";
         note.category = "general";
         note.tags = [];
-        note.reminderAt = null;
-        note.reminderNotified = false;
         note.time = "Private note";
         note.updatedAt = new Date().toISOString();
 
@@ -337,8 +333,6 @@ async function updatePrivateNote(id, updates) {
             html: String(updates.html || ""),
             category: String(updates.category || current?.category || "general"),
             tags: Array.isArray(updates.tags) ? updates.tags : (current?.tags || []),
-            reminderAt: updates.reminderAt || null,
-            reminderNotified: Boolean(updates.reminderNotified),
             time: current?.time || "Private note"
         };
 
@@ -348,8 +342,8 @@ async function updatePrivateNote(id, updates) {
         note.html = "";
         note.category = "general";
         note.tags = [];
-        note.reminderAt = null;
-        note.reminderNotified = false;
+        note.reminderAt = updates.reminderAt || null;
+        note.reminderNotified = Boolean(updates.reminderNotified);
         note.updatedAt = new Date().toISOString();
         privateUnlockCache.set(id, payload);
 
@@ -377,8 +371,8 @@ async function moveNoteFromPrivate(id) {
             html: payload.html || "",
             category: payload.category || "general",
             tags: Array.isArray(payload.tags) ? payload.tags : [],
-            reminderAt: payload.reminderAt || null,
-            reminderNotified: Boolean(payload.reminderNotified),
+            reminderAt: note.reminderAt || null,
+            reminderNotified: Boolean(note.reminderNotified),
             time: payload.time || note.time || "",
             isPrivate: false,
             updatedAt: new Date().toISOString()
