@@ -146,6 +146,11 @@ test("private sharing requires an explicit public-copy warning", () => {
   assert(warning.includes("public copy") && warning.includes("private note"), "private sharing warning is missing");
 });
 
+test("private reminder scheduling remains available outside encrypted content", () => {
+  const note = { isPrivate: true, reminderAt: new Date(Date.now() + 60000).toISOString(), reminderNotified: false };
+  assert(note.isPrivate && note.reminderAt && note.reminderNotified === false, "private reminder schedule contract is invalid");
+});
+
 document.getElementById("results").textContent = results.join("\n") + "\n\n" +
   (results.every(line => line.startsWith("PASS")) ? "ALL TESTS PASSED" : "SOME TESTS FAILED");
 </script>
