@@ -301,6 +301,9 @@ async function moveNoteToPrivate(id) {
             category: note.category || "general",
             tags: Array.isArray(note.tags) ? note.tags : [],
             time: note.time || "",
+            reminderAt: note.reminderAt || null,
+            reminderNotified: Boolean(note.reminderNotified),
+            history: Array.isArray(note.versions) ? structuredClone(note.versions) : []
         };
 
         note.privateData = await encryptPrivatePayload(payload, session.key, session.salt);
@@ -311,6 +314,7 @@ async function moveNoteToPrivate(id) {
         note.category = "general";
         note.tags = [];
         note.time = "Private note";
+        note.versions = [];
         note.updatedAt = new Date().toISOString();
 
         privateUnlockCache.set(note.id, payload);
@@ -345,7 +349,12 @@ async function updatePrivateNote(id, updates) {
             html: String(updates.html || ""),
             category: String(updates.category || current?.category || "general"),
             tags: Array.isArray(updates.tags) ? updates.tags : (current?.tags || []),
-            time: current?.time || "Private note"
+            time: current?.time || "Private note",
+            reminderAt: updates.reminderAt || null,
+            reminderNotified: Boolean(updates.reminderNotified),
+            history: typeof window.appendVersion === "function"
+                ? window.appendVersion(current?.history, current || {})
+                : (Array.isArray(current?.history) ? current.history : [])
         };
 
         note.privateData = await encryptPrivatePayload(payload, privateKey, privateSalt);
@@ -356,6 +365,7 @@ async function updatePrivateNote(id, updates) {
         note.tags = [];
         note.reminderAt = updates.reminderAt || null;
         note.reminderNotified = Boolean(updates.reminderNotified);
+        note.versions = [];
         note.updatedAt = new Date().toISOString();
         privateUnlockCache.set(id, payload);
 
@@ -383,9 +393,10 @@ async function moveNoteFromPrivate(id) {
             html: payload.html || "",
             category: payload.category || "general",
             tags: Array.isArray(payload.tags) ? payload.tags : [],
-            reminderAt: note.reminderAt || null,
-            reminderNotified: Boolean(note.reminderNotified),
+            reminderAt: payload.reminderAt || note.reminderAt || null,
+            reminderNotified: Boolean(payload.reminderNotified ?? note.reminderNotified),
             time: payload.time || note.time || "",
+            versions: Array.isArray(payload.history) ? structuredClone(payload.history) : [],
             isPrivate: false,
             updatedAt: new Date().toISOString()
         });
@@ -400,6 +411,72 @@ async function moveNoteFromPrivate(id) {
     } catch (error) {
         console.error("Could not make note public:", error);
         showToast("Could not unlock this private note.", "warning");
+        return false;
+    }
+}
+
+async function getPrivateVersionHistory(id) {
+    const note = window.notes.find(item => item.id === id);
+    if (!note?.isPrivate || !privateKey) return [];
+
+    try {
+        const payload = privateUnlockCache.get(id) || await decryptPrivatePayload(note, privateKey);
+        if (!privateUnlockCache.has(id)) privateUnlockCache.set(id, payload);
+        return Array.isArray(payload.history) ? structuredClone(payload.history) : [];
+    } catch (error) {
+        console.error("Could not load private note history:", error);
+        showToast("Could not load this note's history.", "warning");
+        return [];
+    }
+}
+
+async function restorePrivateNoteVersion(id, version) {
+    const note = window.notes.find(item => item.id === id);
+    if (!note?.isPrivate || !privateKey || !privateSalt) {
+        showToast("Unlock Private Notes before restoring a version.", "warning");
+        return false;
+    }
+
+    try {
+        const current = privateUnlockCache.get(id) || await decryptPrivatePayload(note, privateKey);
+        const history = typeof window.appendVersion === "function"
+            ? window.appendVersion(current.history, current)
+            : (Array.isArray(current.history) ? current.history : []);
+
+        const payload = {
+            ...current,
+            title: version.title || "",
+            text: version.text || "",
+            html: version.html || "",
+            category: version.category || "general",
+            tags: Array.isArray(version.tags) ? [...version.tags] : [],
+            time: version.time || current.time || "Private note",
+            reminderAt: version.reminderAt || null,
+            reminderNotified: Boolean(version.reminderNotified),
+            history
+        };
+
+        note.privateData = await encryptPrivatePayload(payload, privateKey, privateSalt);
+        note.title = "Private note";
+        note.text = "";
+        note.html = "";
+        note.category = "general";
+        note.tags = [];
+        note.time = "Private note";
+        note.reminderAt = payload.reminderAt;
+        note.reminderNotified = payload.reminderNotified;
+        note.versions = [];
+        note.updatedAt = new Date().toISOString();
+
+        privateUnlockCache.set(id, payload);
+        await saveNotes();
+        renderNotes();
+        updateNavigationCounts();
+        showToast("Earlier private version restored.", "success");
+        return true;
+    } catch (error) {
+        console.error("Could not restore private note version:", error);
+        showToast("Could not restore that private version.", "warning");
         return false;
     }
 }
@@ -444,5 +521,7 @@ window.moveNoteToPrivate = moveNoteToPrivate;
 window.moveNoteFromPrivate = moveNoteFromPrivate;
 window.updatePrivateNote = updatePrivateNote;
 window.duplicatePrivateNote = duplicatePrivateNote;
+window.getPrivateVersionHistory = getPrivateVersionHistory;
+window.restorePrivateNoteVersion = restorePrivateNoteVersion;
 window.getPrivateNotesCount = () => getPrivateNotes().length;
 window.privateNotesReady = true;
