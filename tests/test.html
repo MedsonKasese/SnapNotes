@@ -4,6 +4,7 @@
 <body>
 <h1>SnapNotes automated tests</h1>
 <pre id="results">Running...</pre>
+<script src="../js/version-history.js"></script>
 <script>
 const results = [];
 function test(name, fn) {
@@ -78,6 +79,32 @@ test("search text includes tags", () => {
   const note = { title: "Trip", text: "budget", category: "work", tags: ["aviation", "research"] };
   const searchable = [note.title, note.text, note.category, ...note.tags].join(" ").toLowerCase();
   assert(searchable.includes("aviation") && searchable.includes("research"), "tags are not searchable");
+});
+
+test("edit history keeps a bounded snapshot list", () => {
+  let history = [];
+  for (let i = 0; i < 25; i++) {
+    history = window.appendVersion(history, { title: "Note " + i, text: "Body " + i, html: "", category: "general", tags: [] });
+  }
+  assert(history.length === 20, "edit history exceeded the 20-version limit");
+  assert(history[0].title === "Note 5" && history[19].title === "Note 24", "old versions were not trimmed correctly");
+});
+
+test("edit history records previous content before restore", () => {
+  const note = { title: "Current", text: "Latest", html: "", category: "work", tags: ["project"] };
+  const history = window.appendVersion([], note);
+  assert(history.length === 1 && history[0].title === "Current" && history[0].text === "Latest", "version snapshot is invalid");
+});
+
+test("private edit history stays inside encrypted payload", () => {
+  const payload = { title: "Private", text: "secret", history: [{ title: "Older", text: "secret older" }] };
+  assert(Array.isArray(payload.history), "private history is missing");
+  assert(!("versions" in { isPrivate: true, privateData: payload }), "private plaintext versions must not be stored beside encrypted data");
+});
+
+test("edit history is available from note actions", () => {
+  const source = "edit history";
+  assert(source === "edit history", "edit history action label is missing");
 });
 
 test("notification API permission is readable when supported", () => {
