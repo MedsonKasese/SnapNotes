@@ -230,6 +230,8 @@ function setupEventListeners() {
 }
 
 function openNewNoteView() {
+    window.clearPrivateUnlock?.();
+    activeView = "all";
     document.getElementById("newNoteView").hidden = false;
     document.getElementById("notesView").hidden = true;
     document.getElementById("addBtn").hidden = true;
@@ -240,6 +242,7 @@ function openNewNoteView() {
 }
 
 function openNotesView(category = activeCategory) {
+    window.clearPrivateUnlock?.();
     activeView = "all";
     activeCategory = category;
     document.getElementById("categoryFilter").value = category;
@@ -255,7 +258,14 @@ function openNotesView(category = activeCategory) {
     applyNoteFilters();
 }
 
-function selectView(view) {
+async function selectView(view) {
+    if (view === "private") {
+        const unlocked = window.isPrivateNotesUnlocked?.() || await window.unlockPrivateNotes?.();
+        if (!unlocked) return;
+    } else if (activeView === "private") {
+        window.clearPrivateUnlock?.();
+    }
+
     activeView = view;
     document.querySelectorAll(".drawer-item").forEach(item => {
         item.classList.toggle("active", item.dataset.view === view);
@@ -265,8 +275,14 @@ function selectView(view) {
     document.getElementById("notesView").hidden = false;
     document.getElementById("addBtn").hidden = view !== "all";
     document.getElementById("emptyTrashBtn").hidden = view !== "trash";
-    document.getElementById("notesViewTitle").textContent = view === "archive" ? "Archived" : "Trash";
-    document.getElementById("notesViewEyebrow").textContent = "Library";
+
+    const titles = {
+        archive: "Archived",
+        private: "Private Notes",
+        trash: "Trash"
+    };
+    document.getElementById("notesViewTitle").textContent = titles[view] || "Notes";
+    document.getElementById("notesViewEyebrow").textContent = view === "private" ? "Locked library" : "Library";
     applyNoteFilters();
 }
 
@@ -659,6 +675,10 @@ async function importNotes(event) {
                 reminderNotified: Boolean(note.reminderNotified),
                 archived: Boolean(note.archived),
                 deletedAt: note.deletedAt || null,
+                isPrivate: Boolean(note.isPrivate && note.privateData),
+                privateData: note.isPrivate && note.privateData && typeof note.privateData === "object"
+                    ? note.privateData
+                    : null,
                 time: String(note.time || ""),
                 createdAt: note.createdAt || new Date().toISOString(),
                 updatedAt: note.updatedAt || note.createdAt || new Date().toISOString()
@@ -793,10 +813,11 @@ function updateNavigationCounts() {
         const key = element.dataset.countFor;
         let count = 0;
 
-        if (key === "all") count = activeNotes.filter(note => !note.archived).length;
-        else if (key === "archive") count = activeNotes.filter(note => note.archived).length;
+        if (key === "all") count = activeNotes.filter(note => !note.archived && !note.isPrivate).length;
+        else if (key === "archive") count = activeNotes.filter(note => note.archived && !note.isPrivate).length;
+        else if (key === "private") count = activeNotes.filter(note => note.isPrivate && !note.archived).length;
         else if (key === "trash") count = notes.filter(note => note.deletedAt).length;
-        else count = activeNotes.filter(note => !note.archived && note.category === key).length;
+        else count = activeNotes.filter(note => !note.archived && !note.isPrivate && note.category === key).length;
 
         element.textContent = count;
     });
