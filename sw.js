@@ -29,6 +29,7 @@ const APP_SHELL = [
   "./js/storage.js",
   "./js/notes.js",
   "./js/app.js",
+  "./js/private-notes.js",
   "./js/firebaseConfig.js",
   "./js/firestore.js",
   "./js/auth.js",
