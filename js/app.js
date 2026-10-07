@@ -721,8 +721,8 @@ async function showReminderNotification(note) {
         if (registration?.showNotification) {
             await registration.showNotification(note.title || "SnapNotes reminder", {
                 body: note.text || "You set a reminder for this note.",
-                icon: "./assets/icons/snapnotes-notification.svg",
-                badge: "./assets/icons/snapnotes-notification.svg",
+                icon: "./assets/icons/snapnotes-notification.png",
+                badge: "./assets/icons/snapnotes-notification.png",
                 tag: `snapnotes-reminder-${note.id}`,
                 renotify: true,
                 data: { noteId: note.id }

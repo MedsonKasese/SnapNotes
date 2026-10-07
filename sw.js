@@ -17,7 +17,7 @@ self.addEventListener("notificationclick", event => {
   );
 });
 
-const CACHE_NAME = "snapnotes-v36";
+const CACHE_NAME = "snapnotes-v37";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -33,7 +33,7 @@ const APP_SHELL = [
   "./js/firestore.js",
   "./js/auth.js",
   "./assets/icons/snapnotes-icon.png",
-  "./assets/icons/snapnotes-notification.svg"
+  "./assets/icons/snapnotes-notification.png"
 ];
 
 self.addEventListener("install", event => {
