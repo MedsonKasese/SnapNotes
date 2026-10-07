@@ -309,9 +309,15 @@ function createDropdownItem(text, action, className = "") {
     button.textContent = text;
     if (className) button.classList.add(className);
 
-    button.addEventListener("click", event => {
+    button.addEventListener("click", async event => {
         event.stopPropagation();
-        action();
+        closeNoteMenus();
+        try {
+            await action();
+        } catch (error) {
+            console.error("SnapNotes note action failed:", error);
+            window.showToast?.("That action could not be completed. Please try again.", "warning");
+        }
     });
 
     return button;
