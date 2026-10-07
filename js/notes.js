@@ -465,11 +465,18 @@ function formatReminder(value) {
     return "Reminder " + new Date(time).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
 }
 
-function openNoteDetail(id) {
+async function openNoteDetail(id) {
     const rawNote = window.notes.find(item => item.id === id);
+    if (!rawNote) return false;
+
+    if (rawNote.isPrivate && !window.isPrivateNotesUnlocked?.()) {
+        const unlocked = await window.unlockPrivateNotes?.();
+        if (!unlocked) return false;
+    }
+
     const note = window.getReadablePrivateNote?.(rawNote) || rawNote;
     const modal = document.getElementById("noteDetailModal");
-    if (!note || !modal) return;
+    if (!note || !modal) return false;
 
     const bodyHtml = note.html && typeof window.sanitizeNoteHtml === "function"
         ? getNoteBodyHtml(note)
@@ -500,6 +507,8 @@ function openNoteDetail(id) {
         const card = document.querySelector(`.note-card[data-id="${CSS.escape(id)}"]`);
         if (card) startEditing(card, note);
     });
+
+    return true;
 }
 
 function closeNoteDetail() {
