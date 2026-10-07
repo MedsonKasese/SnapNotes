@@ -16,17 +16,57 @@ let selectedEditorCategory = "general";
 let clockTimer = null;
 let draftTimer = null;
 const DRAFT_KEY = "SnapNotesDraft";
+let pendingNotificationNoteId = null;
 
 document.addEventListener("DOMContentLoaded", () => {
+    handleNotificationNoteFromUrl();
     loadNotes();
     setupEventListeners();
     restoreDraft();
     setupTheme();
     setupTimestamp();
     setupReminderChecks();
+    setupNotificationNoteHandling();
     openNewNoteView();
+    handlePendingNotificationNote();
     updateNavigationCounts();
 });
+
+function setupNotificationNoteHandling() {
+    navigator.serviceWorker?.addEventListener("message", event => {
+        if (event.data?.type !== "SNAPNOTES_OPEN_NOTE" || !event.data.noteId) return;
+        pendingNotificationNoteId = event.data.noteId;
+        handlePendingNotificationNote();
+    });
+}
+
+window.handlePendingNotificationNote = handlePendingNotificationNote;
+
+async function handlePendingNotificationNote() {
+    if (!pendingNotificationNoteId) return;
+
+    const noteId = pendingNotificationNoteId;
+    const note = Array.isArray(window.notes)
+        ? window.notes.find(item => item.id === noteId)
+        : null;
+
+    if (!note) return;
+
+    pendingNotificationNoteId = null;
+    await window.openNoteDetail?.(noteId);
+}
+
+function handleNotificationNoteFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const noteId = params.get("openNote");
+    if (!noteId) return;
+
+    pendingNotificationNoteId = noteId;
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("openNote");
+    window.history.replaceState({}, document.title, url.toString());
+}
 
 function setupEventListeners() {
     const searchInput = document.getElementById("searchInput");
