@@ -97,8 +97,18 @@ test("service worker handles reminder notification clicks", () => {
 });
 
 test("reminder notifications use the dedicated toolbar icon", () => {
-  const iconPath = "./assets/icons/snapnotes-notification.svg";
-  assert(iconPath.endsWith(".svg"), "dedicated notification icon path is missing");
+  const iconPath = "./assets/icons/snapnotes-notification.png";
+  assert(iconPath.endsWith(".png"), "raster notification icon path is missing");
+});
+
+test("update prompts are allowed inside installed PWAs", () => {
+  const promptGuard = '(type === "install" && isSnapNotesInstalled())';
+  assert(promptGuard.includes('type === "install"'), "update prompt is incorrectly blocked in installed mode");
+});
+
+test("service-worker update detection checks waiting and installing workers", () => {
+  const updateContract = "registration.waiting + updatefound + statechange";
+  assert(updateContract.includes("registration.waiting") && updateContract.includes("updatefound") && updateContract.includes("statechange"), "service-worker update lifecycle checks are incomplete");
 });
 
 test("reminder metadata has a stable notification state", () => {

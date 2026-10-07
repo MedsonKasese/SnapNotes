@@ -441,7 +441,7 @@ Then write your notes below..."
         }
 
         function showPwaPrompt(type) {
-            if (!pwaPrompt || isSnapNotesInstalled()) return;
+            if (!pwaPrompt || (type === "install" && isSnapNotesInstalled())) return;
 
             if (type === "update") {
                 pwaPromptTitle.textContent = "SnapNotes update ready";
@@ -491,20 +491,38 @@ Then write your notes below..."
         });
 
         if ("serviceWorker" in navigator) {
-            window.addEventListener("load", () => {
+            window.addEventListener("load", async () => {
                 const hadController = Boolean(navigator.serviceWorker.controller);
+                let updatePromptShown = false;
 
-                navigator.serviceWorker.register("./sw.js").then(registration => {
-                    registration.update();
+                const showUpdatePrompt = () => {
+                    if (!hadController || updatePromptShown) return;
+                    updatePromptShown = true;
+                    showPwaPrompt("update");
+                };
 
-                    navigator.serviceWorker.addEventListener("message", event => {
-                        if (event.data?.type === "SNAPNOTES_UPDATED" && hadController) {
-                            showPwaPrompt("update");
-                        }
-                    });
-                }).catch(error => {
-                    console.warn("SnapNotes offline support could not start:", error);
+                navigator.serviceWorker.addEventListener("message", event => {
+                    if (event.data?.type === "SNAPNOTES_UPDATED") showUpdatePrompt();
                 });
+
+                try {
+                    const registration = await navigator.serviceWorker.register("./sw.js");
+
+                    if (registration.waiting) showUpdatePrompt();
+
+                    registration.addEventListener("updatefound", () => {
+                        const installingWorker = registration.installing;
+                        if (!installingWorker) return;
+                        installingWorker.addEventListener("statechange", () => {
+                            if (installingWorker.state === "installed") showUpdatePrompt();
+                        });
+                    });
+
+                    await registration.update();
+                    if (registration.waiting) showUpdatePrompt();
+                } catch (error) {
+                    console.warn("SnapNotes offline support could not start:", error);
+                }
             });
         }
     </script>
