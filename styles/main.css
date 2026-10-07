@@ -175,3 +175,70 @@ body.dark-mode .category-menu {
     padding-top: 10px;
     margin-bottom: 20px;
 }
+
+
+/* Private notes */
+.private-password-sheet {
+    max-width: 420px;
+}
+
+.private-password-description {
+    margin: 6px 0 0;
+    color: var(--muted-color);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.private-password-input,
+.private-password-confirm {
+    width: 100%;
+    padding: 12px 13px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--surface-soft);
+    color: var(--text-color);
+}
+
+.private-password-hint {
+    min-height: 18px;
+    margin: -2px 0 0;
+    color: var(--muted-color);
+    font-size: 12px;
+}
+
+.private-password-hint.error {
+    color: var(--danger-color);
+}
+
+.private-password-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+    margin-top: 2px;
+}
+
+.private-password-actions button {
+    min-height: 42px;
+}
+
+.private-password-actions .primary-action {
+    color: #fff;
+    background: var(--primary-color);
+}
+
+.private-password-actions .cancel-button {
+    color: var(--text-color);
+    background: var(--surface-soft);
+    border: 1px solid var(--border-color);
+}
+
+body.dark-mode .private-password-sheet input {
+    background: var(--surface-soft);
+    color: var(--text-color);
+}
+
+@media (max-width: 420px) {
+    .private-password-sheet {
+        padding: 20px;
+    }
+}
