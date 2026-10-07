@@ -40,6 +40,8 @@ function setupNotificationNoteHandling() {
     });
 }
 
+window.handlePendingNotificationNote = handlePendingNotificationNote;
+
 async function handlePendingNotificationNote() {
     if (!pendingNotificationNoteId) return;
 
