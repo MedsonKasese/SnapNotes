@@ -278,6 +278,9 @@ function createNoteElement(note) {
             createDropdownItem("Restore note", () => restoreNote(note.id)),
             createDropdownItem("Delete forever", () => permanentlyDeleteNote(note.id), "delete-action")
         );
+    } else if (note.isPrivate) {
+        const deleteButton = createDropdownItem("Move to trash", () => deleteNote(note.id), "delete-action");
+        dropdown.append(detailButton, duplicateButton, shareButton, editButton, privateButton, deleteButton);
     } else {
         const archiveButton = noteView === "archive"
             ? createDropdownItem("Restore note", () => restoreNote(note.id))
