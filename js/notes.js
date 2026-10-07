@@ -272,7 +272,7 @@ function createNoteElement(note) {
     const privateButton = note.isPrivate
         ? createDropdownItem("Move out of private", () => window.moveNoteFromPrivate?.(note.id))
         : createDropdownItem("Move to private", () => window.moveNoteToPrivate?.(note.id));
-    const historyButton = createDropdownItem("Version history", () => window.openNoteVersionHistory?.(note.id));
+    const historyButton = createDropdownItem("edit history", () => window.openNoteVersionHistory?.(note.id));
     const noteView = viewForNote(note);
     if (noteView === "trash") {
         dropdown.append(
