@@ -4,20 +4,31 @@ self.addEventListener("notificationclick", event => {
   event.notification.close();
 
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(clientList => {
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async clientList => {
       const target = clientList.find(client => "focus" in client);
+
       if (target) {
-        return target.focus();
+        await target.focus();
+        target.postMessage({
+          type: "SNAPNOTES_OPEN_NOTE",
+          noteId: noteId || null
+        });
+        return;
       }
+
       if (self.clients.openWindow) {
-        return self.clients.openWindow("./");
+        const url = noteId
+          ? `./?openNote=${encodeURIComponent(noteId)}`
+          : "./";
+        return self.clients.openWindow(url);
       }
+
       return undefined;
     })
   );
 });
 
-const CACHE_NAME = "snapnotes-v38";
+const CACHE_NAME = "snapnotes-v39";
 const APP_SHELL = [
   "./",
   "./index.html",
