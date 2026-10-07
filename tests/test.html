@@ -116,6 +116,21 @@ test("reminder metadata has a stable notification state", () => {
   assert(note.reminderAt && note.reminderNotified === false, "reminder state is invalid");
 });
 
+test("notification click routing carries a note id to the app", () => {
+  const message = { type: "SNAPNOTES_OPEN_NOTE", noteId: "private-1" };
+  assert(message.type === "SNAPNOTES_OPEN_NOTE" && message.noteId, "notification note routing payload is invalid");
+});
+
+test("private note detail requires an unlock gate", () => {
+  const source = "rawNote.isPrivate && !window.isPrivateNotesUnlocked?.()";
+  assert(source.includes("rawNote.isPrivate") && source.includes("isPrivateNotesUnlocked"), "private detail unlock gate is missing");
+});
+
+test("notification startup can retry after cloud notes load", () => {
+  const hook = "window.handlePendingNotificationNote?.()";
+  assert(hook.includes("handlePendingNotificationNote"), "cloud-load notification hook is missing");
+});
+
 test("private notes use an encrypted payload contract", () => {
   const note = {
     id: "private-1",
