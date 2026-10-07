@@ -149,6 +149,7 @@ export async function loadFromCloud(uid) {
 
         window.renderNotes();
         window.checkDueReminders?.();
+        window.handlePendingNotificationNote?.();
         if (typeof window.updateNavigationCounts === "function") {
             window.updateNavigationCounts();
         }
