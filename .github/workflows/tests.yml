@@ -19,6 +19,7 @@ jobs:
           node --check js/auth.js
           node --check js/firestore.js
           node --check js/private-notes.js
+          node --check js/version-history.js
       - name: Validate required PWA files
         run: |
           test -f manifest.json
@@ -39,6 +40,11 @@ jobs:
           grep -q 'SNAPNOTES_OPEN_NOTE' js/app.js
           grep -q 'openNoteDetail' js/notes.js
           grep -q 'handlePendingNotificationNote' js/firestore.js
+          grep -q 'openNoteVersionHistory' js/version-history.js
+          grep -q 'appendVersion' js/version-history.js
+          grep -q 'Version history' js/notes.js
+          grep -q 'history' js/private-notes.js
+          grep -q 'snapnotes-v40' sw.js
           test -f assets/icons/snapnotes-notification.png
           grep -q 'snapnotes-notification.png' js/app.js
           grep -q 'data-view="private"' index.html
