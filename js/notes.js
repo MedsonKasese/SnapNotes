@@ -272,6 +272,7 @@ function createNoteElement(note) {
     const privateButton = note.isPrivate
         ? createDropdownItem("Move out of private", () => window.moveNoteFromPrivate?.(note.id))
         : createDropdownItem("Move to private", () => window.moveNoteToPrivate?.(note.id));
+    const historyButton = createDropdownItem("Version history", () => window.openNoteVersionHistory?.(note.id));
     const noteView = viewForNote(note);
     if (noteView === "trash") {
         dropdown.append(
@@ -280,13 +281,13 @@ function createNoteElement(note) {
         );
     } else if (note.isPrivate) {
         const deleteButton = createDropdownItem("Move to trash", () => deleteNote(note.id), "delete-action");
-        dropdown.append(detailButton, duplicateButton, shareButton, editButton, privateButton, deleteButton);
+        dropdown.append(detailButton, duplicateButton, shareButton, historyButton, editButton, privateButton, deleteButton);
     } else {
         const archiveButton = noteView === "archive"
             ? createDropdownItem("Restore note", () => restoreNote(note.id))
             : createDropdownItem("Archive note", () => archiveNote(note.id));
         const deleteButton = createDropdownItem("Move to trash", () => deleteNote(note.id), "delete-action");
-        dropdown.append(detailButton, duplicateButton, shareButton, editButton, privateButton, archiveButton, deleteButton);
+        dropdown.append(detailButton, duplicateButton, shareButton, historyButton, editButton, privateButton, archiveButton, deleteButton);
     }
 
     menuButton.addEventListener("click", event => {
@@ -427,6 +428,9 @@ function startEditing(card, note) {
 
         recordHistory(note.id);
         const previous = window.notes[noteIndex];
+        previous.versions = typeof window.appendVersion === "function"
+            ? window.appendVersion(previous.versions, previous)
+            : (previous.versions || []);
         window.notes[noteIndex] = {
             ...previous,
             title,
