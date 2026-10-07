@@ -325,7 +325,6 @@ async function moveNoteToPrivate(id) {
         return true;
     } catch (error) {
         console.error("Could not protect note:", error);
-        console.error("Could not protect note:", error);
         window.showToast?.("Could not make this note private. Please try again.", "warning");
         return false;
     }
