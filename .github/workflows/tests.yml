@@ -35,6 +35,10 @@ jobs:
           grep -q 'CACHE_NAME = "snapnotes-v' sw.js
           grep -q 'showNotification' js/app.js
           grep -q 'notificationclick' sw.js
+          grep -q 'SNAPNOTES_OPEN_NOTE' sw.js
+          grep -q 'SNAPNOTES_OPEN_NOTE' js/app.js
+          grep -q 'openNoteDetail' js/notes.js
+          grep -q 'handlePendingNotificationNote' js/firestore.js
           test -f assets/icons/snapnotes-notification.png
           grep -q 'snapnotes-notification.png' js/app.js
           grep -q 'data-view="private"' index.html
