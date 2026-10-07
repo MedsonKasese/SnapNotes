@@ -244,21 +244,21 @@ body.dark-mode .private-password-sheet input {
 }
 
 
-/* Version history */
-.version-history-sheet {
+/* edit history */
+.edit-history-sheet {
     width: min(520px, calc(100vw - 28px));
     max-height: min(720px, calc(100vh - 40px));
     overflow: hidden;
 }
 
-.version-history-description {
+.edit-history-description {
     margin: 6px 0 0;
     color: var(--muted-color);
     font-size: 13px;
     line-height: 1.5;
 }
 
-.version-history-list {
+.edit-history-list {
     display: grid;
     gap: 10px;
     max-height: 430px;
@@ -266,7 +266,7 @@ body.dark-mode .private-password-sheet input {
     padding: 4px 2px;
 }
 
-.version-history-item {
+.edit-history-item {
     display: grid;
     grid-template-columns: 1fr auto;
     gap: 12px;
@@ -277,29 +277,29 @@ body.dark-mode .private-password-sheet input {
     background: var(--surface-soft);
 }
 
-.version-history-copy {
+.edit-history-copy {
     min-width: 0;
 }
 
-.version-history-copy strong,
-.version-history-copy time,
-.version-history-copy p {
+.edit-history-copy strong,
+.edit-history-copy time,
+.edit-history-copy p {
     display: block;
 }
 
-.version-history-copy strong {
+.edit-history-copy strong {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.version-history-copy time {
+.edit-history-copy time {
     margin-top: 3px;
     color: var(--muted-color);
     font-size: 11px;
 }
 
-.version-history-copy p {
+.edit-history-copy p {
     margin: 6px 0 0;
     color: var(--muted-color);
     font-size: 12px;
@@ -314,7 +314,7 @@ body.dark-mode .private-password-sheet input {
     white-space: nowrap;
 }
 
-.version-history-empty {
+.edit-history-empty {
     margin: 0;
     padding: 18px 8px;
     text-align: center;
@@ -323,7 +323,7 @@ body.dark-mode .private-password-sheet input {
     line-height: 1.5;
 }
 
-.version-history-footer {
+.edit-history-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -333,17 +333,17 @@ body.dark-mode .private-password-sheet input {
     border-top: 1px solid var(--border-color);
 }
 
-.version-history-footer > span {
+.edit-history-footer > span {
     color: var(--muted-color);
     font-size: 11px;
 }
 
 @media (max-width: 520px) {
-    .version-history-sheet {
+    .edit-history-sheet {
         width: calc(100vw - 20px);
     }
 
-    .version-history-item {
+    .edit-history-item {
         grid-template-columns: 1fr;
     }
 
@@ -351,7 +351,7 @@ body.dark-mode .private-password-sheet input {
         width: 100%;
     }
 
-    .version-history-footer {
+    .edit-history-footer {
         align-items: stretch;
         flex-direction: column;
     }
