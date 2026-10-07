@@ -1,5 +1,5 @@
 // =========================
-// NOTE VERSION HISTORY
+// NOTE edit history
 // =========================
 
 const MAX_NOTE_VERSIONS = 20;
@@ -60,22 +60,22 @@ function formatVersionDate(value) {
 }
 
 function ensureVersionHistoryModal() {
-    let modal = document.getElementById("versionHistoryModal");
+    let modal = document.getElementById("editHistoryModal");
     if (modal) return modal;
 
     modal = document.createElement("div");
-    modal.id = "versionHistoryModal";
-    modal.className = "auth-modal version-history-modal";
+    modal.id = "editHistoryModal";
+    modal.className = "auth-modal edit-history-modal";
     modal.setAttribute("aria-hidden", "true");
     modal.innerHTML = `
-        <div class="auth-sheet version-history-sheet" role="dialog" aria-modal="true" aria-labelledby="versionHistoryTitle">
+        <div class="auth-sheet edit-history-sheet" role="dialog" aria-modal="true" aria-labelledby="editHistoryTitle">
             <div class="modal-heading">
                 <p class="eyebrow">Note history</p>
-                <h3 id="versionHistoryTitle">Version History</h3>
-                <p class="version-history-description">Restore an earlier version without losing your current one.</p>
+                <h3 id="editHistoryTitle">Edit History</h3>
+                <p class="edit-history-description">Restore an earlier version without losing your current one.</p>
             </div>
-            <div id="versionHistoryList" class="version-history-list"></div>
-            <div class="version-history-footer">
+            <div id="editHistoryList" class="edit-history-list"></div>
+            <div class="edit-history-footer">
                 <span>Up to 20 versions are kept per note.</span>
                 <button type="button" class="cancel-button" id="closeVersionHistoryBtn">Close</button>
             </div>
@@ -91,7 +91,7 @@ function ensureVersionHistoryModal() {
 }
 
 function closeVersionHistory() {
-    const modal = document.getElementById("versionHistoryModal");
+    const modal = document.getElementById("editHistoryModal");
     if (!modal) return;
     modal.classList.remove("show");
     modal.setAttribute("aria-hidden", "true");
@@ -99,7 +99,7 @@ function closeVersionHistory() {
 
 function renderVersionHistory(noteId, versions, isPrivate = false) {
     const modal = ensureVersionHistoryModal();
-    const list = modal.querySelector("#versionHistoryList");
+    const list = modal.querySelector("#editHistoryList");
     list.innerHTML = "";
 
     const ordered = [...(versions || [])].sort((a, b) =>
@@ -107,14 +107,14 @@ function renderVersionHistory(noteId, versions, isPrivate = false) {
     );
 
     if (!ordered.length) {
-        list.innerHTML = '<p class="version-history-empty">No previous versions yet. Edit this note and SnapNotes will keep the earlier version here.</p>';
+        list.innerHTML = '<p class="edit-history-empty">No previous versions yet. Edit this note and SnapNotes will keep the earlier version here.</p>';
     } else {
         ordered.forEach((version, index) => {
             const item = document.createElement("article");
-            item.className = "version-history-item";
+            item.className = "edit-history-item";
 
             const copy = document.createElement("div");
-            copy.className = "version-history-copy";
+            copy.className = "edit-history-copy";
 
             const title = document.createElement("strong");
             title.textContent = version.title || "Untitled note";
