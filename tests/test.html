@@ -130,6 +130,14 @@ test("private notes use an encrypted payload contract", () => {
   assert(note.title === "Private note" && note.text === "" && note.html === "", "private plaintext should not be stored");
 });
 
+test("private notes module loads before the app controller", () => {
+  const scripts = [
+    "js/private-notes.js",
+    "js/app.js"
+  ];
+  assert(scripts.indexOf("js/private-notes.js") < scripts.indexOf("js/app.js"), "private notes module must load before app.js");
+});
+
 test("private notes are excluded from normal note visibility", () => {
   const notes = [
     { id: "public", isPrivate: false, deletedAt: null, archived: false },
