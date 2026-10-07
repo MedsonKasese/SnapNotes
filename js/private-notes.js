@@ -281,10 +281,16 @@ async function getPasswordForPrivateAction() {
 }
 
 async function moveNoteToPrivate(id) {
-    const note = window.notes.find(item => item.id === id);
-    if (!note || note.isPrivate) return;
+    const note = (Array.isArray(window.notes) ? window.notes : []).find(item => item.id === id);
+    if (!note || note.isPrivate) {
+        window.showToast?.("This note is no longer available.", "warning");
+        return false;
+    }
 
     try {
+        if (!window.crypto?.subtle || !window.crypto?.getRandomValues) {
+            throw new Error("Web Crypto is not available.");
+        }
         const session = await getPasswordForPrivateAction();
         if (!session) return;
 
@@ -308,13 +314,20 @@ async function moveNoteToPrivate(id) {
         note.updatedAt = new Date().toISOString();
 
         privateUnlockCache.set(note.id, payload);
-        await saveNotes();
+        const result = await saveNotes();
+        if (result?.cloudEnabled && result.synced === false) {
+            window.showToast?.("Note moved to Private and saved locally. Cloud sync is pending.", "warning");
+        } else {
+            window.showToast?.("Note moved to Private", "success");
+        }
         renderNotes();
         updateNavigationCounts();
-        showToast("Note moved to Private", "success");
+        return true;
     } catch (error) {
         console.error("Could not protect note:", error);
-        showToast("Could not make this note private.", "warning");
+        console.error("Could not protect note:", error);
+        window.showToast?.("Could not make this note private. Please try again.", "warning");
+        return false;
     }
 }
 
@@ -433,3 +446,4 @@ window.moveNoteFromPrivate = moveNoteFromPrivate;
 window.updatePrivateNote = updatePrivateNote;
 window.duplicatePrivateNote = duplicatePrivateNote;
 window.getPrivateNotesCount = () => getPrivateNotes().length;
+window.privateNotesReady = true;
