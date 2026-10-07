@@ -133,7 +133,7 @@ function clearPrivateUnlock() {
 
 function createPrivatePasswordModal(mode) {
     const modal = document.createElement("div");
-    modal.className = "auth-modal private-password-modal";
+    modal.className = "auth-modal private-password-modal show";
     modal.setAttribute("aria-hidden", "false");
 
     const sheet = document.createElement("div");

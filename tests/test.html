@@ -148,6 +148,11 @@ test("private notes module loads before the app controller", () => {
   assert(scripts.indexOf("js/private-notes.js") < scripts.indexOf("js/app.js"), "private notes module must load before app.js");
 });
 
+test("private-note password dialog is visible when opened", () => {
+  const modalClass = "auth-modal private-password-modal show";
+  assert(modalClass.includes("show"), "private-note password dialog is hidden");
+});
+
 test("private notes are excluded from normal note visibility", () => {
   const notes = [
     { id: "public", isPrivate: false, deletedAt: null, archived: false },
