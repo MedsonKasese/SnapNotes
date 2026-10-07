@@ -282,7 +282,7 @@ async function selectView(view) {
         trash: "Trash"
     };
     document.getElementById("notesViewTitle").textContent = titles[view] || "Notes";
-    document.getElementById("notesViewEyebrow").textContent = view === "private" ? "Locked library" : "Library";
+    document.getElementById("notesViewEyebrow").textContent = view === "private" ? "Private library" : "Library";
     applyNoteFilters();
 }
 
@@ -794,9 +794,11 @@ function updateNavigationCounts() {
     if (activeView === "trash") {
         currentNotes = notes.filter(note => note.deletedAt);
     } else if (activeView === "archive") {
-        currentNotes = activeNotes.filter(note => note.archived);
+        currentNotes = activeNotes.filter(note => note.archived && !note.isPrivate);
+    } else if (activeView === "private") {
+        currentNotes = activeNotes.filter(note => note.isPrivate && !note.archived);
     } else {
-        currentNotes = activeNotes.filter(note => !note.archived);
+        currentNotes = activeNotes.filter(note => !note.archived && !note.isPrivate);
         if (activeCategory !== "all") {
             currentNotes = currentNotes.filter(note => note.category === activeCategory);
         }
