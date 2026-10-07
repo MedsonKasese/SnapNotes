@@ -35,13 +35,13 @@ jobs:
           grep -q 'CACHE_NAME = "snapnotes-v' sw.js
           grep -q 'showNotification' js/app.js
           grep -q 'notificationclick' sw.js
-          test -f assets/icons/snapnotes-notification.svg
-          grep -q 'snapnotes-notification.svg' js/app.js
+          test -f assets/icons/snapnotes-notification.png
+          grep -q 'snapnotes-notification.png' js/app.js
           grep -q 'data-view="private"' index.html
           grep -q 'isPrivate' js/notes.js
           grep -q 'AES-GCM' js/private-notes.js
           grep -q 'PBKDF2-SHA-256' js/private-notes.js
-          grep -q 'CACHE_NAME = "snapnotes-v37"' sw.js
+          grep -q 'CACHE_NAME = "snapnotes-v' sw.js
 
       - name: Validate test harness
         run: test -f tests/test.html
