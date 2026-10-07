@@ -242,3 +242,117 @@ body.dark-mode .private-password-sheet input {
         padding: 20px;
     }
 }
+
+
+/* Version history */
+.version-history-sheet {
+    width: min(520px, calc(100vw - 28px));
+    max-height: min(720px, calc(100vh - 40px));
+    overflow: hidden;
+}
+
+.version-history-description {
+    margin: 6px 0 0;
+    color: var(--muted-color);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.version-history-list {
+    display: grid;
+    gap: 10px;
+    max-height: 430px;
+    overflow-y: auto;
+    padding: 4px 2px;
+}
+
+.version-history-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--surface-soft);
+}
+
+.version-history-copy {
+    min-width: 0;
+}
+
+.version-history-copy strong,
+.version-history-copy time,
+.version-history-copy p {
+    display: block;
+}
+
+.version-history-copy strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.version-history-copy time {
+    margin-top: 3px;
+    color: var(--muted-color);
+    font-size: 11px;
+}
+
+.version-history-copy p {
+    margin: 6px 0 0;
+    color: var(--muted-color);
+    font-size: 12px;
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+}
+
+.version-restore-button {
+    white-space: nowrap;
+}
+
+.version-history-empty {
+    margin: 0;
+    padding: 18px 8px;
+    text-align: center;
+    color: var(--muted-color);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.version-history-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+}
+
+.version-history-footer > span {
+    color: var(--muted-color);
+    font-size: 11px;
+}
+
+@media (max-width: 520px) {
+    .version-history-sheet {
+        width: calc(100vw - 20px);
+    }
+
+    .version-history-item {
+        grid-template-columns: 1fr;
+    }
+
+    .version-restore-button {
+        width: 100%;
+    }
+
+    .version-history-footer {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}
