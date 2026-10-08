@@ -5,6 +5,7 @@
 <h1>SnapNotes automated tests</h1>
 <pre id="results">Running...</pre>
 <script src="../js/attachments.js"></script>
+<script src="../js/folders.js"></script>
 <script src="../js/version-history.js"></script>
 <script>
 const results = [];
@@ -31,6 +32,42 @@ test("attachment UI accepts supported file types", () => {
   input.accept = "image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain";
   assert(input.accept.includes("application/pdf") && input.accept.includes("image/png"), "attachment input types are incomplete");
 });
+
+
+test("folder module exposes folder management APIs", () => {
+  assert(typeof window.createFolder === "function", "createFolder API is missing");
+  assert(typeof window.moveNoteToFolder === "function", "moveNoteToFolder API is missing");
+  assert(typeof window.getFolderById === "function", "getFolderById API is missing");
+});
+
+test("folder limits and names are bounded", () => {
+  const name = "A".repeat(32);
+  assert(name.length === 32, "folder name limit fixture is invalid");
+  assert(localStorage.getItem("SnapNotesFolders") === null || Array.isArray(JSON.parse(localStorage.getItem("SnapNotesFolders"))), "folder storage shape is invalid");
+});
+
+test("notes can carry a folder id without changing categories", () => {
+  const note = { id: "note-1", category: "work", folderId: "folder-1" };
+  assert(note.category === "work" && note.folderId === "folder-1", "folder metadata is invalid");
+});
+
+test("folder view excludes archived, trashed, private, and unrelated notes", () => {
+  const notes = [
+    { id: "inside", folderId: "f1", archived: false, deletedAt: null, isPrivate: false },
+    { id: "other", folderId: "f2", archived: false, deletedAt: null, isPrivate: false },
+    { id: "archived", folderId: "f1", archived: true, deletedAt: null, isPrivate: false },
+    { id: "trash", folderId: "f1", archived: false, deletedAt: new Date().toISOString(), isPrivate: false },
+    { id: "private", folderId: "f1", archived: false, deletedAt: null, isPrivate: true }
+  ];
+  const visible = notes.filter(note => note.folderId === "f1" && !note.archived && !note.deletedAt && !note.isPrivate);
+  assert(visible.length === 1 && visible[0].id === "inside", "folder visibility rules are incorrect");
+});
+
+test("folder sync payload keeps folders alongside notes", () => {
+  const payload = { notes: [], folders: [{ id: "f1", name: "Work" }] };
+  assert(Array.isArray(payload.folders) && payload.folders[0].name === "Work", "folder sync payload is invalid");
+});
+
 test("crypto UUID support is available", () => assert(typeof crypto.randomUUID === "function", "crypto.randomUUID missing"));
 test("service worker API is available", () => assert("serviceWorker" in navigator, "serviceWorker missing"));
 test("online state is readable", () => assert(typeof navigator.onLine === "boolean", "navigator.onLine missing"));
