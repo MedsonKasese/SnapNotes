@@ -643,9 +643,12 @@ async function saveEditorNote() {
         html: extractNoteBodyHtml(editor.innerHTML, title),
         category: selectedEditorCategory,
         tags: parseTags(document.getElementById("noteTagsInput")?.value || ""),
-        reminderAt: document.getElementById("noteReminderInput")?.value ? new Date(document.getElementById("noteReminderInput").value).toISOString() : null,
+        reminderAt: window.parseReminderDateTimeLocal?.(document.getElementById("noteReminderInput")?.value) || null,
         reminderRecurrence: document.getElementById("noteReminderInput")?.value
-            ? window.normalizeReminderRecurrence?.(document.getElementById("noteReminderRecurrence")?.value || "")
+            ? window.normalizeReminderRecurrence?.(
+                document.getElementById("noteReminderRecurrence")?.value || "",
+                document.getElementById("noteReminderInput").value
+            )
             : null,
         reminderNotified: false,
         folderId: window.activeFolderId || null,
@@ -668,7 +671,9 @@ async function saveEditorNote() {
     }
 
     window.notes.unshift(newNote);
-    if (newNote.reminderAt) await requestReminderPermission();
+    if (newNote.reminderAt) {
+        await requestReminderPermission();
+    }
     window.recordNoteCreation?.(newNote);
     const saveResult = await saveNotes();
 
@@ -843,7 +848,7 @@ async function importNotes(event) {
                 pinned: Boolean(note.pinned),
                 tags: typeof window.parseTags === "function" ? window.parseTags(Array.isArray(note.tags) ? note.tags.join(",") : String(note.tags || "")) : [],
                 reminderAt: note.reminderAt || null,
-                reminderRecurrence: window.normalizeReminderRecurrence?.(note.reminderRecurrence) || null,
+                reminderRecurrence: window.normalizeReminderRecurrence?.(note.reminderRecurrence, note.reminderAt) || null,
                 reminderNotified: Boolean(note.reminderNotified),
                 archived: Boolean(note.archived),
                 deletedAt: note.deletedAt || null,
