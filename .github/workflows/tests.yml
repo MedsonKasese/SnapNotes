@@ -59,7 +59,7 @@ jobs:
           grep -q 'moveNoteToFolder' js/folders.js
           grep -q 'folderNavList' index.html
           grep -q 'folders' js/firestore.js
-          grep -q 'snapnotes-v44' sw.js
+          grep -q 'snapnotes-v47' sw.js
           test -f assets/icons/snapnotes-notification.png
           test -f assets/icons/snapnotes-notification-badge.svg
           grep -q 'icon: "./assets/icons/snapnotes-notification.png"' js/app.js

@@ -31,6 +31,40 @@ const authModal = document.getElementById("authModal");
 const closeModalBtn = document.getElementById("closeModalBtn");
 let accountDeletionTimer = null;
 
+function accountCacheKey(uid) {
+    return `SnapNotesAccount:${uid}`;
+}
+
+function restoreAccountCache(user) {
+    if (!user?.uid) return;
+    const raw = localStorage.getItem(accountCacheKey(user.uid));
+    if (!raw) return;
+
+    try {
+        const cached = JSON.parse(raw);
+        if (Array.isArray(cached.notes)) {
+            localStorage.setItem("SnapNotes", JSON.stringify(cached.notes));
+        }
+        if (Array.isArray(cached.folders)) {
+            localStorage.setItem("SnapNotesFolders", JSON.stringify(cached.folders));
+        }
+        window.loadNotes?.();
+        window.loadFolders?.();
+    } catch (error) {
+        localStorage.removeItem(accountCacheKey(user.uid));
+        console.warn("Could not restore the local account cache:", error);
+    }
+}
+
+function cacheAccountBeforeSignOut(user) {
+    if (!user?.uid) return;
+    localStorage.setItem(accountCacheKey(user.uid), JSON.stringify({
+        notes: Array.isArray(window.notes) ? window.notes : [],
+        folders: Array.isArray(window.getFolders?.()) ? window.getFolders() : [],
+        savedAt: new Date().toISOString()
+    }));
+}
+
 // Keep Firebase Auth persistent across page reloads and PWA sessions.
 const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch(error => {
     console.warn("Could not enable persistent authentication:", error);
@@ -171,10 +205,13 @@ userAvatar.addEventListener("click", () => {
 
     if (!confirm(`Log out ${accountName}?`)) return;
 
+    cacheAccountBeforeSignOut(user);
     signOut(auth)
         .then(() => {
             window.notes = [];
             localStorage.removeItem("SnapNotes");
+            localStorage.removeItem("SnapNotesFolders");
+            window.loadFolders?.();
             window.renderNotes("", "all");
 
             if (typeof window.updateNavigationCounts === "function") {
@@ -283,6 +320,7 @@ onAuthStateChanged(auth, user => {
     resetGoogleButton();
 
     if (user) {
+        restoreAccountCache(user);
         processScheduledAccountDeletion(user);
         const initials = user.displayName
             ? user.displayName.trim().split(/\\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase()
