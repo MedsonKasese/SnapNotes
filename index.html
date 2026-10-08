@@ -223,6 +223,14 @@ Then write your notes below..."
                 <span>Important</span>
                 <span class="drawer-count" data-count-for="important">0</span>
             </button>
+            <div class="drawer-section-heading folder-section-heading">
+                <span>Folders</span>
+                <button id="createFolderBtn" class="folder-add-button" type="button" aria-label="Create folder" title="Create folder">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+            </div>
+            <div id="folderNavList" class="folder-nav-list"></div>
+            <p id="folderNavEmpty" class="folder-nav-empty">No folders yet.</p>
             <button class="drawer-item" type="button" data-view="archive">
                 <i class="fa-solid fa-box-archive"></i>
                 <span>Archived</span>
@@ -434,6 +442,7 @@ Then write your notes below..."
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="js/attachments.js"></script>
+    <script src="js/folders.js"></script>
     <script src="js/version-history.js"></script>
     <script src="js/private-notes.js"></script>
     <script src="js/storage.js"></script>

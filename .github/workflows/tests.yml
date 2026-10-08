@@ -20,6 +20,7 @@ jobs:
           node --check js/firestore.js
           node --check js/private-notes.js
           node --check js/attachments.js
+          node --check js/folders.js
           node --check js/version-history.js
       - name: Validate required PWA files
         run: |
@@ -49,7 +50,12 @@ jobs:
           grep -q 'MAX_ATTACHMENTS_PER_NOTE' js/attachments.js
           grep -q 'firebase-storage.js' js/attachments.js
           grep -q 'js/attachments.js' index.html
-          grep -q 'snapnotes-v42' sw.js
+          grep -q 'prepareNoteAttachments' js/attachments.js
+          grep -q 'loadFolders' js/folders.js
+          grep -q 'moveNoteToFolder' js/folders.js
+          grep -q 'folderNavList' index.html
+          grep -q 'folders' js/firestore.js
+          grep -q 'snapnotes-v43' sw.js
           test -f assets/icons/snapnotes-notification.png
           test -f assets/icons/snapnotes-notification-badge.svg
           grep -q 'icon: "./assets/icons/snapnotes-notification.png"' js/app.js
