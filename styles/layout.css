@@ -911,3 +911,80 @@
 .settings-option { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; color: var(--text-color); font-size: 14px; }
 .settings-option select { min-width: 110px; padding: 8px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface-color); color: var(--text-color); }
 .settings-option input { width: 18px; height: 18px; }
+
+
+/* =========================
+   FOLDERS
+   ========================= */
+
+.drawer-section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 18px 5px 5px;
+    color: var(--muted-color);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.folder-add-button,
+.folder-manage-button {
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: 8px;
+    color: var(--muted-color);
+    background: transparent;
+    cursor: pointer;
+}
+
+.folder-add-button:hover,
+.folder-manage-button:hover {
+    color: var(--text-color);
+    background: var(--surface-soft);
+}
+
+.folder-nav-list {
+    display: grid;
+    gap: 3px;
+}
+
+.folder-nav-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 30px;
+    align-items: center;
+}
+
+.folder-nav-item {
+    min-width: 0;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    padding-right: 6px;
+}
+
+.folder-nav-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.folder-nav-count {
+    min-width: 22px;
+}
+
+.folder-manage-button {
+    width: 30px;
+    height: 34px;
+}
+
+.folder-nav-empty {
+    margin: 5px 11px 10px;
+    color: var(--muted-color);
+    font-size: 11px;
+}
