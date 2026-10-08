@@ -34,6 +34,11 @@ jobs:
           grep -q 'noteReminderRecurrence' index.html
           grep -q 'getNextReminderAt' js/recurring-reminders.js
           grep -q 'normalizeReminderRecurrence' js/app.js
+          grep -q 'noteReminderRecurrence' index.html
+          grep -q 'getNextReminderAt' js/recurring-reminders.js
+          grep -q 'formatReminderDateTimeLocal' js/recurring-reminders.js
+          grep -q 'parseReminderDateTimeLocal' js/recurring-reminders.js
+          grep -q 'MAX_BROWSER_TIMER_DELAY' js/app.js
           grep -q 'noteReminderInput' index.html
           grep -q 'reminderPickerBtn' index.html
           grep -q 'showPicker' js/app.js
