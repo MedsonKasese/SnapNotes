@@ -117,7 +117,12 @@ Then write your notes below..."
                 </label>
                 <label class="editor-metadata-field">
                     <span><i class="fa-regular fa-bell"></i> Reminder</span>
-                    <input id="noteReminderInput" type="datetime-local">
+                    <div class="reminder-input-wrap">
+                        <input id="noteReminderInput" type="datetime-local" aria-label="Reminder date and time">
+                        <button id="reminderPickerBtn" class="reminder-picker-button" type="button" aria-label="Add reminder" title="Add reminder">
+                            <i class="fa-regular fa-calendar-plus" aria-hidden="true"></i>
+                        </button>
+                    </div>
                 </label>
                 <label class="editor-metadata-field">
                     <span><i class="fa-solid fa-repeat"></i> Repeat</span>
