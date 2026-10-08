@@ -50,7 +50,6 @@ jobs:
           grep -q 'firebase-storage.js' js/attachments.js
           grep -q 'js/attachments.js' index.html
           grep -q 'snapnotes-v42' sw.js
-          grep -q 'snapnotes-v41' sw.js
           test -f assets/icons/snapnotes-notification.png
           test -f assets/icons/snapnotes-notification-badge.svg
           grep -q 'icon: "./assets/icons/snapnotes-notification.png"' js/app.js
