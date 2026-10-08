@@ -645,6 +645,7 @@ async function saveEditorNote() {
     if (reminderInput) reminderInput.value = "";
     renderNotes("", activeCategory);
     updateNavigationCounts();
+    window.renderFolderNavigation?.();
     openNotesView("all");
 
         if (saveResult.cloudEnabled && !saveResult.synced) {
@@ -940,6 +941,7 @@ function updateNavigationCounts() {
         else if (key === "archive") count = activeNotes.filter(note => note.archived && !note.isPrivate).length;
         else if (key === "private") count = activeNotes.filter(note => note.isPrivate && !note.archived).length;
         else if (key === "trash") count = notes.filter(note => note.deletedAt).length;
+        else if (key === "folder") count = activeNotes.filter(note => note.folderId && !note.archived && !note.isPrivate).length;
         else count = activeNotes.filter(note => !note.archived && !note.isPrivate && note.category === key).length;
 
         element.textContent = count;
