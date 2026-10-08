@@ -119,6 +119,16 @@ Then write your notes below..."
                     <span><i class="fa-regular fa-bell"></i> Reminder</span>
                     <input id="noteReminderInput" type="datetime-local">
                 </label>
+                <label class="editor-metadata-field">
+                    <span><i class="fa-solid fa-repeat"></i> Repeat</span>
+                    <select id="noteReminderRecurrence" disabled>
+                        <option value="">Never</option>
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="yearly">Yearly</option>
+                    </select>
+                </label>
             </div>
 
             <div class="editor-attachments">
@@ -443,6 +453,7 @@ Then write your notes below..."
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="js/attachments.js"></script>
     <script src="js/folders.js"></script>
+    <script src="js/recurring-reminders.js"></script>
     <script src="js/version-history.js"></script>
     <script src="js/private-notes.js"></script>
     <script src="js/storage.js"></script>

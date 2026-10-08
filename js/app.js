@@ -74,6 +74,8 @@ function handleNotificationNoteFromUrl() {
 function setupEventListeners() {
     const searchInput = document.getElementById("searchInput");
     const categoryFilter = document.getElementById("categoryFilter");
+    const reminderInput = document.getElementById("noteReminderInput");
+    const reminderRecurrence = document.getElementById("noteReminderRecurrence");
     const settingsBtn = document.getElementById("settingsBtn");
     const settingsModal = document.getElementById("settingsModal");
     const closeSettingsBtn = document.getElementById("closeSettingsBtn");
@@ -180,6 +182,17 @@ function setupEventListeners() {
         window.addPendingAttachments?.(event.target.files);
         event.target.value = "";
     });
+
+    const syncReminderRecurrenceControl = () => {
+        if (!reminderInput || !reminderRecurrence) return;
+        const hasReminder = Boolean(reminderInput.value);
+        reminderRecurrence.disabled = !hasReminder;
+        if (!hasReminder) reminderRecurrence.value = "";
+    };
+
+    reminderInput?.addEventListener("input", syncReminderRecurrenceControl);
+    syncReminderRecurrenceControl();
+
     logoButton.addEventListener("click", openNewNoteView);
 
     editorCategory.addEventListener("click", toggleCategoryMenu);
@@ -496,6 +509,7 @@ function saveDraft() {
         category: selectedEditorCategory,
         tags: parseTags(document.getElementById("noteTagsInput")?.value || ""),
         reminderAt: document.getElementById("noteReminderInput")?.value || "",
+        reminderRecurrence: window.normalizeReminderRecurrence?.(document.getElementById("noteReminderRecurrence")?.value || "") || null,
         savedAt: new Date().toISOString()
     }));
     setDraftStatus("Draft saved");
@@ -514,8 +528,13 @@ function restoreDraft() {
         setEditorCategory(draft.category || "general");
         const tagsInput = document.getElementById("noteTagsInput");
         const reminderInput = document.getElementById("noteReminderInput");
+        const reminderRecurrence = document.getElementById("noteReminderRecurrence");
         if (tagsInput) tagsInput.value = Array.isArray(draft.tags) ? draft.tags.join(", ") : "";
         if (reminderInput) reminderInput.value = draft.reminderAt ? String(draft.reminderAt).slice(0, 16) : "";
+        if (reminderRecurrence) {
+            reminderRecurrence.value = draft.reminderRecurrence?.frequency || "";
+            reminderRecurrence.disabled = !reminderInput?.value;
+        }
         updateCharacterCount();
         setDraftStatus("Draft restored");
     } catch (error) {
@@ -611,6 +630,9 @@ async function saveEditorNote() {
         category: selectedEditorCategory,
         tags: parseTags(document.getElementById("noteTagsInput")?.value || ""),
         reminderAt: document.getElementById("noteReminderInput")?.value ? new Date(document.getElementById("noteReminderInput").value).toISOString() : null,
+        reminderRecurrence: document.getElementById("noteReminderInput")?.value
+            ? window.normalizeReminderRecurrence?.(document.getElementById("noteReminderRecurrence")?.value || "")
+            : null,
         reminderNotified: false,
         folderId: window.activeFolderId || null,
         versions: [],
@@ -641,8 +663,13 @@ async function saveEditorNote() {
     window.resetPendingAttachments?.();
     const tagsInput = document.getElementById("noteTagsInput");
     const reminderInput = document.getElementById("noteReminderInput");
+    const reminderRecurrence = document.getElementById("noteReminderRecurrence");
     if (tagsInput) tagsInput.value = "";
     if (reminderInput) reminderInput.value = "";
+    if (reminderRecurrence) {
+        reminderRecurrence.value = "";
+        reminderRecurrence.disabled = true;
+    }
     renderNotes("", activeCategory);
     updateNavigationCounts();
     window.renderFolderNavigation?.();
@@ -801,6 +828,7 @@ async function importNotes(event) {
                 pinned: Boolean(note.pinned),
                 tags: typeof window.parseTags === "function" ? window.parseTags(Array.isArray(note.tags) ? note.tags.join(",") : String(note.tags || "")) : [],
                 reminderAt: note.reminderAt || null,
+                reminderRecurrence: window.normalizeReminderRecurrence?.(note.reminderRecurrence) || null,
                 reminderNotified: Boolean(note.reminderNotified),
                 archived: Boolean(note.archived),
                 deletedAt: note.deletedAt || null,
@@ -855,20 +883,34 @@ async function checkDueReminders() {
     const notes = Array.isArray(window.notes) ? window.notes : [];
     const now = Date.now();
     let changed = false;
+
     for (const note of notes) {
         if (!note.reminderAt || note.reminderNotified || note.deletedAt) continue;
+
         const due = Date.parse(note.reminderAt);
-        if (!Number.isNaN(due) && due <= now) {
-            note.reminderNotified = true;
-            changed = true;
-            if ("Notification" in window && Notification.permission === "granted") {
-                const shown = await showReminderNotification(note);
-                if (!shown) showToast(`Reminder: ${note.title || "Untitled note"}`, "update");
-            } else {
+        if (Number.isNaN(due) || due > now) continue;
+
+        const recurrence = window.normalizeReminderRecurrence?.(note.reminderRecurrence);
+
+        if ("Notification" in window && Notification.permission === "granted") {
+            const shown = await showReminderNotification(note);
+            if (!shown) {
                 showToast(`Reminder: ${note.title || "Untitled note"}`, "update");
             }
+        } else {
+            showToast(`Reminder: ${note.title || "Untitled note"}`, "update");
         }
+
+        if (recurrence && window.getNextReminderAt) {
+            note.reminderAt = window.getNextReminderAt(note.reminderAt, recurrence, now);
+            note.reminderNotified = false;
+        } else {
+            note.reminderNotified = true;
+        }
+
+        changed = true;
     }
+
     if (changed) {
         await saveNotes();
         renderNotes();
