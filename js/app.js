@@ -893,15 +893,29 @@ function parseTags(value) {
     return [...new Set(String(value || "").split(",").map(tag => tag.trim().toLowerCase().replace(/^#/, "")).filter(Boolean))].slice(0, 10);
 }
 
+const MAX_BROWSER_TIMER_DELAY = 2147483647 - 60000;
+
 function setupReminderChecks() {
     clearInterval(window.snapNotesReminderTimer);
     clearTimeout(window.snapNotesReminderTimeout);
+
     window.snapNotesReminderTimer = setInterval(checkDueReminders, 30000);
+
+    if (!window.snapNotesReminderListenersReady) {
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) checkDueReminders();
+        });
+        window.addEventListener("focus", checkDueReminders);
+        window.addEventListener("online", checkDueReminders);
+        window.snapNotesReminderListenersReady = true;
+    }
+
     checkDueReminders();
 }
 
 function scheduleNextReminderCheck() {
     clearTimeout(window.snapNotesReminderTimeout);
+
     const nextDue = (Array.isArray(window.notes) ? window.notes : [])
         .filter(note => note.reminderAt && !note.reminderNotified && !note.deletedAt)
         .map(note => Date.parse(note.reminderAt))
@@ -909,7 +923,9 @@ function scheduleNextReminderCheck() {
         .sort((a, b) => a - b)[0];
 
     if (!nextDue) return;
-    window.snapNotesReminderTimeout = setTimeout(checkDueReminders, Math.max(1000, nextDue - Date.now() + 50));
+
+    const delay = Math.max(1000, nextDue - Date.now() + 50);
+    window.snapNotesReminderTimeout = setTimeout(checkDueReminders, Math.min(delay, MAX_BROWSER_TIMER_DELAY));
 }
 
 let reminderCheckInProgress = false;
