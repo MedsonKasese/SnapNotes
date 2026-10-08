@@ -191,6 +191,7 @@ function setupEventListeners() {
     };
 
     reminderInput?.addEventListener("input", syncReminderRecurrenceControl);
+    reminderInput?.addEventListener("change", syncReminderRecurrenceControl);
     syncReminderRecurrenceControl();
 
     logoButton.addEventListener("click", openNewNoteView);
@@ -673,6 +674,7 @@ async function saveEditorNote() {
     renderNotes("", activeCategory);
     updateNavigationCounts();
     window.renderFolderNavigation?.();
+    window.scheduleNextReminderCheck?.();
     openNotesView("all");
 
         if (saveResult.cloudEnabled && !saveResult.synced) {
@@ -875,8 +877,21 @@ function parseTags(value) {
 
 function setupReminderChecks() {
     clearInterval(window.snapNotesReminderTimer);
+    clearTimeout(window.snapNotesReminderTimeout);
     window.snapNotesReminderTimer = setInterval(checkDueReminders, 30000);
     checkDueReminders();
+}
+
+function scheduleNextReminderCheck() {
+    clearTimeout(window.snapNotesReminderTimeout);
+    const nextDue = (Array.isArray(window.notes) ? window.notes : [])
+        .filter(note => note.reminderAt && !note.reminderNotified && !note.deletedAt)
+        .map(note => Date.parse(note.reminderAt))
+        .filter(time => Number.isFinite(time) && time > Date.now())
+        .sort((a, b) => a - b)[0];
+
+    if (!nextDue) return;
+    window.snapNotesReminderTimeout = setTimeout(checkDueReminders, Math.max(1000, nextDue - Date.now() + 50));
 }
 
 async function checkDueReminders() {
@@ -915,6 +930,7 @@ async function checkDueReminders() {
         await saveNotes();
         renderNotes();
     }
+    scheduleNextReminderCheck();
 }
 
 async function showReminderNotification(note) {
@@ -947,6 +963,7 @@ async function requestReminderPermission() {
 window.parseTags = parseTags;
 window.requestReminderPermission = requestReminderPermission;
 window.checkDueReminders = checkDueReminders;
+window.scheduleNextReminderCheck = scheduleNextReminderCheck;
 
 function setupTimestamp() {
     updateEditorTimestamp();
