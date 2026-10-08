@@ -98,6 +98,8 @@ function setupEventListeners() {
     const categoryMenu = document.getElementById("categoryMenu");
     const exportNotesBtn = document.getElementById("exportNotesBtn");
     const importNotesBtn = document.getElementById("importNotesBtn");
+    const attachmentInput = document.getElementById("attachmentInput");
+    const addAttachmentBtn = document.getElementById("addAttachmentBtn");
     const importNotesInput = document.getElementById("importNotesInput");
     const formatToolbar = document.getElementById("formatToolbar");
 
@@ -168,6 +170,11 @@ function setupEventListeners() {
     exportNotesBtn.addEventListener("click", exportNotes);
     importNotesBtn.addEventListener("click", () => importNotesInput.click());
     importNotesInput.addEventListener("change", importNotes);
+    addAttachmentBtn?.addEventListener("click", () => attachmentInput?.click());
+    attachmentInput?.addEventListener("change", event => {
+        window.addPendingAttachments?.(event.target.files);
+        event.target.value = "";
+    });
     logoButton.addEventListener("click", openNewNoteView);
 
     editorCategory.addEventListener("click", toggleCategoryMenu);
@@ -275,6 +282,7 @@ function openNewNoteView() {
     document.getElementById("newNoteView").hidden = false;
     document.getElementById("notesView").hidden = true;
     document.getElementById("addBtn").hidden = true;
+    window.resetPendingAttachments?.();
     updateCharacterCount();
     document.getElementById("noteEditor").focus();
     closeSearchPanel();
@@ -558,11 +566,22 @@ async function saveEditorNote() {
         reminderAt: document.getElementById("noteReminderInput")?.value ? new Date(document.getElementById("noteReminderInput").value).toISOString() : null,
         reminderNotified: false,
         versions: [],
+        attachments: [],
         pinned: false,
         time: `Created: ${formattedDate} • ${formattedTime}`,
         createdAt: now.toISOString(),
         updatedAt: now.toISOString()
     };
+
+    try {
+        newNote.attachments = await window.prepareNoteAttachments?.(
+            newNote.id,
+            window.getPendingAttachments?.() || []
+        ) || [];
+    } catch (error) {
+        showToast(error.message || "Could not add the attachments.", "warning");
+        return;
+    }
 
     window.notes.unshift(newNote);
     if (newNote.reminderAt) await requestReminderPermission();
@@ -571,6 +590,7 @@ async function saveEditorNote() {
 
     clearDraft();
     editor.innerHTML = "";
+    window.resetPendingAttachments?.();
     const tagsInput = document.getElementById("noteTagsInput");
     const reminderInput = document.getElementById("noteReminderInput");
     if (tagsInput) tagsInput.value = "";
