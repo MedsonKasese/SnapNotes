@@ -187,6 +187,13 @@ function createNoteElement(note) {
     content.appendChild(title);
     content.appendChild(body);
 
+    if (Array.isArray(note.attachments) && note.attachments.length) {
+        const attachments = document.createElement("div");
+        attachments.className = "note-attachments-list";
+        content.appendChild(attachments);
+        window.renderNoteAttachments?.(attachments, note.attachments);
+    }
+
     if (noteHasMoreThanFiveLines(note, bodyText)) {
         body.classList.add("note-card-body-clamped");
 
@@ -356,7 +363,61 @@ function startEditing(card, note) {
     const reminderInput = document.createElement("input");
     reminderInput.type = "datetime-local";
     reminderInput.value = note.reminderAt ? String(note.reminderAt).slice(0, 16) : "";
-    metadata.append(tagsInput, reminderInput);
+
+    const attachmentEditor = document.createElement("div");
+    attachmentEditor.className = "edit-note-attachments";
+    const attachmentInput = document.createElement("input");
+    attachmentInput.type = "file";
+    attachmentInput.accept = "image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain";
+    attachmentInput.multiple = true;
+    attachmentInput.hidden = true;
+    const attachmentButton = document.createElement("button");
+    attachmentButton.type = "button";
+    attachmentButton.className = "secondary-action";
+    attachmentButton.innerHTML = '<i class="fa-solid fa-paperclip"></i> Add attachments';
+    const attachmentList = document.createElement("div");
+    attachmentList.className = "note-attachments-list edit-attachments-list";
+    attachmentEditor.append(attachmentButton, attachmentInput, attachmentList);
+    metadata.append(tagsInput, reminderInput, attachmentEditor);
+
+    const editAttachmentFiles = [];
+    attachmentButton.addEventListener("click", () => attachmentInput.click());
+    attachmentInput.addEventListener("change", event => {
+        for (const file of Array.from(event.target.files || [])) {
+            if (!editAttachmentFiles.some(item => item.name === file.name && item.size === file.size && item.lastModified === file.lastModified)) {
+                editAttachmentFiles.push(file);
+            }
+        }
+        event.target.value = "";
+        renderPendingEditAttachments();
+    });
+
+    function renderPendingEditAttachments() {
+        attachmentList.querySelectorAll("[data-pending-attachment]").forEach(item => item.remove());
+        editAttachmentFiles.forEach((file, index) => {
+            const item = document.createElement("div");
+            item.dataset.pendingAttachment = "true";
+            item.className = "attachment-chip";
+            item.innerHTML = '<i class="fa-solid fa-paperclip"></i><span class="attachment-chip-copy"><strong></strong><small></small></span><button type="button" class="attachment-remove" aria-label="Remove attachment"><i class="fa-solid fa-xmark"></i></button>';
+            item.querySelector("strong").textContent = file.name;
+            item.querySelector("small").textContent = Math.round(file.size / 1024) + " KB";
+            item.querySelector("button").addEventListener("click", () => {
+                editAttachmentFiles.splice(index, 1);
+                item.remove();
+            });
+            attachmentList.appendChild(item);
+        });
+    }
+
+    if (note.isPrivate) {
+        attachmentEditor.hidden = true;
+    } else {
+        window.renderNoteAttachments?.(attachmentList, note.attachments || [], {
+            removable: true,
+            noteId: note.id,
+            onChange: () => saveNotes()
+        });
+    }
 
     const actions = document.createElement("div");
     actions.className = "edit-save-row";
@@ -431,8 +492,15 @@ function startEditing(card, note) {
         previous.versions = typeof window.appendVersion === "function"
             ? window.appendVersion(previous.versions, previous)
             : (previous.versions || []);
+        const attachments = await window.prepareNoteAttachments?.(
+            note.id,
+            editAttachmentFiles,
+            previous.attachments || []
+        ) || previous.attachments || [];
+
         window.notes[noteIndex] = {
             ...previous,
+            attachments,
             title,
             text: body,
             html,
@@ -497,6 +565,7 @@ async function openNoteDetail(id) {
             </div>
             <div class="note-tags">${tags}</div>
             ${note.reminderAt ? `<div class="note-reminder"><i class="fa-regular fa-bell"></i>${escapeHtml(formatReminder(note.reminderAt))}</div>` : ""}
+            <div class="note-detail-attachments" data-note-attachments></div>
             <div class="note-detail-body">${bodyHtml || "<em>No note body.</em>"}</div>
             <div class="note-detail-actions">
                 <button type="button" class="secondary-action" data-detail-edit>Edit note</button>
@@ -505,6 +574,7 @@ async function openNoteDetail(id) {
         </div>`;
     modal.classList.add("show");
     modal.setAttribute("aria-hidden", "false");
+    window.renderNoteAttachments?.(modal.querySelector("[data-note-attachments]"), note.attachments || []);
     modal.querySelectorAll("[data-detail-close]").forEach(button => button.addEventListener("click", closeNoteDetail));
     modal.querySelector("[data-detail-edit]").addEventListener("click", () => {
         closeNoteDetail();

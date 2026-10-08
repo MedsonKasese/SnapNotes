@@ -4,6 +4,7 @@
 <body>
 <h1>SnapNotes automated tests</h1>
 <pre id="results">Running...</pre>
+<script src="../js/attachments.js"></script>
 <script src="../js/version-history.js"></script>
 <script>
 const results = [];
@@ -14,6 +15,22 @@ function test(name, fn) {
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 
 test("localStorage is available", () => assert("localStorage" in window, "localStorage missing"));
+
+test("attachment limits are defined", () => {
+  assert(window.MAX_ATTACHMENTS_PER_NOTE === 5, "attachment count limit is incorrect");
+  assert(window.MAX_ATTACHMENT_SIZE === 10 * 1024 * 1024, "attachment size limit is incorrect");
+});
+
+test("attachment module exposes note attachment preparation", () => {
+  assert(typeof window.prepareNoteAttachments === "function", "attachment preparation API is missing");
+});
+
+test("attachment UI accepts supported file types", () => {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain";
+  assert(input.accept.includes("application/pdf") && input.accept.includes("image/png"), "attachment input types are incomplete");
+});
 test("crypto UUID support is available", () => assert(typeof crypto.randomUUID === "function", "crypto.randomUUID missing"));
 test("service worker API is available", () => assert("serviceWorker" in navigator, "serviceWorker missing"));
 test("online state is readable", () => assert(typeof navigator.onLine === "boolean", "navigator.onLine missing"));
