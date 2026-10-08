@@ -912,43 +912,69 @@ function scheduleNextReminderCheck() {
     window.snapNotesReminderTimeout = setTimeout(checkDueReminders, Math.max(1000, nextDue - Date.now() + 50));
 }
 
+let reminderCheckInProgress = false;
+
 async function checkDueReminders() {
-    const notes = Array.isArray(window.notes) ? window.notes : [];
-    const now = Date.now();
-    let changed = false;
+    if (reminderCheckInProgress) return;
+    reminderCheckInProgress = true;
 
-    for (const note of notes) {
-        if (!note.reminderAt || note.reminderNotified || note.deletedAt) continue;
+    try {
+        const notes = Array.isArray(window.notes) ? window.notes : [];
+        const now = Date.now();
+        let changed = false;
 
-        const due = Date.parse(note.reminderAt);
-        if (Number.isNaN(due) || due > now) continue;
+        for (const note of notes) {
+            if (!note.reminderAt || note.reminderNotified || note.deletedAt) continue;
 
-        const recurrence = window.normalizeReminderRecurrence?.(note.reminderRecurrence);
+            const due = Date.parse(note.reminderAt);
+            if (Number.isNaN(due) || due > now) continue;
 
-        if ("Notification" in window && Notification.permission === "granted") {
-            const shown = await showReminderNotification(note);
-            if (!shown) {
+            const recurrence = window.normalizeReminderRecurrence?.(
+                note.reminderRecurrence,
+                note.reminderAt
+            );
+
+            if (recurrence) {
+                note.reminderRecurrence = recurrence;
+            }
+
+            if ("Notification" in window && Notification.permission === "granted") {
+                const shown = await showReminderNotification(note);
+                if (!shown) {
+                    showToast(`Reminder: ${note.title || "Untitled note"}`, "update");
+                }
+            } else {
                 showToast(`Reminder: ${note.title || "Untitled note"}`, "update");
             }
-        } else {
-            showToast(`Reminder: ${note.title || "Untitled note"}`, "update");
+
+            if (recurrence && window.getNextReminderAt) {
+                const nextReminderAt = window.getNextReminderAt(
+                    note.reminderAt,
+                    recurrence,
+                    now
+                );
+
+                if (nextReminderAt) {
+                    note.reminderAt = nextReminderAt;
+                    note.reminderNotified = false;
+                } else {
+                    note.reminderNotified = true;
+                }
+            } else {
+                note.reminderNotified = true;
+            }
+
+            changed = true;
         }
 
-        if (recurrence && window.getNextReminderAt) {
-            note.reminderAt = window.getNextReminderAt(note.reminderAt, recurrence, now);
-            note.reminderNotified = false;
-        } else {
-            note.reminderNotified = true;
+        if (changed) {
+            await saveNotes();
+            renderNotes();
         }
-
-        changed = true;
+    } finally {
+        reminderCheckInProgress = false;
+        scheduleNextReminderCheck();
     }
-
-    if (changed) {
-        await saveNotes();
-        renderNotes();
-    }
-    scheduleNextReminderCheck();
 }
 
 async function showReminderNotification(note) {
