@@ -12,6 +12,8 @@ const CATEGORIES = {
 
 let activeCategory = "all";
 let activeView = "all";
+let activeFolderId = null;
+window.activeFolderId = null;
 let selectedEditorCategory = "general";
 let clockTimer = null;
 let draftTimer = null;
@@ -21,6 +23,7 @@ let pendingNotificationNoteId = null;
 document.addEventListener("DOMContentLoaded", () => {
     handleNotificationNoteFromUrl();
     loadNotes();
+    window.loadFolders?.();
     setupEventListeners();
     restoreDraft();
     setupTheme();
@@ -100,6 +103,7 @@ function setupEventListeners() {
     const importNotesBtn = document.getElementById("importNotesBtn");
     const attachmentInput = document.getElementById("attachmentInput");
     const addAttachmentBtn = document.getElementById("addAttachmentBtn");
+    const createFolderBtn = document.getElementById("createFolderBtn");
     const importNotesInput = document.getElementById("importNotesInput");
     const formatToolbar = document.getElementById("formatToolbar");
 
@@ -170,6 +174,7 @@ function setupEventListeners() {
     exportNotesBtn.addEventListener("click", exportNotes);
     importNotesBtn.addEventListener("click", () => importNotesInput.click());
     importNotesInput.addEventListener("change", importNotes);
+    createFolderBtn?.addEventListener("click", () => window.createFolder?.());
     addAttachmentBtn?.addEventListener("click", () => attachmentInput?.click());
     attachmentInput?.addEventListener("change", event => {
         window.addPendingAttachments?.(event.target.files);
@@ -292,6 +297,8 @@ function openNewNoteView() {
 function openNotesView(category = activeCategory) {
     window.clearPrivateUnlock?.();
     activeView = "all";
+    activeFolderId = null;
+    window.activeFolderId = null;
     activeCategory = category;
     document.getElementById("categoryFilter").value = category;
     document.getElementById("newNoteView").hidden = true;
@@ -302,6 +309,7 @@ function openNotesView(category = activeCategory) {
     const title = category === "all" ? "All notes" : CATEGORIES[category];
     document.getElementById("notesViewTitle").textContent = title;
     document.getElementById("notesViewEyebrow").textContent = category === "all" ? "Your notes" : "Category";
+    window.updateFolderActiveState?.();
 
     applyNoteFilters();
 }
@@ -315,6 +323,8 @@ async function selectView(view) {
     }
 
     activeView = view;
+    activeFolderId = null;
+    window.activeFolderId = null;
     document.querySelectorAll(".drawer-item").forEach(item => {
         item.classList.toggle("active", item.dataset.view === view);
     });
@@ -329,12 +339,15 @@ async function selectView(view) {
         private: "Private Notes",
         trash: "Trash"
     };
+    window.updateFolderActiveState?.();
     document.getElementById("notesViewTitle").textContent = titles[view] || "Notes";
     document.getElementById("notesViewEyebrow").textContent = view === "private" ? "Private library" : "Library";
     applyNoteFilters();
 }
 
 function selectCategory(category) {
+    activeFolderId = null;
+    window.activeFolderId = null;
     activeCategory = category;
     document.getElementById("categoryFilter").value = category;
     document.querySelectorAll(".drawer-item").forEach(item => {
@@ -343,12 +356,46 @@ function selectCategory(category) {
     openNotesView(category);
 }
 
+
+
+function openFolderView(folderId) {
+    const folder = window.getFolderById?.(folderId);
+    if (!folder) return;
+
+    if (activeView === "private") {
+        window.clearPrivateUnlock?.();
+    }
+
+    activeFolderId = folderId;
+    window.activeFolderId = folderId;
+    activeView = "all";
+    activeCategory = "all";
+
+    document.getElementById("categoryFilter").value = "all";
+    document.getElementById("newNoteView").hidden = true;
+    document.getElementById("notesView").hidden = false;
+    document.getElementById("addBtn").hidden = false;
+    document.getElementById("emptyTrashBtn").hidden = true;
+    document.getElementById("notesViewTitle").textContent = folder.name;
+    document.getElementById("notesViewEyebrow").textContent = "Folder";
+
+    document.querySelectorAll(".drawer-item").forEach(item => {
+        item.classList.toggle("active", item.dataset.folderId === folderId);
+    });
+    window.updateFolderActiveState?.();
+    applyNoteFilters();
+    closeDrawer();
+}
+
+window.openFolderView = openFolderView;
+window.activeFolderId = activeFolderId;
+
 function applyNoteFilters() {
     const searchInput = document.getElementById("searchInput");
     const categoryFilter = document.getElementById("categoryFilter");
 
     activeCategory = categoryFilter.value;
-    renderNotes(searchInput.value.trim(), activeCategory, activeView);
+    renderNotes(searchInput.value.trim(), activeCategory, activeView, activeFolderId);
     updateNavigationCounts();
 }
 
@@ -565,6 +612,7 @@ async function saveEditorNote() {
         tags: parseTags(document.getElementById("noteTagsInput")?.value || ""),
         reminderAt: document.getElementById("noteReminderInput")?.value ? new Date(document.getElementById("noteReminderInput").value).toISOString() : null,
         reminderNotified: false,
+        folderId: window.activeFolderId || null,
         versions: [],
         attachments: [],
         pinned: false,
