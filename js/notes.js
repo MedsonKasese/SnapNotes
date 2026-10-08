@@ -245,7 +245,7 @@ function createNoteElement(note) {
         const reminder = document.createElement("div");
         reminder.className = "note-reminder";
         reminder.innerHTML = '<i class="fa-regular fa-bell"></i>';
-        reminder.append(document.createTextNode(formatReminder(note.reminderAt)));
+        reminder.append(document.createTextNode(formatReminder(note.reminderAt, note.reminderRecurrence)));
         content.appendChild(reminder);
     }
 
@@ -368,6 +368,21 @@ function startEditing(card, note) {
     reminderInput.type = "datetime-local";
     reminderInput.value = note.reminderAt ? String(note.reminderAt).slice(0, 16) : "";
 
+    const recurrenceSelect = document.createElement("select");
+    recurrenceSelect.innerHTML = `
+        <option value="">Never</option>
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+        <option value="monthly">Monthly</option>
+        <option value="yearly">Yearly</option>
+    `;
+    recurrenceSelect.value = window.normalizeReminderRecurrence?.(note.reminderRecurrence)?.frequency || "";
+    recurrenceSelect.disabled = !reminderInput.value;
+    reminderInput.addEventListener("input", () => {
+        recurrenceSelect.disabled = !reminderInput.value;
+        if (!reminderInput.value) recurrenceSelect.value = "";
+    });
+
     const attachmentEditor = document.createElement("div");
     attachmentEditor.className = "edit-note-attachments";
     const attachmentInput = document.createElement("input");
@@ -382,7 +397,7 @@ function startEditing(card, note) {
     const attachmentList = document.createElement("div");
     attachmentList.className = "note-attachments-list edit-attachments-list";
     attachmentEditor.append(attachmentButton, attachmentInput, attachmentList);
-    metadata.append(tagsInput, reminderInput, attachmentEditor);
+    metadata.append(tagsInput, reminderInput, recurrenceSelect, attachmentEditor);
 
     const editAttachmentFiles = [];
     attachmentButton.addEventListener("click", () => attachmentInput.click());
@@ -474,7 +489,12 @@ function startEditing(card, note) {
                 html,
                 tags: typeof window.parseTags === "function" ? window.parseTags(tagsInput.value) : [],
                 reminderAt: reminderInput.value ? new Date(reminderInput.value).toISOString() : null,
+                reminderRecurrence: reminderInput.value
+                    ? window.normalizeReminderRecurrence?.(recurrenceSelect.value || "")
+                    : null,
                 reminderNotified: reminderInput.value === (note.reminderAt ? String(note.reminderAt).slice(0, 16) : "")
+                    && JSON.stringify(window.normalizeReminderRecurrence?.(note.reminderRecurrence))
+                        === JSON.stringify(window.normalizeReminderRecurrence?.(recurrenceSelect.value || ""))
                     ? Boolean(note.reminderNotified)
                     : false
             });
@@ -510,7 +530,14 @@ function startEditing(card, note) {
             html,
             tags: typeof window.parseTags === "function" ? window.parseTags(tagsInput.value) : [],
             reminderAt: reminderInput.value ? new Date(reminderInput.value).toISOString() : null,
-            reminderNotified: reminderInput.value === (note.reminderAt ? String(note.reminderAt).slice(0, 16) : "") ? Boolean(previous.reminderNotified) : false,
+            reminderRecurrence: reminderInput.value
+                ? window.normalizeReminderRecurrence?.(recurrenceSelect.value || "")
+                : null,
+            reminderNotified: reminderInput.value === (note.reminderAt ? String(note.reminderAt).slice(0, 16) : "")
+                && JSON.stringify(window.normalizeReminderRecurrence?.(note.reminderRecurrence))
+                    === JSON.stringify(window.normalizeReminderRecurrence?.(recurrenceSelect.value || ""))
+                ? Boolean(previous.reminderNotified)
+                : false,
             updatedAt
         };
 
@@ -535,10 +562,16 @@ function startEditing(card, note) {
 
     titleInput.focus();
 }
-function formatReminder(value) {
+function formatReminder(value, recurrence = null) {
     const time = Date.parse(value);
     if (Number.isNaN(time)) return "Reminder set";
-    return "Reminder " + new Date(time).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+
+    const formatted = "Reminder " + new Date(time).toLocaleString([], {
+        dateStyle: "medium",
+        timeStyle: "short"
+    });
+    const repeatLabel = window.getReminderRecurrenceLabel?.(recurrence);
+    return repeatLabel ? formatted + " • " + repeatLabel : formatted;
 }
 
 async function openNoteDetail(id) {
