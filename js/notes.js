@@ -366,7 +366,9 @@ function startEditing(card, note) {
     tagsInput.placeholder = "Tags: work, ideas, urgent";
     const reminderInput = document.createElement("input");
     reminderInput.type = "datetime-local";
-    reminderInput.value = note.reminderAt ? String(note.reminderAt).slice(0, 16) : "";
+    reminderInput.value = note.reminderAt
+        ? (window.formatReminderDateTimeLocal?.(note.reminderAt) || "")
+        : "";
 
     const recurrenceSelect = document.createElement("select");
     recurrenceSelect.innerHTML = `
@@ -376,7 +378,7 @@ function startEditing(card, note) {
         <option value="monthly">Monthly</option>
         <option value="yearly">Yearly</option>
     `;
-    recurrenceSelect.value = window.normalizeReminderRecurrence?.(note.reminderRecurrence)?.frequency || "";
+    recurrenceSelect.value = window.normalizeReminderRecurrence?.(note.reminderRecurrence, note.reminderAt)?.frequency || "";
     recurrenceSelect.disabled = !reminderInput.value;
     reminderInput.addEventListener("input", () => {
         recurrenceSelect.disabled = !reminderInput.value;
@@ -488,13 +490,18 @@ function startEditing(card, note) {
                 text: body,
                 html,
                 tags: typeof window.parseTags === "function" ? window.parseTags(tagsInput.value) : [],
-                reminderAt: reminderInput.value ? new Date(reminderInput.value).toISOString() : null,
+                reminderAt: window.parseReminderDateTimeLocal?.(reminderInput.value) || null,
                 reminderRecurrence: reminderInput.value
-                    ? window.normalizeReminderRecurrence?.(recurrenceSelect.value || "")
+                    ? window.normalizeReminderRecurrence?.(
+                        recurrenceSelect.value || "",
+                        reminderInput.value
+                    )
                     : null,
-                reminderNotified: reminderInput.value === (note.reminderAt ? String(note.reminderAt).slice(0, 16) : "")
-                    && JSON.stringify(window.normalizeReminderRecurrence?.(note.reminderRecurrence))
-                        === JSON.stringify(window.normalizeReminderRecurrence?.(recurrenceSelect.value || ""))
+                reminderNotified: reminderInput.value === (note.reminderAt
+                    ? (window.formatReminderDateTimeLocal?.(note.reminderAt) || "")
+                    : "")
+                    && JSON.stringify(window.normalizeReminderRecurrence?.(note.reminderRecurrence, note.reminderAt))
+                        === JSON.stringify(window.normalizeReminderRecurrence?.(recurrenceSelect.value || "", reminderInput.value))
                     ? Boolean(note.reminderNotified)
                     : false
             });
@@ -507,6 +514,10 @@ function startEditing(card, note) {
                 showToast("Private note updated successfully", "success");
             }
             return;
+        }
+
+        if (reminderInput.value) {
+            await window.requestReminderPermission?.();
         }
 
         const updatedAt = new Date().toISOString();
@@ -529,13 +540,18 @@ function startEditing(card, note) {
             text: body,
             html,
             tags: typeof window.parseTags === "function" ? window.parseTags(tagsInput.value) : [],
-            reminderAt: reminderInput.value ? new Date(reminderInput.value).toISOString() : null,
+            reminderAt: window.parseReminderDateTimeLocal?.(reminderInput.value) || null,
             reminderRecurrence: reminderInput.value
-                ? window.normalizeReminderRecurrence?.(recurrenceSelect.value || "")
+                ? window.normalizeReminderRecurrence?.(
+                    recurrenceSelect.value || "",
+                    reminderInput.value
+                )
                 : null,
-            reminderNotified: reminderInput.value === (note.reminderAt ? String(note.reminderAt).slice(0, 16) : "")
-                && JSON.stringify(window.normalizeReminderRecurrence?.(note.reminderRecurrence))
-                    === JSON.stringify(window.normalizeReminderRecurrence?.(recurrenceSelect.value || ""))
+            reminderNotified: reminderInput.value === (note.reminderAt
+                ? (window.formatReminderDateTimeLocal?.(note.reminderAt) || "")
+                : "")
+                && JSON.stringify(window.normalizeReminderRecurrence?.(note.reminderRecurrence, note.reminderAt))
+                    === JSON.stringify(window.normalizeReminderRecurrence?.(recurrenceSelect.value || "", reminderInput.value))
                 ? Boolean(previous.reminderNotified)
                 : false,
             updatedAt
