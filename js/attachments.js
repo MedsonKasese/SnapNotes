@@ -195,6 +195,10 @@ async function uploadAttachmentToCloud(noteId, attachment, file) {
 async function prepareNoteAttachments(noteId, files, existing = []) {
     const attachments = Array.isArray(existing) ? [...existing] : [];
     const incoming = Array.from(files || []);
+    const available = MAX_ATTACHMENTS_PER_NOTE - attachments.length;
+    if (incoming.length > available) {
+        throw new Error(`A note can have up to ${MAX_ATTACHMENTS_PER_NOTE} attachments.`);
+    }
 
     for (const file of incoming) {
         const error = validateAttachment(file);
@@ -215,7 +219,7 @@ async function prepareNoteAttachments(noteId, files, existing = []) {
         attachments.push(attachment);
     }
 
-    return attachments.slice(0, MAX_ATTACHMENTS_PER_NOTE);
+    return attachments;
 }
 
 async function resolveAttachmentUrl(attachment) {
