@@ -21,6 +21,7 @@ jobs:
           node --check js/private-notes.js
           node --check js/attachments.js
           node --check js/folders.js
+          node --check js/recurring-reminders.js
           node --check js/version-history.js
       - name: Validate required PWA files
         run: |
@@ -30,6 +31,9 @@ jobs:
       - name: Validate productivity feature contracts
         run: |
           grep -q 'noteTagsInput' index.html
+          grep -q 'noteReminderRecurrence' index.html
+          grep -q 'getNextReminderAt' js/recurring-reminders.js
+          grep -q 'normalizeReminderRecurrence' js/app.js
           grep -q 'noteReminderInput' index.html
           grep -q 'noteDetailModal' index.html
           grep -q 'function parseTags' js/app.js
@@ -55,7 +59,7 @@ jobs:
           grep -q 'moveNoteToFolder' js/folders.js
           grep -q 'folderNavList' index.html
           grep -q 'folders' js/firestore.js
-          grep -q 'snapnotes-v43' sw.js
+          grep -q 'snapnotes-v44' sw.js
           test -f assets/icons/snapnotes-notification.png
           test -f assets/icons/snapnotes-notification-badge.svg
           grep -q 'icon: "./assets/icons/snapnotes-notification.png"' js/app.js
