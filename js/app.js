@@ -733,7 +733,8 @@ function exportNotes() {
                 app: "SnapNotes",
                 version: 1,
                 exportedAt: new Date().toISOString(),
-                notes
+                notes,
+                folders: Array.isArray(window.getFolders?.()) ? window.getFolders() : []
             }, null, 2),
             "application/json"
         );
@@ -766,12 +767,29 @@ async function importNotes(event) {
         const text = await file.text();
         const parsed = JSON.parse(text);
         const imported = Array.isArray(parsed) ? parsed : parsed.notes;
+        const importedFolders = Array.isArray(parsed?.folders) ? parsed.folders : [];
 
         if (!Array.isArray(imported)) {
             throw new Error("Invalid SnapNotes export.");
         }
 
         const existingIds = new Set((window.notes || []).map(note => note.id));
+        if (importedFolders.length && typeof window.getFolders === "function") {
+            const existingFolderIds = new Set((window.getFolders() || []).map(folder => folder.id));
+            importedFolders.slice(0, 20).forEach(folder => {
+                if (!folder?.id || existingFolderIds.has(folder.id)) return;
+                const name = String(folder.name || "").trim().replace(/\s+/g, " ").slice(0, 32);
+                if (!name) return;
+                window.getFolders().push({
+                    id: String(folder.id),
+                    name,
+                    createdAt: folder.createdAt || new Date().toISOString(),
+                    updatedAt: folder.updatedAt || folder.createdAt || new Date().toISOString()
+                });
+            });
+            localStorage.setItem("SnapNotesFolders", JSON.stringify(window.getFolders().slice(0, 20)));
+            window.renderFolderNavigation?.();
+        }
         const normalized = imported
             .filter(note => note && typeof note === "object")
             .map(note => ({
