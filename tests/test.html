@@ -6,6 +6,7 @@
 <pre id="results">Running...</pre>
 <script src="../js/attachments.js"></script>
 <script src="../js/folders.js"></script>
+<script src="../js/recurring-reminders.js"></script>
 <script src="../js/version-history.js"></script>
 <script>
 const results = [];
@@ -66,6 +67,32 @@ test("folder view excludes archived, trashed, private, and unrelated notes", () 
 test("folder sync payload keeps folders alongside notes", () => {
   const payload = { notes: [], folders: [{ id: "f1", name: "Work" }] };
   assert(Array.isArray(payload.folders) && payload.folders[0].name === "Work", "folder sync payload is invalid");
+});
+
+test("recurring reminder module exposes scheduling helpers", () => {
+  assert(typeof window.normalizeReminderRecurrence === "function", "recurrence normalizer is missing");
+  assert(typeof window.getNextReminderAt === "function", "next reminder calculator is missing");
+});
+
+test("recurring reminders advance to the next future occurrence", () => {
+  const start = new Date("2026-10-08T09:00:00.000Z");
+  const next = window.getNextReminderAt(start.toISOString(), { frequency: "daily", interval: 1 }, start.getTime());
+  assert(next === "2026-10-09T09:00:00.000Z", "daily recurrence did not advance by one day");
+});
+
+test("monthly recurrence clamps invalid month dates", () => {
+  const start = new Date("2026-01-31T09:00:00.000Z");
+  const next = window.getNextReminderAt(start.toISOString(), { frequency: "monthly", interval: 1 }, start.getTime());
+  assert(next === "2026-02-28T09:00:00.000Z", "monthly recurrence did not clamp to the last valid day");
+});
+
+test("non-recurring reminders remain one-time reminders", () => {
+  assert(window.getNextReminderAt(new Date().toISOString(), null) === null, "one-time reminder unexpectedly recurred");
+});
+
+test("recurrence settings are stored as structured metadata", () => {
+  const recurrence = window.normalizeReminderRecurrence("weekly");
+  assert(recurrence && recurrence.frequency === "weekly" && recurrence.interval === 1, "recurrence metadata is invalid");
 });
 
 test("crypto UUID support is available", () => assert(typeof crypto.randomUUID === "function", "crypto.randomUUID missing"));
