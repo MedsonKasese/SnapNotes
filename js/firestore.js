@@ -108,6 +108,7 @@ export async function syncToCloud() {
         const userDocRef = doc(db, "users", uid);
         await setDoc(userDocRef, {
             notes: Array.isArray(window.notes) ? window.notes : [],
+            folders: Array.isArray(window.getFolders?.()) ? window.getFolders() : [],
             lastSynced: new Date().toISOString(),
             syncVersion: 1,
             lastSyncedBy: getDeviceId(),
@@ -141,11 +142,28 @@ export async function loadFromCloud(uid) {
         const cloudData = docSnap.data();
         const cloudNotes = Array.isArray(cloudData.notes) ? cloudData.notes : [];
         const localNotes = Array.isArray(window.notes) ? window.notes : [];
+        const cloudFolders = Array.isArray(cloudData.folders) ? cloudData.folders : [];
+        const localFolders = Array.isArray(window.getFolders?.()) ? window.getFolders() : [];
 
         const merged = mergeNotes(localNotes, cloudNotes);
+        const folderMap = new Map();
+        [...cloudFolders, ...localFolders].forEach(folder => {
+            if (!folder?.id) return;
+            const existing = folderMap.get(folder.id);
+            if (!existing) {
+                folderMap.set(folder.id, folder);
+                return;
+            }
+            const existingTime = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
+            const incomingTime = new Date(folder.updatedAt || folder.createdAt || 0).getTime();
+            if (incomingTime > existingTime) folderMap.set(folder.id, folder);
+        });
+        const mergedFolders = [...folderMap.values()].slice(0, 20);
 
         window.notes = merged;
         localStorage.setItem("SnapNotes", JSON.stringify(merged));
+        localStorage.setItem("SnapNotesFolders", JSON.stringify(mergedFolders));
+        window.loadFolders?.();
 
         window.renderNotes();
         window.checkDueReminders?.();
