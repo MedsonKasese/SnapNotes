@@ -121,6 +121,16 @@ Then write your notes below..."
                 </label>
             </div>
 
+            <div class="editor-attachments">
+                <input id="attachmentInput" type="file" accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain" multiple hidden>
+                <button id="addAttachmentBtn" class="secondary-action attachment-add-button" type="button">
+                    <i class="fa-solid fa-paperclip"></i>
+                    Attach files
+                </button>
+                <span class="attachment-limit">Up to 5 files, 10 MB each</span>
+                <div id="pendingAttachments" class="pending-attachments" hidden></div>
+            </div>
+
             <div class="editor-footer">
                 <div class="editor-status" id="draftStatus" aria-live="polite"><i class="fa-regular fa-floppy-disk"></i><span>Drafts save automatically</span><span id="editorCharacterCount" class="editor-character-count">0/1500</span></div>
                 <p class="editor-hint">
@@ -423,6 +433,7 @@ Then write your notes below..."
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="js/attachments.js"></script>
     <script src="js/version-history.js"></script>
     <script src="js/private-notes.js"></script>
     <script src="js/storage.js"></script>
