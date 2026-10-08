@@ -187,6 +187,13 @@ function createNoteElement(note) {
     content.appendChild(title);
     content.appendChild(body);
 
+    if (Array.isArray(note.attachments) && note.attachments.length) {
+        const attachments = document.createElement("div");
+        attachments.className = "note-attachments-list";
+        content.appendChild(attachments);
+        window.renderNoteAttachments?.(attachments, note.attachments);
+    }
+
     if (noteHasMoreThanFiveLines(note, bodyText)) {
         body.classList.add("note-card-body-clamped");
 
@@ -497,6 +504,7 @@ async function openNoteDetail(id) {
             </div>
             <div class="note-tags">${tags}</div>
             ${note.reminderAt ? `<div class="note-reminder"><i class="fa-regular fa-bell"></i>${escapeHtml(formatReminder(note.reminderAt))}</div>` : ""}
+            <div class="note-detail-attachments" data-note-attachments></div>
             <div class="note-detail-body">${bodyHtml || "<em>No note body.</em>"}</div>
             <div class="note-detail-actions">
                 <button type="button" class="secondary-action" data-detail-edit>Edit note</button>
@@ -505,6 +513,7 @@ async function openNoteDetail(id) {
         </div>`;
     modal.classList.add("show");
     modal.setAttribute("aria-hidden", "false");
+    window.renderNoteAttachments?.(modal.querySelector("[data-note-attachments]"), note.attachments || []);
     modal.querySelectorAll("[data-detail-close]").forEach(button => button.addEventListener("click", closeNoteDetail));
     modal.querySelector("[data-detail-edit]").addEventListener("click", () => {
         closeNoteDetail();
