@@ -741,6 +741,17 @@ async function importNotes(event) {
                 privateData: note.isPrivate && note.privateData && typeof note.privateData === "object"
                     ? note.privateData
                     : null,
+                attachments: Array.isArray(note.attachments)
+                    ? note.attachments.map(attachment => ({
+                        id: String(attachment.id || crypto.randomUUID()),
+                        name: String(attachment.name || "Attachment"),
+                        type: String(attachment.type || "application/octet-stream"),
+                        size: Number(attachment.size) || 0,
+                        createdAt: attachment.createdAt || new Date().toISOString(),
+                        storagePath: attachment.storagePath || null,
+                        downloadUrl: attachment.downloadUrl || null
+                    })).slice(0, window.MAX_ATTACHMENTS_PER_NOTE || 5)
+                    : [],
                 time: String(note.time || ""),
                 createdAt: note.createdAt || new Date().toISOString(),
                 updatedAt: note.updatedAt || note.createdAt || new Date().toISOString()
