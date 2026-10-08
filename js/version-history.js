@@ -12,7 +12,7 @@ function createVersionSnapshot(note) {
         category: String(note?.category || "general"),
         tags: Array.isArray(note?.tags) ? [...note.tags] : [],
         reminderAt: note?.reminderAt || null,
-        reminderRecurrence: window.normalizeReminderRecurrence?.(note?.reminderRecurrence) || null,
+        reminderRecurrence: window.normalizeReminderRecurrence?.(note?.reminderRecurrence, note?.reminderAt) || null,
         reminderNotified: Boolean(note?.reminderNotified),
         time: String(note?.time || ""),
         savedAt: new Date().toISOString()
@@ -184,7 +184,7 @@ async function restorePublicNoteVersion(id, version) {
         category: version.category || "general",
         tags: Array.isArray(version.tags) ? [...version.tags] : [],
         reminderAt: version.reminderAt || null,
-        reminderRecurrence: window.normalizeReminderRecurrence?.(version.reminderRecurrence) || null,
+        reminderRecurrence: window.normalizeReminderRecurrence?.(version.reminderRecurrence, version.reminderAt) || null,
         reminderNotified: Boolean(version.reminderNotified),
         time: version.time || note.time || "",
         updatedAt: new Date().toISOString()
