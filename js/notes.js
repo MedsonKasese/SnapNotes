@@ -22,7 +22,7 @@ function purgeExpiredTrash(now = Date.now()) {
     return removedCount;
 }
 
-function renderNotes(filterText = "", filterCategory = "all", view = window.getActiveNotesView ? window.getActiveNotesView() : "all") {
+function renderNotes(filterText = "", filterCategory = "all", view = window.getActiveNotesView ? window.getActiveNotesView() : "all", folderId = window.activeFolderId || null) {
     const notesContainer = document.getElementById("notesContainer");
     if (!notesContainer) return;
     purgeExpiredTrash();
@@ -59,6 +59,7 @@ function renderNotes(filterText = "", filterCategory = "all", view = window.getA
         if (view === "trash") return Boolean(note.deletedAt);
         if (view === "archive") return Boolean(note.archived) && !note.deletedAt && !note.isPrivate;
         if (view === "private") return Boolean(note.isPrivate) && !note.deletedAt && !note.archived;
+        if (folderId) return note.folderId === folderId && !note.archived && !note.deletedAt && !note.isPrivate;
         return !note.archived && !note.deletedAt && !note.isPrivate;
     });
 
@@ -279,6 +280,9 @@ function createNoteElement(note) {
     const privateButton = note.isPrivate
         ? createDropdownItem("Move out of private", () => window.moveNoteFromPrivate?.(note.id))
         : createDropdownItem("Move to private", () => window.moveNoteToPrivate?.(note.id));
+    const folderButton = !note.isPrivate && !note.deletedAt
+        ? createDropdownItem("Move to folder", () => window.moveNoteToFolder?.(note.id))
+        : null;
     const historyButton = createDropdownItem("edit history", () => window.openNoteVersionHistory?.(note.id));
     const noteView = viewForNote(note);
     if (noteView === "trash") {
@@ -288,13 +292,13 @@ function createNoteElement(note) {
         );
     } else if (note.isPrivate) {
         const deleteButton = createDropdownItem("Move to trash", () => deleteNote(note.id), "delete-action");
-        dropdown.append(detailButton, duplicateButton, shareButton, historyButton, editButton, privateButton, deleteButton);
+        dropdown.append(detailButton, duplicateButton, shareButton, historyButton, editButton, privateButton, ...(folderButton ? [folderButton] : []), deleteButton);
     } else {
         const archiveButton = noteView === "archive"
             ? createDropdownItem("Restore note", () => restoreNote(note.id))
             : createDropdownItem("Archive note", () => archiveNote(note.id));
         const deleteButton = createDropdownItem("Move to trash", () => deleteNote(note.id), "delete-action");
-        dropdown.append(detailButton, duplicateButton, shareButton, historyButton, editButton, privateButton, archiveButton, deleteButton);
+        dropdown.append(detailButton, duplicateButton, shareButton, historyButton, editButton, privateButton, ...(folderButton ? [folderButton] : []), archiveButton, deleteButton);
     }
 
     menuButton.addEventListener("click", event => {
