@@ -1132,6 +1132,10 @@
 .editor-metadata-field span{display:flex;align-items:center;gap:6px}
 .editor-metadata-field input{width:100%;min-height:38px;padding:8px 10px;border:1px solid var(--border-color);border-radius:9px;color:var(--text-color);background:var(--surface-soft);font:inherit;font-weight:500}
 .editor-metadata-field input:focus{outline:2px solid color-mix(in srgb,var(--primary-color) 35%,transparent);border-color:var(--primary-color)}
+.reminder-input-wrap{display:grid;grid-template-columns:minmax(0,1fr) 40px;gap:6px;align-items:center}
+.reminder-picker-button{width:40px;height:38px;display:inline-flex;align-items:center;justify-content:center;padding:0;border:1px solid var(--border-color);border-radius:9px;color:var(--primary-color);background:var(--surface-soft);cursor:pointer}
+.reminder-picker-button:hover,.reminder-picker-button:focus-visible{border-color:var(--primary-color);background:var(--surface-color);outline:none}
+.reminder-picker-button:focus-visible{box-shadow:0 0 0 3px color-mix(in srgb,var(--primary-color) 25%,transparent)}
 .note-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
 .note-tag{display:inline-flex;align-items:center;padding:3px 7px;border-radius:999px;background:var(--surface-soft);color:var(--primary-color);font-size:10px;font-weight:700}
 .note-reminder{display:inline-flex;align-items:center;gap:4px;margin-top:8px;color:var(--muted-color);font-size:10px;font-weight:700}

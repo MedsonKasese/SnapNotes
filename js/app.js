@@ -76,6 +76,7 @@ function setupEventListeners() {
     const categoryFilter = document.getElementById("categoryFilter");
     const reminderInput = document.getElementById("noteReminderInput");
     const reminderRecurrence = document.getElementById("noteReminderRecurrence");
+    const reminderPickerBtn = document.getElementById("reminderPickerBtn");
     const settingsBtn = document.getElementById("settingsBtn");
     const settingsModal = document.getElementById("settingsModal");
     const closeSettingsBtn = document.getElementById("closeSettingsBtn");
@@ -192,6 +193,18 @@ function setupEventListeners() {
 
     reminderInput?.addEventListener("input", syncReminderRecurrenceControl);
     reminderInput?.addEventListener("change", syncReminderRecurrenceControl);
+    reminderPickerBtn?.addEventListener("click", () => {
+        try {
+            if (typeof reminderInput?.showPicker === "function") {
+                reminderInput.showPicker();
+                return;
+            }
+        } catch (error) {
+            console.debug("Native reminder picker is unavailable:", error);
+        }
+        reminderInput?.focus();
+        reminderInput?.click();
+    });
     syncReminderRecurrenceControl();
 
     logoButton.addEventListener("click", openNewNoteView);
