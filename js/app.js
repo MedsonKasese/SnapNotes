@@ -667,7 +667,9 @@ async function saveEditorNote() {
     window.renderFolderNavigation?.();
     openNotesView("all");
 
-        if (saveResult.cloudEnabled && !saveResult.synced) {
+        if (newNote.attachments.some(attachment => attachment.uploadStatus === "pending")) {
+            showToast("Note saved. Attachment is stored on this device and waiting to sync.", "warning");
+        } else if (saveResult.cloudEnabled && !saveResult.synced) {
             showToast("Note saved locally. Cloud sync pending.", "warning");
         } else if (saveResult.cloudEnabled) {
             showToast("Note saved and synced", "success");
