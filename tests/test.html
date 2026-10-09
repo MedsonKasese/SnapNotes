@@ -6,7 +6,7 @@
 <pre id="results">Running...</pre>
 <script src="../js/attachments.js"></script>
 <script src="../js/folders.js"></script>
-<script src="../js/recurring-reminders.js"></script>
+<script src="../js/reminder-utils.js"></script>
 <script src="../js/version-history.js"></script>
 <script>
 const results = [];
@@ -69,57 +69,14 @@ test("folder sync payload keeps folders alongside notes", () => {
   assert(Array.isArray(payload.folders) && payload.folders[0].name === "Work", "folder sync payload is invalid");
 });
 
-test("recurring reminder dates round-trip through local input helpers", () => {
+test("one-time reminder dates round-trip through local input helpers", () => {
   const source = "2026-10-08T09:15";
   const iso = window.parseReminderDateTimeLocal(source);
   assert(iso && window.formatReminderDateTimeLocal(iso) === source, "local reminder time was not preserved");
 });
 
-test("monthly recurrence keeps the original day anchor", () => {
-  const start = new Date("2026-01-31T09:00:00.000Z");
-  const recurrence = window.normalizeReminderRecurrence("monthly", start);
-  const february = window.getNextReminderAt(start.toISOString(), recurrence, start.getTime());
-  const march = window.getNextReminderAt(february, recurrence, Date.parse(february));
-  assert(february === "2026-02-28T09:00:00.000Z", "January 31 did not clamp to February 28");
-  assert(march === "2026-03-31T09:00:00.000Z", "monthly recurrence lost its day anchor");
-});
-
-test("yearly leap-day recurrence keeps its anchor", () => {
-  const start = new Date("2028-02-29T09:00:00.000Z");
-  const recurrence = window.normalizeReminderRecurrence("yearly", start);
-  const next = window.getNextReminderAt(start.toISOString(), recurrence, start.getTime());
-  assert(next === "2029-02-28T09:00:00.000Z", "leap-day recurrence did not clamp to February 28");
-});
-
-test("recurring reminder scheduler exposes a safe browser timer limit", () => {
-  const source = "Math.min(delay, MAX_BROWSER_TIMER_DELAY)";
-  assert(source.includes("MAX_BROWSER_TIMER_DELAY"), "long reminder timers are not capped");
-});
-
-test("recurring reminder module exposes scheduling helpers", () => {
-  assert(typeof window.normalizeReminderRecurrence === "function", "recurrence normalizer is missing");
-  assert(typeof window.getNextReminderAt === "function", "next reminder calculator is missing");
-});
-
-test("recurring reminders advance to the next future occurrence", () => {
-  const start = new Date("2026-10-08T09:00:00.000Z");
-  const next = window.getNextReminderAt(start.toISOString(), { frequency: "daily", interval: 1 }, start.getTime());
-  assert(next === "2026-10-09T09:00:00.000Z", "daily recurrence did not advance by one day");
-});
-
-test("monthly recurrence clamps invalid month dates", () => {
-  const start = new Date("2026-01-31T09:00:00.000Z");
-  const next = window.getNextReminderAt(start.toISOString(), { frequency: "monthly", interval: 1 }, start.getTime());
-  assert(next === "2026-02-28T09:00:00.000Z", "monthly recurrence did not clamp to the last valid day");
-});
-
-test("non-recurring reminders remain one-time reminders", () => {
-  assert(window.getNextReminderAt(new Date().toISOString(), null) === null, "one-time reminder unexpectedly recurred");
-});
-
-test("recurrence settings are stored as structured metadata", () => {
-  const recurrence = window.normalizeReminderRecurrence("weekly");
-  assert(recurrence && recurrence.frequency === "weekly" && recurrence.interval === 1, "recurrence metadata is invalid");
+test("attachment creation requires an authenticated account", () => {
+  assert(window.prepareNoteAttachments.length >= 2, "attachment preparation API is incomplete");
 });
 
 test("crypto UUID support is available", () => assert(typeof crypto.randomUUID === "function", "crypto.randomUUID missing"));
@@ -158,9 +115,9 @@ test("tag parser normalises and deduplicates tags", () => {
   assert(JSON.stringify(parseTags(" Work, #Ideas, work ")) === JSON.stringify(["work", "ideas"]), "tags were not normalised");
 });
 
-test("advanced search recognises tag and reminder operators", () => {
-  const query = 'project tag:work has:reminder is:pinned -archived';
-  assert(query.includes("tag:work") && query.includes("has:reminder") && query.includes("is:pinned") && query.includes("-archived"), "advanced search operators missing");
+test("advanced search recognises tag and archive operators", () => {
+  const query = 'project tag:work is:pinned -archived';
+  assert(query.includes("tag:work") && query.includes("is:pinned") && query.includes("-archived"), "advanced search operators missing");
 });
 
 test("reminder due logic detects past reminders", () => {

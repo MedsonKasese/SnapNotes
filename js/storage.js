@@ -40,7 +40,6 @@ function loadNotes() {
         try {
             window.notes = JSON.parse(savedNotes);
             renderNotes();
-            window.checkDueReminders?.();
         } catch (e) {
             console.error("Failed to parse notes from local storage", e);
             window.notes = [];

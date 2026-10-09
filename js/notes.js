@@ -35,14 +35,13 @@ function renderNotes(filterText = "", filterCategory = "all", view = window.getA
     const pinnedToken = tokens.find(token => token === "is:pinned");
     const archivedToken = tokens.find(token => token === "is:archived");
     const trashToken = tokens.find(token => token === "is:trash" || token === "is:trashed");
-    const reminderToken = tokens.find(token => token === "has:reminder");
     const tagTokens = tokens.filter(token => token.startsWith("tag:")).map(token => token.slice(4).trim()).filter(Boolean);
     const positiveTerms = [];
     const negativeTerms = [];
     const searchTokens = rawQuery.match(/"[^"]+"|\S+/g) || [];
     searchTokens.forEach(token => {
         if (token.startsWith("-") && token.length > 1) negativeTerms.push(token.slice(1).replace(/^"|"$/g, ""));
-        else if (!token.startsWith("category:") && token !== "is:pinned" && token !== "is:archived" && token !== "is:trash" && token !== "is:trashed" && token !== "has:reminder" && !token.startsWith("tag:") && !token.startsWith("sort:")) positiveTerms.push(token.replace(/^"|"$/g, ""));
+        else if (!token.startsWith("category:") && token !== "is:pinned" && token !== "is:archived" && token !== "is:trash" && token !== "is:trashed" && !token.startsWith("tag:") && !token.startsWith("sort:")) positiveTerms.push(token.replace(/^"|"$/g, ""));
     });
     const validCategories = ["all", "general", "work", "personal", "ideas", "important"];
     const requestedCategory = categoryToken
@@ -78,9 +77,8 @@ function renderNotes(filterText = "", filterCategory = "all", view = window.getA
         const matchesPinned = !pinnedToken || note.pinned;
         const matchesArchived = !archivedToken || Boolean(note.archived);
         const matchesTrash = !trashToken || Boolean(note.deletedAt);
-        const matchesReminder = !reminderToken || Boolean(note.reminderAt);
         const matchesTags = !tagTokens.length || tagTokens.every(tag => (note.tags || []).map(value => value.toLowerCase()).includes(tag.toLowerCase()));
-        return matchesSearch && matchesExcluded && matchesCategory && matchesPinned && matchesArchived && matchesTrash && matchesReminder && matchesTags;
+        return matchesSearch && matchesExcluded && matchesCategory && matchesPinned && matchesArchived && matchesTrash && matchesTags;
     });
 
     filteredNotes.sort((a, b) => {
@@ -245,7 +243,7 @@ function createNoteElement(note) {
         const reminder = document.createElement("div");
         reminder.className = "note-reminder";
         reminder.innerHTML = '<i class="fa-regular fa-bell"></i>';
-        reminder.append(document.createTextNode(formatReminder(note.reminderAt, note.reminderRecurrence)));
+        reminder.append(document.createTextNode(formatReminder(note.reminderAt)));
         content.appendChild(reminder);
     }
 
@@ -370,21 +368,6 @@ function startEditing(card, note) {
         ? (window.formatReminderDateTimeLocal?.(note.reminderAt) || "")
         : "";
 
-    const recurrenceSelect = document.createElement("select");
-    recurrenceSelect.innerHTML = `
-        <option value="">Never</option>
-        <option value="daily">Daily</option>
-        <option value="weekly">Weekly</option>
-        <option value="monthly">Monthly</option>
-        <option value="yearly">Yearly</option>
-    `;
-    recurrenceSelect.value = window.normalizeReminderRecurrence?.(note.reminderRecurrence, note.reminderAt)?.frequency || "";
-    recurrenceSelect.disabled = !reminderInput.value;
-    reminderInput.addEventListener("input", () => {
-        recurrenceSelect.disabled = !reminderInput.value;
-        if (!reminderInput.value) recurrenceSelect.value = "";
-    });
-
     const attachmentEditor = document.createElement("div");
     attachmentEditor.className = "edit-note-attachments";
     const attachmentInput = document.createElement("input");
@@ -399,7 +382,7 @@ function startEditing(card, note) {
     const attachmentList = document.createElement("div");
     attachmentList.className = "note-attachments-list edit-attachments-list";
     attachmentEditor.append(attachmentButton, attachmentInput, attachmentList);
-    metadata.append(tagsInput, reminderInput, recurrenceSelect, attachmentEditor);
+    metadata.append(tagsInput, reminderInput, attachmentEditor);
 
     const editAttachmentFiles = [];
     attachmentButton.addEventListener("click", () => attachmentInput.click());
@@ -491,19 +474,9 @@ function startEditing(card, note) {
                 html,
                 tags: typeof window.parseTags === "function" ? window.parseTags(tagsInput.value) : [],
                 reminderAt: window.parseReminderDateTimeLocal?.(reminderInput.value) || null,
-                reminderRecurrence: reminderInput.value
-                    ? window.normalizeReminderRecurrence?.(
-                        recurrenceSelect.value || "",
-                        reminderInput.value
-                    )
-                    : null,
                 reminderNotified: reminderInput.value === (note.reminderAt
                     ? (window.formatReminderDateTimeLocal?.(note.reminderAt) || "")
-                    : "")
-                    && JSON.stringify(window.normalizeReminderRecurrence?.(note.reminderRecurrence, note.reminderAt))
-                        === JSON.stringify(window.normalizeReminderRecurrence?.(recurrenceSelect.value || "", reminderInput.value))
-                    ? Boolean(note.reminderNotified)
-                    : false
+                    : "") ? Boolean(note.reminderNotified) : false
             });
 
             if (updated) {
@@ -541,19 +514,9 @@ function startEditing(card, note) {
             html,
             tags: typeof window.parseTags === "function" ? window.parseTags(tagsInput.value) : [],
             reminderAt: window.parseReminderDateTimeLocal?.(reminderInput.value) || null,
-            reminderRecurrence: reminderInput.value
-                ? window.normalizeReminderRecurrence?.(
-                    recurrenceSelect.value || "",
-                    reminderInput.value
-                )
-                : null,
             reminderNotified: reminderInput.value === (note.reminderAt
                 ? (window.formatReminderDateTimeLocal?.(note.reminderAt) || "")
-                : "")
-                && JSON.stringify(window.normalizeReminderRecurrence?.(note.reminderRecurrence, note.reminderAt))
-                    === JSON.stringify(window.normalizeReminderRecurrence?.(recurrenceSelect.value || "", reminderInput.value))
-                ? Boolean(previous.reminderNotified)
-                : false,
+                : "") ? Boolean(previous.reminderNotified) : false,
             updatedAt
         };
 
@@ -578,7 +541,7 @@ function startEditing(card, note) {
 
     titleInput.focus();
 }
-function formatReminder(value, recurrence = null) {
+function formatReminder(value) {
     const time = Date.parse(value);
     if (Number.isNaN(time)) return "Reminder set";
 
@@ -586,8 +549,7 @@ function formatReminder(value, recurrence = null) {
         dateStyle: "medium",
         timeStyle: "short"
     });
-    const repeatLabel = window.getReminderRecurrenceLabel?.(recurrence);
-    return repeatLabel ? formatted + " • " + repeatLabel : formatted;
+    return formatted;
 }
 
 async function openNoteDetail(id) {

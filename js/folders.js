@@ -165,7 +165,7 @@ function renameFolder(id) {
     window.showToast?.("Folder renamed", "success");
 }
 
-function deleteFolder(id) {
+async function deleteFolder(id) {
     const folder = getFolderById(id);
     if (!folder) return;
 
@@ -178,18 +178,17 @@ function deleteFolder(id) {
     if (!confirmed) return;
 
     (window.notes || []).forEach(note => {
-        if (note.folderId === id) delete note.folderId;
+        if (note.folderId === id) note.folderId = null;
     });
 
     folders = folders.filter(item => item.id !== id);
     saveFolders();
     localStorage.setItem("SnapNotes", JSON.stringify(window.notes || []));
     window.activeFolderId = null;
-    window.saveNotes?.();
+    await window.saveNotes?.();
     renderFolderNavigation();
     window.renderNotes?.();
     window.updateNavigationCounts?.();
-    window.syncToCloud?.();
     window.showToast?.("Folder deleted", "success");
 }
 
@@ -206,7 +205,7 @@ function manageFolder(id) {
     else window.showToast?.("Choose rename or delete.", "warning");
 }
 
-function moveNoteToFolder(noteId) {
+async function moveNoteToFolder(noteId) {
     const note = (window.notes || []).find(item => item.id === noteId);
     if (!note || note.deletedAt || note.isPrivate) return;
 
@@ -222,7 +221,7 @@ function moveNoteToFolder(noteId) {
 
     const index = Number.parseInt(value, 10);
     if (index === 0) {
-        delete note.folderId;
+        note.folderId = null;
     } else if (Number.isInteger(index) && index >= 1 && index <= folders.length) {
         note.folderId = folders[index - 1].id;
     } else {
@@ -231,11 +230,10 @@ function moveNoteToFolder(noteId) {
     }
 
     note.updatedAt = new Date().toISOString();
-    window.saveNotes?.();
+    await window.saveNotes?.();
     window.renderNotes?.();
     renderFolderNavigation();
     window.updateNavigationCounts?.();
-    window.syncToCloud?.();
     window.showToast?.(index === 0 ? "Note removed from folder" : `Moved to ${folders[index - 1].name}`, "success");
 }
 

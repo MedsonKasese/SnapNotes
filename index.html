@@ -55,7 +55,7 @@
         <div class="search-row">
             <div class="search-input-wrap">
                 <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-                <input type="search" id="searchInput" placeholder="Search notes, tag:work, is:pinned, has:reminder..." autocomplete="off">
+                <input type="search" id="searchInput" placeholder="Search notes, tag:work, is:pinned..." autocomplete="off">
                 <button id="closeSearch" class="search-close" type="button" aria-label="Close search">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
@@ -123,16 +123,6 @@ Then write your notes below..."
                             <i class="fa-regular fa-calendar-plus" aria-hidden="true"></i>
                         </button>
                     </div>
-                </label>
-                <label class="editor-metadata-field">
-                    <span><i class="fa-solid fa-repeat"></i> Repeat</span>
-                    <select id="noteReminderRecurrence" disabled>
-                        <option value="">Never</option>
-                        <option value="daily">Daily</option>
-                        <option value="weekly">Weekly</option>
-                        <option value="monthly">Monthly</option>
-                        <option value="yearly">Yearly</option>
-                    </select>
                 </label>
             </div>
 
@@ -458,11 +448,11 @@ Then write your notes below..."
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="js/attachments.js"></script>
     <script src="js/folders.js"></script>
-    <script src="js/recurring-reminders.js"></script>
     <script src="js/version-history.js"></script>
     <script src="js/private-notes.js"></script>
     <script src="js/storage.js"></script>
     <script src="js/notes.js"></script>
+    <script src="js/reminder-utils.js"></script>
     <script type="module" src="js/firebaseConfig.js"></script>
     <script type="module" src="js/firestore.js"></script>
     <script type="module" src="js/auth.js"></script>
