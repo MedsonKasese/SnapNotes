@@ -75,7 +75,6 @@ function setupEventListeners() {
     const searchInput = document.getElementById("searchInput");
     const categoryFilter = document.getElementById("categoryFilter");
     const reminderInput = document.getElementById("noteReminderInput");
-    const reminderRecurrence = document.getElementById("noteReminderRecurrence");
     const reminderPickerBtn = document.getElementById("reminderPickerBtn");
     const settingsBtn = document.getElementById("settingsBtn");
     const settingsModal = document.getElementById("settingsModal");
@@ -184,15 +183,9 @@ function setupEventListeners() {
         event.target.value = "";
     });
 
-    const syncReminderRecurrenceControl = () => {
-        if (!reminderInput || !reminderRecurrence) return;
-        const hasReminder = Boolean(reminderInput.value);
-        reminderRecurrence.disabled = !hasReminder;
-        if (!hasReminder) reminderRecurrence.value = "";
-    };
-
-    reminderInput?.addEventListener("input", syncReminderRecurrenceControl);
-    reminderInput?.addEventListener("change", syncReminderRecurrenceControl);
+    reminderInput?.addEventListener("change", () => {
+        if (reminderInput.value) requestReminderPermission();
+    });
     reminderPickerBtn?.addEventListener("click", () => {
         try {
             if (typeof reminderInput?.showPicker === "function") {
@@ -205,7 +198,6 @@ function setupEventListeners() {
         reminderInput?.focus();
         reminderInput?.click();
     });
-    syncReminderRecurrenceControl();
 
     logoButton.addEventListener("click", openNewNoteView);
 
@@ -523,7 +515,6 @@ function saveDraft() {
         category: selectedEditorCategory,
         tags: parseTags(document.getElementById("noteTagsInput")?.value || ""),
         reminderAt: document.getElementById("noteReminderInput")?.value || "",
-        reminderRecurrence: window.normalizeReminderRecurrence?.(document.getElementById("noteReminderRecurrence")?.value || "") || null,
         savedAt: new Date().toISOString()
     }));
     setDraftStatus("Draft saved");
@@ -542,13 +533,8 @@ function restoreDraft() {
         setEditorCategory(draft.category || "general");
         const tagsInput = document.getElementById("noteTagsInput");
         const reminderInput = document.getElementById("noteReminderInput");
-        const reminderRecurrence = document.getElementById("noteReminderRecurrence");
         if (tagsInput) tagsInput.value = Array.isArray(draft.tags) ? draft.tags.join(", ") : "";
         if (reminderInput) reminderInput.value = draft.reminderAt ? String(draft.reminderAt).slice(0, 16) : "";
-        if (reminderRecurrence) {
-            reminderRecurrence.value = draft.reminderRecurrence?.frequency || "";
-            reminderRecurrence.disabled = !reminderInput?.value;
-        }
         updateCharacterCount();
         setDraftStatus("Draft restored");
     } catch (error) {
@@ -644,13 +630,6 @@ async function saveEditorNote() {
         category: selectedEditorCategory,
         tags: parseTags(document.getElementById("noteTagsInput")?.value || ""),
         reminderAt: window.parseReminderDateTimeLocal?.(document.getElementById("noteReminderInput")?.value) || null,
-        reminderRecurrence: document.getElementById("noteReminderInput")?.value
-            ? window.normalizeReminderRecurrence?.(
-                document.getElementById("noteReminderRecurrence")?.value || "",
-                document.getElementById("noteReminderInput").value
-            )
-            : null,
-        reminderNotified: false,
         folderId: window.activeFolderId || null,
         versions: [],
         attachments: [],
@@ -671,9 +650,7 @@ async function saveEditorNote() {
     }
 
     window.notes.unshift(newNote);
-    if (newNote.reminderAt) {
-        await requestReminderPermission();
-    }
+    if (newNote.reminderAt) await requestReminderPermission();
     window.recordNoteCreation?.(newNote);
     const saveResult = await saveNotes();
 
@@ -682,17 +659,11 @@ async function saveEditorNote() {
     window.resetPendingAttachments?.();
     const tagsInput = document.getElementById("noteTagsInput");
     const reminderInput = document.getElementById("noteReminderInput");
-    const reminderRecurrence = document.getElementById("noteReminderRecurrence");
     if (tagsInput) tagsInput.value = "";
     if (reminderInput) reminderInput.value = "";
-    if (reminderRecurrence) {
-        reminderRecurrence.value = "";
-        reminderRecurrence.disabled = true;
-    }
     renderNotes("", activeCategory);
     updateNavigationCounts();
     window.renderFolderNavigation?.();
-    window.scheduleNextReminderCheck?.();
     openNotesView("all");
 
         if (saveResult.cloudEnabled && !saveResult.synced) {
@@ -848,8 +819,6 @@ async function importNotes(event) {
                 pinned: Boolean(note.pinned),
                 tags: typeof window.parseTags === "function" ? window.parseTags(Array.isArray(note.tags) ? note.tags.join(",") : String(note.tags || "")) : [],
                 reminderAt: note.reminderAt || null,
-                reminderRecurrence: window.normalizeReminderRecurrence?.(note.reminderRecurrence, note.reminderAt) || null,
-                reminderNotified: Boolean(note.reminderNotified),
                 archived: Boolean(note.archived),
                 deletedAt: note.deletedAt || null,
                 isPrivate: Boolean(note.isPrivate && note.privateData),
@@ -893,103 +862,35 @@ function parseTags(value) {
     return [...new Set(String(value || "").split(",").map(tag => tag.trim().toLowerCase().replace(/^#/, "")).filter(Boolean))].slice(0, 10);
 }
 
-const MAX_BROWSER_TIMER_DELAY = 2147483647 - 60000;
-
 function setupReminderChecks() {
     clearInterval(window.snapNotesReminderTimer);
-    clearTimeout(window.snapNotesReminderTimeout);
-
     window.snapNotesReminderTimer = setInterval(checkDueReminders, 30000);
-
-    if (!window.snapNotesReminderListenersReady) {
-        document.addEventListener("visibilitychange", () => {
-            if (!document.hidden) checkDueReminders();
-        });
-        window.addEventListener("focus", checkDueReminders);
-        window.addEventListener("online", checkDueReminders);
-        window.snapNotesReminderListenersReady = true;
-    }
-
     checkDueReminders();
 }
 
-function scheduleNextReminderCheck() {
-    clearTimeout(window.snapNotesReminderTimeout);
-
-    const nextDue = (Array.isArray(window.notes) ? window.notes : [])
-        .filter(note => note.reminderAt && !note.reminderNotified && !note.deletedAt)
-        .map(note => Date.parse(note.reminderAt))
-        .filter(time => Number.isFinite(time) && time > Date.now())
-        .sort((a, b) => a - b)[0];
-
-    if (!nextDue) return;
-
-    const delay = Math.max(1000, nextDue - Date.now() + 50);
-    window.snapNotesReminderTimeout = setTimeout(checkDueReminders, Math.min(delay, MAX_BROWSER_TIMER_DELAY));
-}
-
-let reminderCheckInProgress = false;
-
 async function checkDueReminders() {
-    if (reminderCheckInProgress) return;
-    reminderCheckInProgress = true;
+    const notes = Array.isArray(window.notes) ? window.notes : [];
+    const now = Date.now();
+    let changed = false;
 
-    try {
-        const notes = Array.isArray(window.notes) ? window.notes : [];
-        const now = Date.now();
-        let changed = false;
+    for (const note of notes) {
+        if (!note.reminderAt || note.reminderNotified || note.deletedAt) continue;
+        const due = Date.parse(note.reminderAt);
+        if (Number.isNaN(due) || due > now) continue;
 
-        for (const note of notes) {
-            if (!note.reminderAt || note.reminderNotified || note.deletedAt) continue;
-
-            const due = Date.parse(note.reminderAt);
-            if (Number.isNaN(due) || due > now) continue;
-
-            const recurrence = window.normalizeReminderRecurrence?.(
-                note.reminderRecurrence,
-                note.reminderAt
-            );
-
-            if (recurrence) {
-                note.reminderRecurrence = recurrence;
-            }
-
-            if ("Notification" in window && Notification.permission === "granted") {
-                const shown = await showReminderNotification(note);
-                if (!shown) {
-                    showToast(`Reminder: ${note.title || "Untitled note"}`, "update");
-                }
-            } else {
-                showToast(`Reminder: ${note.title || "Untitled note"}`, "update");
-            }
-
-            if (recurrence && window.getNextReminderAt) {
-                const nextReminderAt = window.getNextReminderAt(
-                    note.reminderAt,
-                    recurrence,
-                    now
-                );
-
-                if (nextReminderAt) {
-                    note.reminderAt = nextReminderAt;
-                    note.reminderNotified = false;
-                } else {
-                    note.reminderNotified = true;
-                }
-            } else {
-                note.reminderNotified = true;
-            }
-
-            changed = true;
+        if ("Notification" in window && Notification.permission === "granted") {
+            const shown = await showReminderNotification(note);
+            if (!shown) showToast(`Reminder: ${note.title || "Untitled note"}`, "update");
+        } else {
+            showToast(`Reminder: ${note.title || "Untitled note"}`, "update");
         }
+        note.reminderNotified = true;
+        changed = true;
+    }
 
-        if (changed) {
-            await saveNotes();
-            renderNotes();
-        }
-    } finally {
-        reminderCheckInProgress = false;
-        scheduleNextReminderCheck();
+    if (changed) {
+        await saveNotes();
+        renderNotes();
     }
 }
 
@@ -1002,7 +903,6 @@ async function showReminderNotification(note) {
                 icon: "./assets/icons/snapnotes-notification.png",
                 badge: "./assets/icons/snapnotes-notification-badge.svg",
                 tag: `snapnotes-reminder-${note.id}`,
-                renotify: true,
                 data: { noteId: note.id }
             });
             return true;
@@ -1023,7 +923,6 @@ async function requestReminderPermission() {
 window.parseTags = parseTags;
 window.requestReminderPermission = requestReminderPermission;
 window.checkDueReminders = checkDueReminders;
-window.scheduleNextReminderCheck = scheduleNextReminderCheck;
 
 function setupTimestamp() {
     updateEditorTimestamp();

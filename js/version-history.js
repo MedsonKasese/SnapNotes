@@ -12,7 +12,6 @@ function createVersionSnapshot(note) {
         category: String(note?.category || "general"),
         tags: Array.isArray(note?.tags) ? [...note.tags] : [],
         reminderAt: note?.reminderAt || null,
-        reminderRecurrence: window.normalizeReminderRecurrence?.(note?.reminderRecurrence, note?.reminderAt) || null,
         reminderNotified: Boolean(note?.reminderNotified),
         time: String(note?.time || ""),
         savedAt: new Date().toISOString()
@@ -34,8 +33,7 @@ function appendVersion(history, noteOrSnapshot) {
         previous.text === snapshot.text &&
         previous.html === snapshot.html &&
         JSON.stringify(previous.tags || []) === JSON.stringify(snapshot.tags || []) &&
-        previous.reminderAt === snapshot.reminderAt &&
-        JSON.stringify(previous.reminderRecurrence || null) === JSON.stringify(snapshot.reminderRecurrence || null);
+        previous.reminderAt === snapshot.reminderAt;
 
     if (sameContent) return list.slice(-MAX_NOTE_VERSIONS);
 
@@ -184,7 +182,6 @@ async function restorePublicNoteVersion(id, version) {
         category: version.category || "general",
         tags: Array.isArray(version.tags) ? [...version.tags] : [],
         reminderAt: version.reminderAt || null,
-        reminderRecurrence: window.normalizeReminderRecurrence?.(version.reminderRecurrence, version.reminderAt) || null,
         reminderNotified: Boolean(version.reminderNotified),
         time: version.time || note.time || "",
         updatedAt: new Date().toISOString()

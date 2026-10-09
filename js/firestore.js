@@ -45,8 +45,6 @@ function noteSignature(note) {
         pinned: Boolean(note?.pinned),
         archived: Boolean(note?.archived),
         deletedAt: note?.deletedAt || null,
-        reminderAt: note?.reminderAt || null,
-        reminderRecurrence: note?.reminderRecurrence || null,
         folderId: note?.folderId || null,
         attachments: Array.isArray(note?.attachments)
             ? note.attachments.map(attachment => attachment?.id || "").sort()
@@ -171,7 +169,6 @@ export async function loadFromCloud(uid) {
         window.loadFolders?.();
 
         window.renderNotes();
-        window.checkDueReminders?.();
         window.handlePendingNotificationNote?.();
         if (typeof window.updateNavigationCounts === "function") {
             window.updateNavigationCounts();
