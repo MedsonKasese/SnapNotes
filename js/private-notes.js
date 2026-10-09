@@ -343,6 +343,10 @@ async function updatePrivateNote(id, updates) {
     }
 
     try {
+        if (updates.reminderAt) {
+            await window.requestReminderPermission?.();
+        }
+
         const current = privateUnlockCache.get(id);
         const payload = {
             title: String(updates.title || ""),
@@ -352,7 +356,7 @@ async function updatePrivateNote(id, updates) {
             tags: Array.isArray(updates.tags) ? updates.tags : (current?.tags || []),
             time: current?.time || "Private note",
             reminderAt: updates.reminderAt || null,
-            reminderRecurrence: window.normalizeReminderRecurrence?.(updates.reminderRecurrence) || null,
+            reminderRecurrence: window.normalizeReminderRecurrence?.(updates.reminderRecurrence, updates.reminderAt) || null,
             reminderNotified: Boolean(updates.reminderNotified),
             history: typeof window.appendVersion === "function"
                 ? window.appendVersion(current?.history, current || {})
@@ -366,7 +370,7 @@ async function updatePrivateNote(id, updates) {
         note.category = "general";
         note.tags = [];
         note.reminderAt = updates.reminderAt || null;
-        note.reminderRecurrence = window.normalizeReminderRecurrence?.(updates.reminderRecurrence) || null;
+        note.reminderRecurrence = window.normalizeReminderRecurrence?.(updates.reminderRecurrence, updates.reminderAt) || null;
         note.reminderNotified = Boolean(updates.reminderNotified);
         note.versions = [];
         note.updatedAt = new Date().toISOString();
@@ -397,7 +401,7 @@ async function moveNoteFromPrivate(id) {
             category: payload.category || "general",
             tags: Array.isArray(payload.tags) ? payload.tags : [],
             reminderAt: payload.reminderAt || note.reminderAt || null,
-            reminderRecurrence: window.normalizeReminderRecurrence?.(payload.reminderRecurrence) || null,
+            reminderRecurrence: window.normalizeReminderRecurrence?.(payload.reminderRecurrence, payload.reminderAt) || null,
             reminderNotified: Boolean(payload.reminderNotified ?? note.reminderNotified),
             time: payload.time || note.time || "",
             versions: Array.isArray(payload.history) ? structuredClone(payload.history) : [],
@@ -456,7 +460,7 @@ async function restorePrivateNoteVersion(id, version) {
             tags: Array.isArray(version.tags) ? [...version.tags] : [],
             time: version.time || current.time || "Private note",
             reminderAt: version.reminderAt || null,
-            reminderRecurrence: window.normalizeReminderRecurrence?.(version.reminderRecurrence) || null,
+            reminderRecurrence: window.normalizeReminderRecurrence?.(version.reminderRecurrence, version.reminderAt) || null,
             reminderNotified: Boolean(version.reminderNotified),
             history
         };

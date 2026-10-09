@@ -643,9 +643,12 @@ async function saveEditorNote() {
         html: extractNoteBodyHtml(editor.innerHTML, title),
         category: selectedEditorCategory,
         tags: parseTags(document.getElementById("noteTagsInput")?.value || ""),
-        reminderAt: document.getElementById("noteReminderInput")?.value ? new Date(document.getElementById("noteReminderInput").value).toISOString() : null,
+        reminderAt: window.parseReminderDateTimeLocal?.(document.getElementById("noteReminderInput")?.value) || null,
         reminderRecurrence: document.getElementById("noteReminderInput")?.value
-            ? window.normalizeReminderRecurrence?.(document.getElementById("noteReminderRecurrence")?.value || "")
+            ? window.normalizeReminderRecurrence?.(
+                document.getElementById("noteReminderRecurrence")?.value || "",
+                document.getElementById("noteReminderInput").value
+            )
             : null,
         reminderNotified: false,
         folderId: window.activeFolderId || null,
@@ -668,7 +671,9 @@ async function saveEditorNote() {
     }
 
     window.notes.unshift(newNote);
-    if (newNote.reminderAt) await requestReminderPermission();
+    if (newNote.reminderAt) {
+        await requestReminderPermission();
+    }
     window.recordNoteCreation?.(newNote);
     const saveResult = await saveNotes();
 
@@ -843,7 +848,7 @@ async function importNotes(event) {
                 pinned: Boolean(note.pinned),
                 tags: typeof window.parseTags === "function" ? window.parseTags(Array.isArray(note.tags) ? note.tags.join(",") : String(note.tags || "")) : [],
                 reminderAt: note.reminderAt || null,
-                reminderRecurrence: window.normalizeReminderRecurrence?.(note.reminderRecurrence) || null,
+                reminderRecurrence: window.normalizeReminderRecurrence?.(note.reminderRecurrence, note.reminderAt) || null,
                 reminderNotified: Boolean(note.reminderNotified),
                 archived: Boolean(note.archived),
                 deletedAt: note.deletedAt || null,
@@ -888,15 +893,29 @@ function parseTags(value) {
     return [...new Set(String(value || "").split(",").map(tag => tag.trim().toLowerCase().replace(/^#/, "")).filter(Boolean))].slice(0, 10);
 }
 
+const MAX_BROWSER_TIMER_DELAY = 2147483647 - 60000;
+
 function setupReminderChecks() {
     clearInterval(window.snapNotesReminderTimer);
     clearTimeout(window.snapNotesReminderTimeout);
+
     window.snapNotesReminderTimer = setInterval(checkDueReminders, 30000);
+
+    if (!window.snapNotesReminderListenersReady) {
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) checkDueReminders();
+        });
+        window.addEventListener("focus", checkDueReminders);
+        window.addEventListener("online", checkDueReminders);
+        window.snapNotesReminderListenersReady = true;
+    }
+
     checkDueReminders();
 }
 
 function scheduleNextReminderCheck() {
     clearTimeout(window.snapNotesReminderTimeout);
+
     const nextDue = (Array.isArray(window.notes) ? window.notes : [])
         .filter(note => note.reminderAt && !note.reminderNotified && !note.deletedAt)
         .map(note => Date.parse(note.reminderAt))
@@ -904,46 +923,74 @@ function scheduleNextReminderCheck() {
         .sort((a, b) => a - b)[0];
 
     if (!nextDue) return;
-    window.snapNotesReminderTimeout = setTimeout(checkDueReminders, Math.max(1000, nextDue - Date.now() + 50));
+
+    const delay = Math.max(1000, nextDue - Date.now() + 50);
+    window.snapNotesReminderTimeout = setTimeout(checkDueReminders, Math.min(delay, MAX_BROWSER_TIMER_DELAY));
 }
 
+let reminderCheckInProgress = false;
+
 async function checkDueReminders() {
-    const notes = Array.isArray(window.notes) ? window.notes : [];
-    const now = Date.now();
-    let changed = false;
+    if (reminderCheckInProgress) return;
+    reminderCheckInProgress = true;
 
-    for (const note of notes) {
-        if (!note.reminderAt || note.reminderNotified || note.deletedAt) continue;
+    try {
+        const notes = Array.isArray(window.notes) ? window.notes : [];
+        const now = Date.now();
+        let changed = false;
 
-        const due = Date.parse(note.reminderAt);
-        if (Number.isNaN(due) || due > now) continue;
+        for (const note of notes) {
+            if (!note.reminderAt || note.reminderNotified || note.deletedAt) continue;
 
-        const recurrence = window.normalizeReminderRecurrence?.(note.reminderRecurrence);
+            const due = Date.parse(note.reminderAt);
+            if (Number.isNaN(due) || due > now) continue;
 
-        if ("Notification" in window && Notification.permission === "granted") {
-            const shown = await showReminderNotification(note);
-            if (!shown) {
+            const recurrence = window.normalizeReminderRecurrence?.(
+                note.reminderRecurrence,
+                note.reminderAt
+            );
+
+            if (recurrence) {
+                note.reminderRecurrence = recurrence;
+            }
+
+            if ("Notification" in window && Notification.permission === "granted") {
+                const shown = await showReminderNotification(note);
+                if (!shown) {
+                    showToast(`Reminder: ${note.title || "Untitled note"}`, "update");
+                }
+            } else {
                 showToast(`Reminder: ${note.title || "Untitled note"}`, "update");
             }
-        } else {
-            showToast(`Reminder: ${note.title || "Untitled note"}`, "update");
+
+            if (recurrence && window.getNextReminderAt) {
+                const nextReminderAt = window.getNextReminderAt(
+                    note.reminderAt,
+                    recurrence,
+                    now
+                );
+
+                if (nextReminderAt) {
+                    note.reminderAt = nextReminderAt;
+                    note.reminderNotified = false;
+                } else {
+                    note.reminderNotified = true;
+                }
+            } else {
+                note.reminderNotified = true;
+            }
+
+            changed = true;
         }
 
-        if (recurrence && window.getNextReminderAt) {
-            note.reminderAt = window.getNextReminderAt(note.reminderAt, recurrence, now);
-            note.reminderNotified = false;
-        } else {
-            note.reminderNotified = true;
+        if (changed) {
+            await saveNotes();
+            renderNotes();
         }
-
-        changed = true;
+    } finally {
+        reminderCheckInProgress = false;
+        scheduleNextReminderCheck();
     }
-
-    if (changed) {
-        await saveNotes();
-        renderNotes();
-    }
-    scheduleNextReminderCheck();
 }
 
 async function showReminderNotification(note) {
