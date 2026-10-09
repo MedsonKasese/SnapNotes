@@ -17,6 +17,7 @@ const ALLOWED_ATTACHMENT_TYPES = new Set([
 
 let pendingAttachmentFiles = [];
 let attachmentUploadPromise = null;
+let attachmentRetryQueued = false;
 
 function isAttachmentUserSignedIn() {
     return Boolean(window.firebaseAuth?.currentUser);
@@ -259,9 +260,12 @@ async function prepareNoteAttachments(noteId, files, existing = []) {
 }
 
 async function retryPendingAttachmentUploads(options = {}) {
-    // If an automatic retry is already running, let a manual retry await that
-    // same work instead of silently returning while its button appears to do nothing.
-    if (attachmentUploadPromise) return attachmentUploadPromise;
+    // If a retry is already running, await it and queue one follow-up pass. This
+    // prevents a reconnect event arriving mid-upload from being lost.
+    if (attachmentUploadPromise) {
+        attachmentRetryQueued = true;
+        return attachmentUploadPromise;
+    }
 
     if (!navigator.onLine) {
         return { uploadedCount: 0, failedCount: 0, offline: true, uploadedIds: [] };
@@ -337,6 +341,12 @@ async function retryPendingAttachmentUploads(options = {}) {
         return await task;
     } finally {
         if (attachmentUploadPromise === task) attachmentUploadPromise = null;
+        if (attachmentRetryQueued) {
+            attachmentRetryQueued = false;
+            if (navigator.onLine && isAttachmentUserSignedIn()) {
+                Promise.resolve().then(() => retryPendingAttachmentUploads({ silent: true }));
+            }
+        }
     }
 }
 
