@@ -125,7 +125,6 @@ function getAttachmentUploadErrorMessage(error) {
     const networkFailure = !navigator.onLine ||
         code.includes("network-request-failed") ||
         code.includes("retry-limit-exceeded") ||
-        code.includes("storage/unknown") ||
         message.includes("failed to fetch") ||
         message.includes("network") ||
         message.includes("offline") ||
