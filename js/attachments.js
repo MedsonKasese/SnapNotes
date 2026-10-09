@@ -16,24 +16,47 @@ const ALLOWED_ATTACHMENT_TYPES = new Set([
 ]);
 
 let pendingAttachmentFiles = [];
+let attachmentUploadInProgress = false;
+
+function isAttachmentUserSignedIn() {
+    return Boolean(window.firebaseAuth?.currentUser);
+}
 
 function updateAttachmentAccess() {
     const button = document.getElementById("addAttachmentBtn");
     if (!button) return;
-    const available = Boolean(window.firebaseAuth?.currentUser);
-    button.disabled = !available;
+    const available = isAttachmentUserSignedIn();
+    // Keep the control actionable so signed-out users receive an explanation.
+    button.disabled = false;
     button.title = available ? "Attach files" : "Sign in to attach files";
-    button.setAttribute("aria-disabled", String(!available));
+    button.setAttribute("aria-label", available ? "Attach files" : "Sign in to attach files");
+    button.setAttribute("aria-disabled", "false");
+    button.classList.toggle("attachment-requires-signin", !available);
 }
 
-window.addEventListener("snapnotes:auth-changed", updateAttachmentAccess);
+window.addEventListener("snapnotes:auth-changed", () => {
+    updateAttachmentAccess();
+    retryPendingAttachmentUploads();
+});
+window.addEventListener("online", retryPendingAttachmentUploads);
 document.addEventListener("DOMContentLoaded", updateAttachmentAccess);
+
+function openAttachmentPicker(input) {
+    if (!isAttachmentUserSignedIn()) {
+        window.showToast?.("Sign in to your SnapNotes account to add attachments and sync them across devices.", "warning");
+        return false;
+    }
+    input?.click();
+    return true;
+}
 
 function openAttachmentDb() {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open(ATTACHMENT_DB, 1);
         request.onupgradeneeded = () => {
-            request.result.createObjectStore(ATTACHMENT_STORE, { keyPath: "id" });
+            if (!request.result.objectStoreNames.contains(ATTACHMENT_STORE)) {
+                request.result.createObjectStore(ATTACHMENT_STORE, { keyPath: "id" });
+            }
         };
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
@@ -49,14 +72,9 @@ async function putAttachmentFile(id, file) {
             blob: file,
             updatedAt: new Date().toISOString()
         });
-        tx.oncomplete = () => {
-            db.close();
-            resolve();
-        };
-        tx.onerror = () => {
-            db.close();
-            reject(tx.error);
-        };
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+        tx.onabort = () => { db.close(); reject(tx.error || new Error("Local attachment save was cancelled.")); };
     });
 }
 
@@ -68,6 +86,7 @@ async function getAttachmentFile(id) {
         request.onsuccess = () => resolve(request.result?.blob || null);
         request.onerror = () => reject(request.error);
         tx.oncomplete = () => db.close();
+        tx.onerror = () => { db.close(); reject(tx.error); };
     });
 }
 
@@ -76,25 +95,15 @@ async function deleteAttachmentFile(id) {
     return new Promise((resolve, reject) => {
         const tx = db.transaction(ATTACHMENT_STORE, "readwrite");
         tx.objectStore(ATTACHMENT_STORE).delete(id);
-        tx.oncomplete = () => {
-            db.close();
-            resolve();
-        };
-        tx.onerror = () => {
-            db.close();
-            reject(tx.error);
-        };
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
     });
 }
 
 function validateAttachment(file) {
     if (!file) return "Invalid attachment.";
-    if (!ALLOWED_ATTACHMENT_TYPES.has(file.type)) {
-        return "Only images, PDF, and text files are supported.";
-    }
-    if (file.size > MAX_ATTACHMENT_SIZE) {
-        return "Each attachment must be 10 MB or smaller.";
-    }
+    if (!ALLOWED_ATTACHMENT_TYPES.has(file.type)) return "Only images, PDF, and text files are supported.";
+    if (file.size > MAX_ATTACHMENT_SIZE) return "Each attachment must be 10 MB or smaller.";
     return "";
 }
 
@@ -116,14 +125,13 @@ function resetPendingAttachments() {
 }
 
 function addPendingAttachments(files) {
-    if (!window.firebaseAuth?.currentUser) {
-        window.showToast?.("Sign in before adding attachments.", "warning");
+    if (!isAttachmentUserSignedIn()) {
+        window.showToast?.("Sign in to your SnapNotes account to add attachments and sync them across devices.", "warning");
         return;
     }
 
     const incoming = Array.from(files || []);
     const available = Math.max(0, MAX_ATTACHMENTS_PER_NOTE - pendingAttachmentFiles.length);
-
     if (!available) {
         window.showToast?.("A note can have up to 5 attachments.", "warning");
         return;
@@ -135,43 +143,33 @@ function addPendingAttachments(files) {
             window.showToast?.(error, "warning");
             continue;
         }
-
         const duplicate = pendingAttachmentFiles.some(existing =>
-            existing.name === file.name &&
-            existing.size === file.size &&
-            existing.lastModified === file.lastModified
+            existing.name === file.name && existing.size === file.size && existing.lastModified === file.lastModified
         );
         if (!duplicate) pendingAttachmentFiles.push(file);
     }
 
-    if (incoming.length > available) {
-        window.showToast?.("Only 5 attachments can be added to one note.", "warning");
-    }
-
+    if (incoming.length > available) window.showToast?.("Only 5 attachments can be added to one note.", "warning");
     renderPendingAttachments();
 }
 
 function renderPendingAttachments() {
     const list = document.getElementById("pendingAttachments");
     if (!list) return;
-
     list.innerHTML = "";
     list.hidden = pendingAttachmentFiles.length === 0;
 
     pendingAttachmentFiles.forEach((file, index) => {
         const item = document.createElement("div");
         item.className = "attachment-chip";
-
         const icon = document.createElement("i");
         icon.className = "fa-solid " + attachmentIcon(file.type);
         icon.setAttribute("aria-hidden", "true");
-
         const copy = document.createElement("span");
         copy.className = "attachment-chip-copy";
         copy.innerHTML = "<strong></strong><small></small>";
         copy.querySelector("strong").textContent = file.name;
-        copy.querySelector("small").textContent = formatAttachmentSize(file.size);
-
+        copy.querySelector("small").textContent = formatAttachmentSize(file.size) + " · Ready to save locally";
         const remove = document.createElement("button");
         remove.type = "button";
         remove.className = "attachment-remove";
@@ -181,7 +179,6 @@ function renderPendingAttachments() {
             pendingAttachmentFiles.splice(index, 1);
             renderPendingAttachments();
         });
-
         item.append(icon, copy, remove);
         list.appendChild(item);
     });
@@ -189,8 +186,8 @@ function renderPendingAttachments() {
 
 async function uploadAttachmentToCloud(noteId, attachment, file) {
     const user = window.firebaseAuth?.currentUser;
-    if (!user) throw new Error("Sign in before adding attachments.");
-    if (!navigator.onLine) throw new Error("Connect to the internet before adding attachments.");
+    if (!user) throw new Error("Sign in to sync attachments.");
+    if (!navigator.onLine) throw new Error("Offline. Attachment will stay on this device until the connection returns.");
 
     const { getStorage, ref, uploadBytes, getDownloadURL } =
         await import("https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js");
@@ -198,32 +195,27 @@ async function uploadAttachmentToCloud(noteId, attachment, file) {
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
     const storagePath = "users/" + user.uid + "/attachments/" + noteId + "/" + attachment.id + "-" + safeName;
     const storageRef = ref(storage, storagePath);
-
     await uploadBytes(storageRef, file, { contentType: file.type || "application/octet-stream" });
     attachment.storagePath = storagePath;
     attachment.downloadUrl = await getDownloadURL(storageRef);
-
+    attachment.uploadStatus = "synced";
+    attachment.uploadError = null;
+    attachment.uploadedAt = new Date().toISOString();
     return attachment;
 }
 
 async function prepareNoteAttachments(noteId, files, existing = []) {
     const attachments = Array.isArray(existing) ? [...existing] : [];
     const incoming = Array.from(files || []);
-    if (incoming.length && !window.firebaseAuth?.currentUser) {
-        throw new Error("Sign in before adding attachments.");
-    }
-    if (incoming.length && !navigator.onLine) {
-        throw new Error("Connect to the internet before adding attachments.");
+    if (incoming.length && !isAttachmentUserSignedIn()) {
+        throw new Error("Sign in to your SnapNotes account to add attachments and sync them across devices.");
     }
     const available = MAX_ATTACHMENTS_PER_NOTE - attachments.length;
-    if (incoming.length > available) {
-        throw new Error(`A note can have up to ${MAX_ATTACHMENTS_PER_NOTE} attachments.`);
-    }
+    if (incoming.length > available) throw new Error("A note can have up to 5 attachments.");
 
     for (const file of incoming) {
         const error = validateAttachment(file);
         if (error) throw new Error(error);
-
         const attachment = {
             id: crypto.randomUUID(),
             name: file.name,
@@ -231,37 +223,78 @@ async function prepareNoteAttachments(noteId, files, existing = []) {
             size: file.size,
             createdAt: new Date().toISOString(),
             storagePath: null,
-            downloadUrl: null
+            downloadUrl: null,
+            uploadStatus: "pending",
+            uploadError: null
         };
 
-        try {
-            await putAttachmentFile(attachment.id, file);
-            await uploadAttachmentToCloud(noteId, attachment, file);
-            attachments.push(attachment);
-        } catch (error) {
-            await deleteAttachmentFile(attachment.id).catch(() => {});
-            throw error;
-        }
+        // Persist the bytes locally first. A cloud outage must never discard the note.
+        await putAttachmentFile(attachment.id, file);
+        attachments.push(attachment);
     }
-
     return attachments;
 }
 
+async function retryPendingAttachmentUploads() {
+    if (attachmentUploadInProgress || !navigator.onLine || !isAttachmentUserSignedIn()) return;
+    if (!Array.isArray(window.notes) || !window.notes.length) return;
+
+    attachmentUploadInProgress = true;
+    let changed = false;
+    let uploadedCount = 0;
+
+    try {
+        for (const note of window.notes) {
+            if (!Array.isArray(note.attachments)) continue;
+            for (const attachment of note.attachments) {
+                if (attachment.uploadStatus === "synced" || attachment.downloadUrl) continue;
+                if (!attachment.id || !attachment.storagePath && attachment.uploadStatus !== "pending") continue;
+
+                const file = await getAttachmentFile(attachment.id).catch(() => null);
+                // A pending attachment received from another device has no local blob here.
+                // It will become available when the device that owns the blob completes its upload.
+                if (!file) continue;
+
+                try {
+                    await uploadAttachmentToCloud(note.id, attachment, file);
+                    changed = true;
+                    uploadedCount++;
+                } catch (error) {
+                    attachment.uploadStatus = "pending";
+                    attachment.uploadError = error?.message || "Upload will be retried.";
+                    changed = true;
+                }
+            }
+        }
+
+        if (changed) {
+            await window.saveNotes?.();
+            window.renderNotes?.();
+            if (uploadedCount) {
+                window.showToast?.(
+                    uploadedCount === 1 ? "Attachment synced across your devices." : uploadedCount + " attachments synced across your devices.",
+                    "success"
+                );
+            }
+        }
+    } finally {
+        attachmentUploadInProgress = false;
+    }
+}
+
 async function resolveAttachmentUrl(attachment) {
+    if (attachment?.id) {
+        const blob = await getAttachmentFile(attachment.id).catch(() => null);
+        if (blob) return URL.createObjectURL(blob);
+    }
     if (attachment?.downloadUrl) return attachment.downloadUrl;
-
-    if (!attachment?.id) return "";
-    const blob = await getAttachmentFile(attachment.id);
-    if (!blob) return "";
-
-    return URL.createObjectURL(blob);
+    return "";
 }
 
 async function removeNoteAttachment(noteId, attachmentId) {
     const note = (window.notes || []).find(item => item.id === noteId);
     const attachment = note?.attachments?.find(item => item.id === attachmentId);
-
-    await deleteAttachmentFile(attachmentId);
+    await deleteAttachmentFile(attachmentId).catch(() => {});
 
     if (attachment?.storagePath && window.firebaseAuth?.currentUser) {
         try {
@@ -272,42 +305,54 @@ async function removeNoteAttachment(noteId, attachmentId) {
             console.warn("Could not remove cloud attachment:", error);
         }
     }
-
-    if (note?.attachments) {
-        note.attachments = note.attachments.filter(item => item.id !== attachmentId);
-    }
+    if (note?.attachments) note.attachments = note.attachments.filter(item => item.id !== attachmentId);
 }
 
 async function renderNoteAttachments(container, attachments = [], options = {}) {
     if (!container) return;
     container.innerHTML = "";
-
     if (!attachments.length) {
         container.hidden = true;
         return;
     }
-
     container.hidden = false;
 
     for (const attachment of attachments) {
         const item = document.createElement("div");
         item.className = "note-attachment";
-
         const preview = document.createElement("div");
         preview.className = "note-attachment-preview";
-
         const copy = document.createElement("div");
         copy.className = "note-attachment-copy";
-
         const name = document.createElement("strong");
         name.textContent = attachment.name || "Attachment";
-
         const size = document.createElement("small");
         size.textContent = formatAttachmentSize(Number(attachment.size) || 0);
-        copy.append(name, size);
+        const status = document.createElement("small");
+        status.className = "attachment-sync-status";
+        if (attachment.uploadStatus === "pending" && !attachment.downloadUrl) {
+            status.textContent = "Saved on this device · waiting to sync";
+        } else {
+            status.textContent = "Synced across devices";
+            status.classList.add("is-synced");
+        }
+        copy.append(name, size, status);
 
         const url = await resolveAttachmentUrl(attachment);
-
+        if (attachment.uploadStatus === "pending" && url) {
+            const retry = document.createElement("button");
+            retry.type = "button";
+            retry.className = "attachment-retry";
+            retry.textContent = "Retry upload";
+            retry.addEventListener("click", async () => {
+                if (!navigator.onLine) {
+                    window.showToast?.("You're offline. This attachment will retry when you're connected.", "warning");
+                    return;
+                }
+                await retryPendingAttachmentUploads();
+            });
+            copy.appendChild(retry);
+        }
         if (attachment.type?.startsWith("image/") && url) {
             const image = document.createElement("img");
             image.src = url;
@@ -317,22 +362,23 @@ async function renderNoteAttachments(container, attachments = [], options = {}) 
         } else {
             const icon = document.createElement("i");
             icon.className = "fa-solid " + attachmentIcon(attachment.type || "");
+            icon.setAttribute("aria-hidden", "true");
             preview.appendChild(icon);
         }
 
         const open = document.createElement("a");
         open.className = "attachment-open";
-        open.href = url || "#";
-        open.target = "_blank";
-        open.rel = "noopener noreferrer";
-        open.textContent = attachment.type?.startsWith("image/") ? "Open" : "Download";
-        if (!url) {
-            open.removeAttribute("href");
+        if (url) {
+            open.href = url;
+            open.target = "_blank";
+            open.rel = "noopener noreferrer";
+        } else {
             open.setAttribute("aria-disabled", "true");
+            open.title = "This attachment is waiting to upload from the device where it was added.";
         }
+        open.textContent = attachment.type?.startsWith("image/") ? "Open" : "Download";
 
         item.append(preview, copy, open);
-
         if (options.removable) {
             const remove = document.createElement("button");
             remove.type = "button";
@@ -347,16 +393,17 @@ async function renderNoteAttachments(container, attachments = [], options = {}) 
             });
             item.appendChild(remove);
         }
-
         container.appendChild(item);
     }
 }
 
 window.MAX_ATTACHMENTS_PER_NOTE = MAX_ATTACHMENTS_PER_NOTE;
 window.MAX_ATTACHMENT_SIZE = MAX_ATTACHMENT_SIZE;
+window.openAttachmentPicker = openAttachmentPicker;
 window.addPendingAttachments = addPendingAttachments;
 window.resetPendingAttachments = resetPendingAttachments;
 window.getPendingAttachments = () => [...pendingAttachmentFiles];
 window.prepareNoteAttachments = prepareNoteAttachments;
+window.retryPendingAttachmentUploads = retryPendingAttachmentUploads;
 window.renderNoteAttachments = renderNoteAttachments;
 window.removeNoteAttachment = removeNoteAttachment;
