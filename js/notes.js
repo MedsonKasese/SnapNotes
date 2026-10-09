@@ -540,7 +540,12 @@ function startEditing(card, note) {
                 window.updateNavigationCounts();
             }
 
-            showToast("Note updated successfully", "success");
+            const savedNote = window.notes[noteIndex];
+            if (savedNote?.attachments?.some(attachment => attachment.uploadStatus === "pending")) {
+                showToast("Note saved. Attachment is stored on this device and waiting to sync.", "warning");
+            } else {
+                showToast("Note updated successfully", "success");
+            }
         });
     });
 
