@@ -931,92 +931,199 @@ function formatDate(dateValue) {
 // =========================
 
 async function shareNote(note) {
+    if (!note || typeof note !== "object") {
+        showToast("This note could not be shared.", "warning");
+        return;
+    }
+
     if (note.isPrivate) {
         if (!window.isPrivateNotesUnlocked?.()) {
             showToast("Unlock Private Notes before sharing.", "warning");
             return;
         }
-
-        const confirmed = confirm("This will share a public copy of this private note. The private lock will not protect the shared copy. Continue?");
+        const confirmed = confirm("This will share a copy of this private note outside its protected area. The private lock will not protect the shared copy. Continue?");
         if (!confirmed) return;
     }
 
     const bodyText = getNoteBodyText(note);
-    const bodyHtml = note.html && typeof window.sanitizeNoteHtml === "function"
-        ? getNoteBodyHtml(note)
-        : "";
-    const text = note.title
-        ? `${note.title}${bodyText ? "\n\n" + bodyText : ""}`
-        : bodyText;
+    const text = [note.title || "", bodyText || ""].filter(Boolean).join("\n\n");
+    const attachmentNames = Array.isArray(note.attachments)
+        ? note.attachments.map(item => item?.name).filter(Boolean)
+        : [];
+    const shareText = attachmentNames.length
+        ? `${text}${text ? "\n\n" : ""}Attachments (not included in this share): ${attachmentNames.join(", ")}`
+        : text;
 
+    openSmartShareDialog(note, shareText, bodyText);
+}
+
+function openSmartShareDialog(note, text, bodyText) {
+    document.getElementById("smartShareDialog")?.remove();
+
+    const overlay = document.createElement("div");
+    overlay.id = "smartShareDialog";
+    overlay.className = "smart-share-overlay";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-labelledby", "smartShareTitle");
+
+    const panel = document.createElement("section");
+    panel.className = "smart-share-panel";
+    const title = document.createElement("h2");
+    title.id = "smartShareTitle";
+    title.textContent = "Share note";
+    const description = document.createElement("p");
+    description.className = "smart-share-description";
+    description.textContent = "Choose how you want to share this note.";
+    const preview = document.createElement("div");
+    preview.className = "smart-share-preview";
+    preview.textContent = (note.title || bodyText || "Untitled note").slice(0, 150);
+
+    const actions = document.createElement("div");
+    actions.className = "smart-share-actions";
+    const addAction = (label, detail, handler, primary = false) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = primary ? "smart-share-option primary" : "smart-share-option";
+        const heading = document.createElement("span");
+        heading.className = "smart-share-option-title";
+        heading.textContent = label;
+        const hint = document.createElement("span");
+        hint.className = "smart-share-option-detail";
+        hint.textContent = detail;
+        button.append(heading, hint);
+        button.addEventListener("click", async () => {
+            button.disabled = true;
+            try {
+                overlay.remove();
+                await handler();
+            } catch (error) {
+                console.error("Sharing failed:", error);
+                showToast("Sharing failed. Try copying the note instead.", "warning");
+            }
+        });
+        actions.appendChild(button);
+    };
+
+    addAction("Share as text", "Best for messages and email", () => shareTextNative(text), true);
+    addAction("Share as image", "A polished SnapNotes note card", () => shareNoteImage(note, text));
+    addAction("Copy text", "Copy the title and note content", () => copyShareText(text));
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "smart-share-close";
+    close.textContent = "Cancel";
+    close.addEventListener("click", () => overlay.remove());
+    overlay.addEventListener("click", event => {
+        if (event.target === overlay) overlay.remove();
+    });
+    panel.append(title, description, preview, actions, close);
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+    close.focus();
+}
+
+async function shareTextNative(text) {
+    if (!text.trim()) {
+        showToast("There is no text to share yet.", "warning");
+        return;
+    }
+    if (typeof navigator.share === "function") {
+        try {
+            await navigator.share({ title: "SnapNotes", text });
+            showToast("Note shared", "success");
+            return;
+        } catch (error) {
+            if (error?.name === "AbortError") return;
+            console.warn("Native text sharing unavailable:", error);
+        }
+    }
+    await copyShareText(text, "Sharing isn't available here, so the note was copied instead.");
+}
+
+async function copyShareText(text, message = "Note copied to clipboard") {
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(text);
+        } else {
+            const helper = document.createElement("textarea");
+            helper.value = text;
+            helper.setAttribute("readonly", "");
+            helper.style.position = "fixed";
+            helper.style.opacity = "0";
+            document.body.appendChild(helper);
+            helper.select();
+            const copied = document.execCommand("copy");
+            helper.remove();
+            if (!copied) throw new Error("Clipboard copy was rejected");
+        }
+        showToast(message, "success");
+    } catch (error) {
+        console.error("Could not copy shared note:", error);
+        showToast("Could not copy the note. Check your browser permissions and try again.", "warning");
+    }
+}
+
+async function shareNoteImage(note, text) {
     const shareTemplate = document.getElementById("shareTemplate");
     const shareTimestamp = document.getElementById("shareTimestamp");
-
-    if (!shareTemplate || !shareTimestamp || typeof html2canvas === "undefined") {
-        fallbackShare(text);
+    const shareTitle = document.getElementById("shareTitle");
+    const shareBody = document.getElementById("shareBody");
+    if (!shareTemplate || !shareTimestamp || !shareTitle || !shareBody || typeof html2canvas === "undefined") {
+        await shareTextNative(text);
         return;
     }
 
-    const shareTitle = document.getElementById("shareTitle");
-    const shareBody = document.getElementById("shareBody");
+    const bodyHtml = note.html && typeof window.sanitizeNoteHtml === "function"
+        ? getNoteBodyHtml(note)
+        : "";
     shareTitle.textContent = note.title || "Untitled note";
-    if (bodyHtml) {
-        shareBody.innerHTML = bodyHtml;
-    } else {
-        shareBody.textContent = bodyText;
-    }
+    if (bodyHtml) shareBody.innerHTML = bodyHtml;
+    else shareBody.textContent = getNoteBodyText(note);
     shareTimestamp.textContent = note.time || "";
 
+    showToast("Preparing share image...", "default");
     try {
-        showToast("Preparing share image...", "default");
-
         const canvas = await html2canvas(shareTemplate, {
             backgroundColor: "#ffffff",
             scale: 2,
             logging: false,
             useCORS: true
         });
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+        if (!blob) throw new Error("Image could not be generated");
+        const file = new File([blob], "SnapNotes-note.png", { type: "image/png" });
 
-        canvas.toBlob(async blob => {
-            if (!blob) {
-                fallbackShare(text);
+        if (typeof navigator.share === "function" && navigator.canShare?.({ files: [file] })) {
+            try {
+                await navigator.share({ files: [file], title: note.title || "SnapNotes", text });
+                showToast("Note image shared", "success");
                 return;
+            } catch (error) {
+                if (error?.name === "AbortError") return;
+                console.warn("Image sharing unavailable:", error);
             }
+        }
 
-            const file = new File([blob], "SnapNote.png", { type: "image/png" });
-
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                try {
-                    await navigator.share({
-                        files: [file],
-                        title: "SnapNotes",
-                        text
-                    });
-                    showToast("Note shared", "success");
-                } catch (error) {
-                    if (error.name !== "AbortError") fallbackShare(text);
-                }
-            } else {
-                fallbackShare(text);
+        if (navigator.clipboard?.write && typeof ClipboardItem !== "undefined") {
+            try {
+                await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+                showToast("Note image copied to clipboard", "success");
+                return;
+            } catch (error) {
+                console.warn("Image clipboard unavailable:", error);
             }
-        }, "image/png");
+        }
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "SnapNotes-note.png";
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        showToast("Image saved. You can attach it to your message.", "success");
     } catch (error) {
         console.error("Error generating share image:", error);
-        fallbackShare(text);
+        showToast("Could not create the image. Try sharing as text.", "warning");
     }
-}
-
-function fallbackShare(text) {
-    if (navigator.share) {
-        navigator.share({ title: "SnapNotes", text })
-            .then(() => showToast("Note shared", "success"))
-            .catch(() => {});
-        return;
-    }
-
-    navigator.clipboard.writeText(text)
-        .then(() => showToast("Note copied to clipboard", "success"))
-        .catch(() => showToast("Could not share note", "warning"));
 }
 
 // Compatibility helper for older callers.
