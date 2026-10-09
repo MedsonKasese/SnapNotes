@@ -16,7 +16,7 @@ const ALLOWED_ATTACHMENT_TYPES = new Set([
 ]);
 
 let pendingAttachmentFiles = [];
-let attachmentUploadInProgress = false;
+let attachmentUploadPromise = null;
 
 function isAttachmentUserSignedIn() {
     return Boolean(window.firebaseAuth?.currentUser);
@@ -117,6 +117,30 @@ function attachmentIcon(type) {
     if (type.startsWith("image/")) return "fa-image";
     if (type === "application/pdf") return "fa-file-pdf";
     return "fa-file-lines";
+}
+
+function getAttachmentUploadErrorMessage(error) {
+    const code = String(error?.code || "").toLowerCase();
+    const message = String(error?.message || "").toLowerCase();
+    const networkFailure = !navigator.onLine ||
+        code.includes("network-request-failed") ||
+        code.includes("retry-limit-exceeded") ||
+        code.includes("storage/unknown") ||
+        message.includes("failed to fetch") ||
+        message.includes("network") ||
+        message.includes("offline") ||
+        message.includes("timed out");
+
+    if (networkFailure) {
+        return "Network problem. The file is safe on this device and will retry automatically when you're online.";
+    }
+    if (code.includes("unauthorized") || code.includes("unauthenticated") || code.includes("permission-denied")) {
+        return "Cloud storage denied access. The file is safe on this device; sign in again and retry.";
+    }
+    if (code.includes("quota-exceeded")) {
+        return "Cloud storage is full. The file is safe on this device; free up storage and retry.";
+    }
+    return "Upload failed. The file is safe on this device; check your connection or account access, then retry.";
 }
 
 function resetPendingAttachments() {
@@ -235,33 +259,58 @@ async function prepareNoteAttachments(noteId, files, existing = []) {
     return attachments;
 }
 
-async function retryPendingAttachmentUploads() {
-    if (attachmentUploadInProgress || !navigator.onLine || !isAttachmentUserSignedIn()) return;
-    if (!Array.isArray(window.notes) || !window.notes.length) return;
+async function retryPendingAttachmentUploads(options = {}) {
+    // If an automatic retry is already running, let a manual retry await that
+    // same work instead of silently returning while its button appears to do nothing.
+    if (attachmentUploadPromise) return attachmentUploadPromise;
 
-    attachmentUploadInProgress = true;
-    let changed = false;
-    let uploadedCount = 0;
+    if (!navigator.onLine) {
+        return { uploadedCount: 0, failedCount: 0, offline: true, uploadedIds: [] };
+    }
+    if (!isAttachmentUserSignedIn()) {
+        return { uploadedCount: 0, failedCount: 0, signedOut: true, uploadedIds: [] };
+    }
+    if (!Array.isArray(window.notes) || !window.notes.length) {
+        return { uploadedCount: 0, failedCount: 0, uploadedIds: [] };
+    }
 
-    try {
+    const task = (async () => {
+        let changed = false;
+        let uploadedCount = 0;
+        let failedCount = 0;
+        const uploadedIds = [];
+
         for (const note of window.notes) {
             if (!Array.isArray(note.attachments)) continue;
             for (const attachment of note.attachments) {
+                if (options.attachmentId && attachment.id !== options.attachmentId) continue;
                 if (attachment.uploadStatus === "synced" || attachment.downloadUrl) continue;
-                if (!attachment.id || !attachment.storagePath && attachment.uploadStatus !== "pending") continue;
+                if (!attachment.id || (!attachment.storagePath && attachment.uploadStatus !== "pending")) continue;
 
-                const file = await getAttachmentFile(attachment.id).catch(() => null);
-                // A pending attachment received from another device has no local blob here.
-                // It will become available when the device that owns the blob completes its upload.
+                let file;
+                try {
+                    file = await getAttachmentFile(attachment.id);
+                } catch (error) {
+                    attachment.uploadStatus = "pending";
+                    attachment.uploadError = getAttachmentUploadErrorMessage(error);
+                    failedCount++;
+                    changed = true;
+                    continue;
+                }
+
+                // A pending attachment from another device has no local blob here.
+                // The original device will upload it when it reconnects.
                 if (!file) continue;
 
                 try {
                     await uploadAttachmentToCloud(note.id, attachment, file);
                     changed = true;
                     uploadedCount++;
+                    uploadedIds.push(attachment.id);
                 } catch (error) {
                     attachment.uploadStatus = "pending";
-                    attachment.uploadError = error?.message || "Upload will be retried.";
+                    attachment.uploadError = getAttachmentUploadErrorMessage(error);
+                    failedCount++;
                     changed = true;
                 }
             }
@@ -270,15 +319,25 @@ async function retryPendingAttachmentUploads() {
         if (changed) {
             await window.saveNotes?.();
             window.renderNotes?.();
-            if (uploadedCount) {
-                window.showToast?.(
-                    uploadedCount === 1 ? "Attachment synced across your devices." : uploadedCount + " attachments synced across your devices.",
-                    "success"
-                );
-            }
         }
+
+        if (uploadedCount && !options.silent) {
+            window.showToast?.(
+                uploadedCount === 1
+                    ? "Attachment uploaded and synced across your devices."
+                    : uploadedCount + " attachments uploaded and synced across your devices.",
+                "success"
+            );
+        }
+
+        return { uploadedCount, failedCount, uploadedIds };
+    })();
+
+    attachmentUploadPromise = task;
+    try {
+        return await task;
     } finally {
-        attachmentUploadInProgress = false;
+        if (attachmentUploadPromise === task) attachmentUploadPromise = null;
     }
 }
 
@@ -331,7 +390,10 @@ async function renderNoteAttachments(container, attachments = [], options = {}) 
         const status = document.createElement("small");
         status.className = "attachment-sync-status";
         if (attachment.uploadStatus === "pending" && !attachment.downloadUrl) {
-            status.textContent = "Saved on this device · waiting to sync";
+            status.textContent = attachment.uploadError
+                ? attachment.uploadError
+                : "Saved on this device · waiting to sync";
+            status.title = attachment.uploadError || "SnapNotes will upload this file automatically when you're online.";
         } else {
             status.textContent = "Synced across devices";
             status.classList.add("is-synced");
@@ -345,11 +407,59 @@ async function renderNoteAttachments(container, attachments = [], options = {}) 
             retry.className = "attachment-retry";
             retry.textContent = "Retry upload";
             retry.addEventListener("click", async () => {
+                if (retry.disabled) return;
                 if (!navigator.onLine) {
-                    window.showToast?.("You're offline. This attachment will retry when you're connected.", "warning");
+                    attachment.uploadError = "Network problem. Saved on this device; will retry automatically when you're online.";
+                    status.textContent = attachment.uploadError;
+                    status.title = attachment.uploadError;
+                    window.showToast?.("You're offline. This file is safe on this device and will retry automatically when you're online.", "warning");
                     return;
                 }
-                await retryPendingAttachmentUploads();
+                if (!isAttachmentUserSignedIn()) {
+                    window.showToast?.("Sign in again to upload this attachment. The local file is still saved.", "warning");
+                    return;
+                }
+
+                retry.disabled = true;
+                retry.textContent = "Uploading…";
+                retry.setAttribute("aria-busy", "true");
+
+                try {
+                    const result = await retryPendingAttachmentUploads({
+                        attachmentId: attachment.id,
+                        silent: true
+                    });
+
+                    if (attachment.uploadStatus === "synced" || result.uploadedIds?.includes(attachment.id)) {
+                        status.textContent = "Synced across devices";
+                        status.title = "This attachment is uploaded and available across your devices.";
+                        status.classList.add("is-synced");
+                        retry.remove();
+                        window.showToast?.("Attachment uploaded and synced across your devices.", "success");
+                    } else {
+                        const message = attachment.uploadError ||
+                            (result.offline
+                                ? "Network problem. Saved on this device; will retry automatically when you're online."
+                                : result.signedOut
+                                    ? "Sign in again to upload this attachment."
+                                    : "Upload could not be completed. The file is still saved locally; please retry.");
+                        status.textContent = message;
+                        status.title = message;
+                        retry.textContent = "Retry upload";
+                        retry.disabled = false;
+                        retry.removeAttribute("aria-busy");
+                        window.showToast?.(message, "warning");
+                    }
+                } catch (error) {
+                    const message = getAttachmentUploadErrorMessage(error);
+                    attachment.uploadError = message;
+                    status.textContent = message;
+                    status.title = message;
+                    retry.textContent = "Retry upload";
+                    retry.disabled = false;
+                    retry.removeAttribute("aria-busy");
+                    window.showToast?.(message, "warning");
+                }
             });
             copy.appendChild(retry);
         }
