@@ -523,6 +523,9 @@ function startEditing(card, note) {
         // Save locally immediately, then wait for Firestore persistence.
         // This prevents a stale cloud snapshot from replacing the edit.
         saveNotes().then(() => {
+            // Attachments added while editing need the same immediate upload attempt
+            // as attachments added to a new note.
+            window.retryPendingAttachmentUploads?.();
             const searchInput = document.getElementById("searchInput");
             const categoryFilter = document.getElementById("categoryFilter");
 

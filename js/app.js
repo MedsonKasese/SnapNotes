@@ -24,6 +24,8 @@ document.addEventListener("DOMContentLoaded", () => {
     handleNotificationNoteFromUrl();
     loadNotes();
     window.loadFolders?.();
+    // Retry locally stored attachments on startup as well as on reconnect.
+    window.retryPendingAttachmentUploads?.();
     setupEventListeners();
     restoreDraft();
     setupTheme();
@@ -75,7 +77,6 @@ function setupEventListeners() {
     const searchInput = document.getElementById("searchInput");
     const categoryFilter = document.getElementById("categoryFilter");
     const reminderInput = document.getElementById("noteReminderInput");
-    const reminderPickerBtn = document.getElementById("reminderPickerBtn");
     const settingsBtn = document.getElementById("settingsBtn");
     const settingsModal = document.getElementById("settingsModal");
     const closeSettingsBtn = document.getElementById("closeSettingsBtn");
@@ -177,7 +178,7 @@ function setupEventListeners() {
     importNotesBtn.addEventListener("click", () => importNotesInput.click());
     importNotesInput.addEventListener("change", importNotes);
     createFolderBtn?.addEventListener("click", () => window.createFolder?.());
-    addAttachmentBtn?.addEventListener("click", () => attachmentInput?.click());
+    addAttachmentBtn?.addEventListener("click", () => window.openAttachmentPicker?.(attachmentInput));
     attachmentInput?.addEventListener("change", event => {
         window.addPendingAttachments?.(event.target.files);
         event.target.value = "";
@@ -186,19 +187,6 @@ function setupEventListeners() {
     reminderInput?.addEventListener("change", () => {
         if (reminderInput.value) requestReminderPermission();
     });
-    reminderPickerBtn?.addEventListener("click", () => {
-        try {
-            if (typeof reminderInput?.showPicker === "function") {
-                reminderInput.showPicker();
-                return;
-            }
-        } catch (error) {
-            console.debug("Native reminder picker is unavailable:", error);
-        }
-        reminderInput?.focus();
-        reminderInput?.click();
-    });
-
     logoButton.addEventListener("click", openNewNoteView);
 
     editorCategory.addEventListener("click", toggleCategoryMenu);
@@ -653,6 +641,7 @@ async function saveEditorNote() {
     if (newNote.reminderAt) await requestReminderPermission();
     window.recordNoteCreation?.(newNote);
     const saveResult = await saveNotes();
+    window.retryPendingAttachmentUploads?.();
 
     clearDraft();
     editor.innerHTML = "";
@@ -666,7 +655,9 @@ async function saveEditorNote() {
     window.renderFolderNavigation?.();
     openNotesView("all");
 
-        if (saveResult.cloudEnabled && !saveResult.synced) {
+        if (newNote.attachments.some(attachment => attachment.uploadStatus === "pending")) {
+            showToast("Note saved. Attachment is stored on this device and waiting to sync.", "warning");
+        } else if (saveResult.cloudEnabled && !saveResult.synced) {
             showToast("Note saved locally. Cloud sync pending.", "warning");
         } else if (saveResult.cloudEnabled) {
             showToast("Note saved and synced", "success");
