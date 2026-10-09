@@ -370,6 +370,14 @@ body.dark-mode .private-password-sheet input {
     margin: 12px 0 4px;
 }
 
+.attachment-section-title {
+    flex: 0 0 100%;
+    color: var(--text-color);
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
 .attachment-add-button {
     display: inline-flex;
     align-items: center;
@@ -378,7 +386,7 @@ body.dark-mode .private-password-sheet input {
 
 .attachment-limit {
     font-size: 0.75rem;
-    color: var(--muted-text, #777);
+    color: var(--muted-color, #718071);
 }
 
 .pending-attachments {
@@ -399,7 +407,7 @@ body.dark-mode .private-password-sheet input {
     padding: 9px 10px;
     border: 1px solid var(--border-color, #ddd);
     border-radius: 12px;
-    background: var(--surface, #fff);
+    background: var(--surface-color, #fff);
 }
 
 .attachment-chip > i {
@@ -421,7 +429,35 @@ body.dark-mode .private-password-sheet input {
 }
 
 .attachment-chip-copy small {
-    color: var(--muted-text, #777);
+    color: var(--muted-color, #718071);
+}
+
+.attachment-sync-status {
+    color: var(--muted-color, #718071);
+    font-size: 0.72rem;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.attachment-sync-status.is-synced {
+    color: var(--primary-dark, #367d0c);
+}
+
+body.dark-mode .attachment-sync-status.is-synced {
+    color: var(--primary-color, #67bd2e);
+}
+
+.attachment-retry {
+    justify-self: start;
+    width: fit-content;
+    margin-top: 3px;
+    padding: 4px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 7px;
+    background: var(--surface-soft);
+    color: var(--text-color);
+    font-size: 0.72rem;
+    font-weight: 700;
 }
 
 .attachment-remove {
@@ -450,7 +486,7 @@ body.dark-mode .private-password-sheet input {
     padding: 8px;
     border: 1px solid var(--border-color, #ddd);
     border-radius: 12px;
-    background: var(--surface, #fff);
+    background: var(--surface-color, #fff);
 }
 
 .note-attachment-preview {
@@ -460,7 +496,7 @@ body.dark-mode .private-password-sheet input {
     display: grid;
     place-items: center;
     overflow: hidden;
-    background: var(--soft-surface, #f2f4f2);
+    background: var(--surface-soft, #f2f4f2);
 }
 
 .note-attachment-preview img {
@@ -487,7 +523,19 @@ body.dark-mode .private-password-sheet input {
 }
 
 .note-attachment-copy small {
-    color: var(--muted-text, #777);
+    color: var(--muted-color, #718071);
+}
+
+body.dark-mode .attachment-section-title,
+body.dark-mode .attachment-chip-copy strong,
+body.dark-mode .note-attachment-copy strong {
+    color: var(--text-color);
+}
+
+body.dark-mode .attachment-limit,
+body.dark-mode .attachment-chip-copy small,
+body.dark-mode .note-attachment-copy small {
+    color: var(--muted-color);
 }
 
 .attachment-open {
