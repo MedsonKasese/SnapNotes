@@ -27,6 +27,18 @@ test("attachment module exposes note attachment preparation", () => {
   assert(typeof window.prepareNoteAttachments === "function", "attachment preparation API is missing");
 });
 
+
+test("signed-out users receive a sign-in gate before choosing files", () => {
+  let clicked = false;
+  const accepted = window.openAttachmentPicker({ click() { clicked = true; } });
+  assert(accepted === false, "signed-out attachment picker should be blocked");
+  assert(clicked === false, "file picker opened for a signed-out user");
+});
+
+test("attachment uploads can be retried after connectivity returns", () => {
+  assert(typeof window.retryPendingAttachmentUploads === "function", "attachment retry API is missing");
+});
+
 test("attachment UI accepts supported file types", () => {
   const input = document.createElement("input");
   input.type = "file";
