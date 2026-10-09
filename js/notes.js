@@ -379,13 +379,14 @@ function startEditing(card, note) {
     attachmentButton.type = "button";
     attachmentButton.className = "secondary-action";
     attachmentButton.innerHTML = '<i class="fa-solid fa-paperclip"></i> Add attachments';
+    attachmentButton.setAttribute("aria-label", "Add attachments");
     const attachmentList = document.createElement("div");
     attachmentList.className = "note-attachments-list edit-attachments-list";
     attachmentEditor.append(attachmentButton, attachmentInput, attachmentList);
     metadata.append(tagsInput, reminderInput, attachmentEditor);
 
     const editAttachmentFiles = [];
-    attachmentButton.addEventListener("click", () => attachmentInput.click());
+    attachmentButton.addEventListener("click", () => window.openAttachmentPicker?.(attachmentInput));
     attachmentInput.addEventListener("change", event => {
         for (const file of Array.from(event.target.files || [])) {
             if (!editAttachmentFiles.some(item => item.name === file.name && item.size === file.size && item.lastModified === file.lastModified)) {
@@ -523,6 +524,7 @@ function startEditing(card, note) {
         // Save locally immediately, then wait for Firestore persistence.
         // This prevents a stale cloud snapshot from replacing the edit.
         saveNotes().then(() => {
+            window.retryPendingAttachmentUploads?.();
             const searchInput = document.getElementById("searchInput");
             const categoryFilter = document.getElementById("categoryFilter");
 
