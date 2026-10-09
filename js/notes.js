@@ -370,6 +370,9 @@ function startEditing(card, note) {
 
     const attachmentEditor = document.createElement("div");
     attachmentEditor.className = "edit-note-attachments";
+    const attachmentHeading = document.createElement("strong");
+    attachmentHeading.className = "attachment-section-title";
+    attachmentHeading.textContent = "Attachments";
     const attachmentInput = document.createElement("input");
     attachmentInput.type = "file";
     attachmentInput.accept = "image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain";
@@ -382,7 +385,7 @@ function startEditing(card, note) {
     attachmentButton.setAttribute("aria-label", "Add attachments");
     const attachmentList = document.createElement("div");
     attachmentList.className = "note-attachments-list edit-attachments-list";
-    attachmentEditor.append(attachmentButton, attachmentInput, attachmentList);
+    attachmentEditor.append(attachmentHeading, attachmentButton, attachmentInput, attachmentList);
     metadata.append(tagsInput, reminderInput, attachmentEditor);
 
     const editAttachmentFiles = [];
