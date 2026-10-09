@@ -50,6 +50,13 @@ jobs:
           grep -q 'history' js/private-notes.js
           grep -q 'prepareNoteAttachments' js/attachments.js
           grep -q 'MAX_ATTACHMENTS_PER_NOTE' js/attachments.js
+          grep -q 'uploadStatus: "pending"' js/attachments.js
+          grep -q 'putAttachmentFile(attachment.id, file)' js/attachments.js
+          grep -q 'retryPendingAttachmentUploads' js/attachments.js
+          grep -q 'window.addEventListener("online", retryPendingAttachmentUploads)' js/attachments.js
+          grep -q 'Sign in to your SnapNotes account' js/attachments.js
+          grep -q 'attachment-section-title' index.html
+          grep -q 'attachment-sync-status' styles/main.css
           grep -q 'firebase-storage.js' js/attachments.js
           grep -q 'js/attachments.js' index.html
           grep -q 'prepareNoteAttachments' js/attachments.js
@@ -57,7 +64,7 @@ jobs:
           grep -q 'moveNoteToFolder' js/folders.js
           grep -q 'folderNavList' index.html
           grep -q 'folders' js/firestore.js
-          grep -q 'snapnotes-v50' sw.js
+          grep -q 'snapnotes-v51' sw.js
           test -f assets/icons/snapnotes-notification.png
           test -f assets/icons/snapnotes-notification-badge.svg
           grep -q 'icon: "./assets/icons/snapnotes-notification.png"' js/app.js
