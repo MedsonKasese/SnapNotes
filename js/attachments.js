@@ -339,6 +339,20 @@ async function renderNoteAttachments(container, attachments = [], options = {}) 
         copy.append(name, size, status);
 
         const url = await resolveAttachmentUrl(attachment);
+        if (attachment.uploadStatus === "pending" && url) {
+            const retry = document.createElement("button");
+            retry.type = "button";
+            retry.className = "attachment-retry";
+            retry.textContent = "Retry upload";
+            retry.addEventListener("click", async () => {
+                if (!navigator.onLine) {
+                    window.showToast?.("You're offline. This attachment will retry when you're connected.", "warning");
+                    return;
+                }
+                await retryPendingAttachmentUploads();
+            });
+            copy.appendChild(retry);
+        }
         if (attachment.type?.startsWith("image/") && url) {
             const image = document.createElement("img");
             image.src = url;
