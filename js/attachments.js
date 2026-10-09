@@ -17,6 +17,18 @@ const ALLOWED_ATTACHMENT_TYPES = new Set([
 
 let pendingAttachmentFiles = [];
 
+function updateAttachmentAccess() {
+    const button = document.getElementById("addAttachmentBtn");
+    if (!button) return;
+    const available = Boolean(window.firebaseAuth?.currentUser);
+    button.disabled = !available;
+    button.title = available ? "Attach files" : "Sign in to attach files";
+    button.setAttribute("aria-disabled", String(!available));
+}
+
+window.addEventListener("snapnotes:auth-changed", updateAttachmentAccess);
+document.addEventListener("DOMContentLoaded", updateAttachmentAccess);
+
 function openAttachmentDb() {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open(ATTACHMENT_DB, 1);
@@ -104,6 +116,11 @@ function resetPendingAttachments() {
 }
 
 function addPendingAttachments(files) {
+    if (!window.firebaseAuth?.currentUser) {
+        window.showToast?.("Sign in before adding attachments.", "warning");
+        return;
+    }
+
     const incoming = Array.from(files || []);
     const available = Math.max(0, MAX_ATTACHMENTS_PER_NOTE - pendingAttachmentFiles.length);
 
@@ -172,22 +189,19 @@ function renderPendingAttachments() {
 
 async function uploadAttachmentToCloud(noteId, attachment, file) {
     const user = window.firebaseAuth?.currentUser;
-    if (!user || !navigator.onLine) return attachment;
+    if (!user) throw new Error("Sign in before adding attachments.");
+    if (!navigator.onLine) throw new Error("Connect to the internet before adding attachments.");
 
-    try {
-        const { getStorage, ref, uploadBytes, getDownloadURL } =
-            await import("https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js");
-        const storage = getStorage();
-        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-        const storagePath = "users/" + user.uid + "/attachments/" + noteId + "/" + attachment.id + "-" + safeName;
-        const storageRef = ref(storage, storagePath);
+    const { getStorage, ref, uploadBytes, getDownloadURL } =
+        await import("https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js");
+    const storage = getStorage();
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const storagePath = "users/" + user.uid + "/attachments/" + noteId + "/" + attachment.id + "-" + safeName;
+    const storageRef = ref(storage, storagePath);
 
-        await uploadBytes(storageRef, file, { contentType: file.type || "application/octet-stream" });
-        attachment.storagePath = storagePath;
-        attachment.downloadUrl = await getDownloadURL(storageRef);
-    } catch (error) {
-        console.warn("Attachment cloud upload failed:", error);
-    }
+    await uploadBytes(storageRef, file, { contentType: file.type || "application/octet-stream" });
+    attachment.storagePath = storagePath;
+    attachment.downloadUrl = await getDownloadURL(storageRef);
 
     return attachment;
 }
@@ -195,6 +209,12 @@ async function uploadAttachmentToCloud(noteId, attachment, file) {
 async function prepareNoteAttachments(noteId, files, existing = []) {
     const attachments = Array.isArray(existing) ? [...existing] : [];
     const incoming = Array.from(files || []);
+    if (incoming.length && !window.firebaseAuth?.currentUser) {
+        throw new Error("Sign in before adding attachments.");
+    }
+    if (incoming.length && !navigator.onLine) {
+        throw new Error("Connect to the internet before adding attachments.");
+    }
     const available = MAX_ATTACHMENTS_PER_NOTE - attachments.length;
     if (incoming.length > available) {
         throw new Error(`A note can have up to ${MAX_ATTACHMENTS_PER_NOTE} attachments.`);
@@ -214,9 +234,14 @@ async function prepareNoteAttachments(noteId, files, existing = []) {
             downloadUrl: null
         };
 
-        await putAttachmentFile(attachment.id, file);
-        await uploadAttachmentToCloud(noteId, attachment, file);
-        attachments.push(attachment);
+        try {
+            await putAttachmentFile(attachment.id, file);
+            await uploadAttachmentToCloud(noteId, attachment, file);
+            attachments.push(attachment);
+        } catch (error) {
+            await deleteAttachmentFile(attachment.id).catch(() => {});
+            throw error;
+        }
     }
 
     return attachments;

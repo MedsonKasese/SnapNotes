@@ -317,6 +317,7 @@ async function processScheduledAccountDeletion(user) {
 }
 
 onAuthStateChanged(auth, user => {
+    window.dispatchEvent(new CustomEvent("snapnotes:auth-changed", { detail: { user } }));
     resetGoogleButton();
 
     if (user) {
