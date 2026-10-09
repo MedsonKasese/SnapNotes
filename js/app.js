@@ -24,6 +24,8 @@ document.addEventListener("DOMContentLoaded", () => {
     handleNotificationNoteFromUrl();
     loadNotes();
     window.loadFolders?.();
+    // Retry locally stored attachments on startup as well as on reconnect.
+    window.retryPendingAttachmentUploads?.();
     setupEventListeners();
     restoreDraft();
     setupTheme();
