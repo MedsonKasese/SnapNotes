@@ -370,6 +370,14 @@ body.dark-mode .private-password-sheet input {
     margin: 12px 0 4px;
 }
 
+.attachment-section-title {
+    flex: 0 0 100%;
+    color: var(--text-color);
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
 .attachment-add-button {
     display: inline-flex;
     align-items: center;
@@ -378,7 +386,7 @@ body.dark-mode .private-password-sheet input {
 
 .attachment-limit {
     font-size: 0.75rem;
-    color: var(--muted-text, #777);
+    color: var(--muted-color, #718071);
 }
 
 .pending-attachments {
@@ -399,7 +407,7 @@ body.dark-mode .private-password-sheet input {
     padding: 9px 10px;
     border: 1px solid var(--border-color, #ddd);
     border-radius: 12px;
-    background: var(--surface, #fff);
+    background: var(--surface-color, #fff);
 }
 
 .attachment-chip > i {
@@ -460,7 +468,7 @@ body.dark-mode .private-password-sheet input {
     display: grid;
     place-items: center;
     overflow: hidden;
-    background: var(--soft-surface, #f2f4f2);
+    background: var(--surface-soft, #f2f4f2);
 }
 
 .note-attachment-preview img {
