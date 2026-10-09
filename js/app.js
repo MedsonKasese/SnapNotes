@@ -177,7 +177,7 @@ function setupEventListeners() {
     importNotesBtn.addEventListener("click", () => importNotesInput.click());
     importNotesInput.addEventListener("change", importNotes);
     createFolderBtn?.addEventListener("click", () => window.createFolder?.());
-    addAttachmentBtn?.addEventListener("click", () => attachmentInput?.click());
+    addAttachmentBtn?.addEventListener("click", () => window.openAttachmentPicker?.(attachmentInput));
     attachmentInput?.addEventListener("change", event => {
         window.addPendingAttachments?.(event.target.files);
         event.target.value = "";
@@ -653,6 +653,7 @@ async function saveEditorNote() {
     if (newNote.reminderAt) await requestReminderPermission();
     window.recordNoteCreation?.(newNote);
     const saveResult = await saveNotes();
+    window.retryPendingAttachmentUploads?.();
 
     clearDraft();
     editor.innerHTML = "";
