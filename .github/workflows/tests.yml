@@ -57,6 +57,7 @@ jobs:
           grep -q 'uploadStatus: "pending"' js/attachments.js
           grep -q 'Sign in to your SnapNotes account' js/attachments.js
           grep -q 'retryPendingAttachmentUploads' js/attachments.js
+          grep -q 'attachmentRetryQueued' js/attachments.js
           grep -q 'Uploading…' js/attachments.js
           grep -q 'Network problem' js/attachments.js
           grep -q 'addEventListener("online", retryPendingAttachmentUploads)' js/attachments.js
