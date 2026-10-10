@@ -109,7 +109,7 @@
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(action === "improve"
           ? { action, prompt, note: { title: document.title || "Note", text } }
-          : { action, prompt, notes: eligibleNotes })
+          : { action, prompt })
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || "The AI request failed. Please try again.");
