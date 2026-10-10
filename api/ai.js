@@ -68,9 +68,10 @@ export default async function handler(req, res) {
       }
       contents = [
         "Task: improve the wording, clarity, structure and readability of the user's note.",
-        "Preserve the user's meaning and facts. Do not invent facts. Return only the improved note, without commentary or code fences.",
+        "Preserve the user's meaning and facts. Do not invent facts. Keep the existing title exactly as supplied; do not create a new title, app name, hashtag, or document heading.",
+        "Return only the improved body text, without the title, commentary, Markdown headings, Markdown code fences, or labels such as 'Note:'. Plain text with normal line breaks is preferred.",
         "User instruction: " + prompt.trim(),
-        "Note title: " + String(note.title || "").slice(0, 180),
+        "Existing note title (preserve exactly, do not repeat in your response): " + String(note.title || "").slice(0, 180),
         "Note content:\n" + note.text
       ].join("\n\n");
     } else {

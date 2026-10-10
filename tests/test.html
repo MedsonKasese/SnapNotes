@@ -7,6 +7,7 @@
 <script src="../js/attachments.js"></script>
 <script src="../js/folders.js"></script>
 <script src="../js/reminder-utils.js"></script>
+<script src="../js/ai-format.js"></script>
 <script src="../js/version-history.js"></script>
 <script>
 const results = [];
@@ -73,6 +74,16 @@ test("one-time reminder dates round-trip through local input helpers", () => {
   const source = "2026-10-08T09:15";
   const iso = window.parseReminderDateTimeLocal(source);
   assert(iso && window.formatReminderDateTimeLocal(iso) === source, "local reminder time was not preserved");
+});
+
+test("AI improvements preserve the existing title and remove app headings", () => {
+  const result = window.normalizeAskMyNotesResult("#snapnotes\n## Original title\n\nImproved body.", "Original title");
+  assert(result === "## Original title\n\nImproved body.", "AI Markdown title was not normalised");
+});
+
+test("AI improvements strip code fences without losing line breaks", () => {
+  const result = window.normalizeAskMyNotesResult("```markdown\n#snapnotes\nNew body\n```", "My title");
+  assert(result === "## My title\n\nNew body", "AI code-fenced output was not normalised");
 });
 
 test("attachment creation requires an authenticated account", () => {

@@ -47,37 +47,21 @@
     dialog.setAttribute("aria-hidden", "true");
   }
 
-  function currentNoteText() {
-    return editor.innerText.trim().slice(0, 1500);
-  }
-
-  function normalizeImprovedNote(value) {
-    const text = String(value || "").replace(/\r\n?/g, "\n").trim();
-    if (!text) return "";
-
-    const lines = text.split("\n");
+  function readEditorTitleAndBody() {
+    const lines = editor.innerText.replace(/\r/g, "").split("\n");
     const firstIndex = lines.findIndex(line => line.trim());
-    if (firstIndex < 0) return "";
+    if (firstIndex < 0) return { title: "", body: "" };
 
     const firstLine = lines[firstIndex].trim();
-    const heading = firstLine.match(/^#{1,6}\s+(.+?)\s*#*$/);
-    if (heading) {
-      // SnapNotes recognises the first line beginning with "##" as the title.
-      // Gemini often returns a Markdown H1 ("# Title"), which otherwise saves
-      // as an untitled note. Normalise only the first heading; keep body headings.
-      lines[firstIndex] = "## " + heading[1].trim();
-      return lines.join("\n").trim();
+    const titleMatch = firstLine.match(/^##\s*(.*?)\s*#*$/);
+    if (!titleMatch || !titleMatch[1].trim()) {
+      return { title: "", body: lines.join("\n").trim().slice(0, 1500) };
     }
 
-    // If the model omits a heading, retain the title already present in the editor.
-    const currentFirstLine = editor.innerText.replace(/\r/g, "").split("\n")
-      .find(line => line.trim())?.trim() || "";
-    const currentHeading = currentFirstLine.match(/^##\s*(.*?)\s*#*$/);
-    if (currentHeading && currentHeading[1].trim()) {
-      return ["## " + currentHeading[1].trim(), "", text].join("\n").trim();
-    }
-
-    return text;
+    return {
+      title: titleMatch[1].trim(),
+      body: lines.slice(firstIndex + 1).join("\n").trim().slice(0, 1500)
+    };
   }
 
   function getEligibleNotes() {
@@ -109,7 +93,8 @@
       promptInput.focus();
       return;
     }
-    const text = currentNoteText();
+    const noteParts = readEditorTitleAndBody();
+    const text = noteParts.body || editor.innerText.trim().slice(0, 1500);
     if (action === "improve" && !text) {
       setStatus("Write something in the editor before asking AI to improve it.", true);
       return;
@@ -137,13 +122,13 @@
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(action === "improve"
-          ? { action, prompt, note: { title: document.title || "Note", text } }
+          ? { action, prompt, note: { title: noteParts.title, text } }
           : { action, prompt })
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || "The AI request failed. Please try again.");
       if (action === "improve") {
-        lastImprovement = normalizeImprovedNote(payload.result);
+        lastImprovement = window.normalizeAskMyNotesResult(payload.result, noteParts.title);
         if (!lastImprovement) throw new Error("The AI returned an empty result.");
         resultText.textContent = lastImprovement;
         resultPanel.hidden = false;
@@ -181,7 +166,7 @@
     if (!lastImprovement) return;
     // Re-normalise before applying so an edited preview can never turn a
     // Markdown H1 into an untitled SnapNotes note.
-    editor.textContent = normalizeImprovedNote(lastImprovement);
+    editor.textContent = window.normalizeAskMyNotesResult(lastImprovement, readEditorTitleAndBody().title);
     editor.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText" }));
     editor.focus();
     setStatus("Improvement applied to the editor. Save the note to keep it.");
