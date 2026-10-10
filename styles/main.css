@@ -714,7 +714,38 @@ body.dark-mode .smart-share-preview {
 .ai-dialog-heading h2 { margin: 2px 0 0; font-size: 1.3rem; }
 .ai-dialog-heading .eyebrow { margin: 0; color: var(--muted-color); font-size: .75rem; }
 .ai-dialog-description, .ai-privacy-note { color: var(--muted-color); font-size: .86rem; line-height: 1.5; }
-.ai-prompt-label { display: block; margin: 15px 0 7px; font-weight: 700; font-size: .9rem; }
+.ai-prompt-label-row { position: relative; display: flex; align-items: center; gap: 6px; margin: 15px 0 7px; }
+.ai-prompt-label { margin: 0; font-weight: 700; font-size: .9rem; }
+.ai-info-button {
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--muted-color);
+    cursor: pointer;
+}
+.ai-info-button:hover, .ai-info-button:focus-visible { color: var(--primary-color); background: var(--surface-soft); }
+.ai-info-button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+.ai-info-tooltip {
+    position: absolute;
+    z-index: 2;
+    top: calc(100% + 8px);
+    left: 0;
+    width: min(100%, 430px);
+    padding: 11px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--surface-color);
+    color: var(--text-color);
+    box-shadow: var(--shadow);
+    font-size: .82rem;
+    font-weight: 500;
+    line-height: 1.45;
+}
 #askMyNotesPrompt { width: 100%; min-height: 92px; resize: vertical; padding: 12px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--surface-soft); color: var(--text-color); }
 .ai-privacy-note { display: flex; align-items: flex-start; gap: 8px; }
 .ai-privacy-note i { margin-top: 3px; color: var(--primary-color); }

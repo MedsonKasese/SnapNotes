@@ -15,6 +15,8 @@
   const sources = document.getElementById("askMyNotesSources");
   const applyButton = document.getElementById("askMyNotesApply");
   const copyButton = document.getElementById("askMyNotesCopy");
+  const infoButton = document.getElementById("askMyNotesInfo");
+  const infoTooltip = document.getElementById("askMyNotesInfoTooltip");
   let lastImprovement = "";
   let lastAction = "";
   let busy = false;
@@ -36,13 +38,15 @@
       : "";
     resultPanel.hidden = true;
     answerPanel.hidden = true;
-    setStatus("Your note content is sent to Google Gemini only after you confirm.");
+    setInfoTooltip(false);
+    setStatus("Review the information tooltip, then send your request when ready.");
     dialog.hidden = false;
     dialog.setAttribute("aria-hidden", "false");
     promptInput.focus();
   }
 
   function closeDialog() {
+    setInfoTooltip(false);
     dialog.hidden = true;
     dialog.setAttribute("aria-hidden", "true");
   }
@@ -105,11 +109,6 @@
       return;
     }
 
-    const consentText = action === "improve"
-      ? "Send the current note text to Google Gemini to improve it? Do not continue if this note contains private or sensitive information. Private notes are excluded from this feature."
-      : "Send up to 8 regular notes (excluding private, archived and trashed notes) to Google Gemini to answer your question? Google may process submitted content under its API terms.";
-    if (!window.confirm(consentText)) return;
-
     busy = true;
     improveButton.disabled = true;
     searchButton.disabled = true;
@@ -160,6 +159,25 @@
   editorButton.addEventListener("click", () => openDialog("improve"));
   document.getElementById("askMyNotesClose")?.addEventListener("click", closeDialog);
   dialog.addEventListener("click", event => { if (event.target === dialog) closeDialog(); });
+  function setInfoTooltip(open) {
+    if (!infoButton || !infoTooltip) return;
+    infoTooltip.hidden = !open;
+    infoButton.setAttribute("aria-expanded", String(open));
+  }
+  infoButton?.addEventListener("click", event => {
+    event.stopPropagation();
+    setInfoTooltip(infoTooltip.hidden);
+  });
+  dialog.addEventListener("click", event => {
+    if (infoTooltip?.hidden || event.target === infoButton || infoButton?.contains(event.target) || infoTooltip?.contains(event.target)) return;
+    setInfoTooltip(false);
+  });
+  dialog.addEventListener("keydown", event => {
+    if (event.key === "Escape" && infoTooltip && !infoTooltip.hidden) {
+      setInfoTooltip(false);
+      infoButton?.focus();
+    }
+  });
   improveButton.addEventListener("click", () => requestAI("improve"));
   searchButton.addEventListener("click", () => requestAI("search"));
   applyButton.addEventListener("click", () => {
