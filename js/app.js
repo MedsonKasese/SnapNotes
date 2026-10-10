@@ -24,6 +24,8 @@ document.addEventListener("DOMContentLoaded", () => {
     handleNotificationNoteFromUrl();
     loadNotes();
     window.loadFolders?.();
+    // Retry locally stored attachments on startup as well as on reconnect.
+    window.retryPendingAttachmentUploads?.();
     setupEventListeners();
     restoreDraft();
     setupTheme();
@@ -75,7 +77,6 @@ function setupEventListeners() {
     const searchInput = document.getElementById("searchInput");
     const categoryFilter = document.getElementById("categoryFilter");
     const reminderInput = document.getElementById("noteReminderInput");
-    const reminderPickerBtn = document.getElementById("reminderPickerBtn");
     const settingsBtn = document.getElementById("settingsBtn");
     const settingsModal = document.getElementById("settingsModal");
     const closeSettingsBtn = document.getElementById("closeSettingsBtn");
@@ -186,19 +187,6 @@ function setupEventListeners() {
     reminderInput?.addEventListener("change", () => {
         if (reminderInput.value) requestReminderPermission();
     });
-    reminderPickerBtn?.addEventListener("click", () => {
-        try {
-            if (typeof reminderInput?.showPicker === "function") {
-                reminderInput.showPicker();
-                return;
-            }
-        } catch (error) {
-            console.debug("Native reminder picker is unavailable:", error);
-        }
-        reminderInput?.focus();
-        reminderInput?.click();
-    });
-
     logoButton.addEventListener("click", openNewNoteView);
 
     editorCategory.addEventListener("click", toggleCategoryMenu);

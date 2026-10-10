@@ -31,8 +31,10 @@ jobs:
         run: |
           grep -q 'noteTagsInput' index.html
           grep -q 'noteReminderInput' index.html
-          grep -q 'reminderPickerBtn' index.html
-          grep -q 'showPicker' js/app.js
+          # The native date/time input is the only reminder picker control.
+          ! grep -q 'reminderPickerBtn' index.html
+          ! grep -q 'reminderPickerBtn' js/app.js
+          ! grep -q 'showPicker' js/app.js
           grep -q 'noteDetailModal' index.html
           grep -q 'function parseTags' js/app.js
           grep -q 'function openNoteDetail' js/notes.js
@@ -45,18 +47,28 @@ jobs:
           grep -q 'openNoteDetail' js/notes.js
           grep -q 'handlePendingNotificationNote' js/firestore.js
           grep -q 'openNoteVersionHistory' js/version-history.js
+          grep -q 'openSmartShareDialog' js/notes.js
+          grep -q 'shareNoteImage' js/notes.js
+          grep -q 'smart-share-overlay' styles/main.css
           grep -q 'appendVersion' js/version-history.js
           grep -q 'edit history' js/notes.js
           grep -q 'history' js/private-notes.js
           grep -q 'prepareNoteAttachments' js/attachments.js
           grep -q 'MAX_ATTACHMENTS_PER_NOTE' js/attachments.js
+          # Attachments must be saved locally first, with sign-in guidance and retry support.
+          grep -q 'indexedDB.open' js/attachments.js
           grep -q 'uploadStatus: "pending"' js/attachments.js
-          grep -q 'putAttachmentFile(attachment.id, file)' js/attachments.js
-          grep -q 'retryPendingAttachmentUploads' js/attachments.js
-          grep -q 'window.addEventListener("online", retryPendingAttachmentUploads)' js/attachments.js
           grep -q 'Sign in to your SnapNotes account' js/attachments.js
-          grep -q 'attachment-section-title' index.html
-          grep -q 'attachment-sync-status' styles/main.css
+          grep -q 'retryPendingAttachmentUploads' js/attachments.js
+          grep -q 'attachmentRetryQueued' js/attachments.js
+          grep -q 'Uploading…' js/attachments.js
+          grep -q 'Network problem' js/attachments.js
+          grep -q 'addEventListener("online", retryPendingAttachmentUploads)' js/attachments.js
+          grep -q 'retryPendingAttachmentUploads' js/app.js
+          grep -q 'retryPendingAttachmentUploads' js/firestore.js
+          grep -q 'retryPendingAttachmentUploads' js/notes.js
+          grep -q 'attachment-section-title' styles/main.css
+          grep -q 'body.dark-mode .attachment-section-title' styles/main.css
           grep -q 'firebase-storage.js' js/attachments.js
           grep -q 'js/attachments.js' index.html
           grep -q 'prepareNoteAttachments' js/attachments.js
@@ -64,7 +76,7 @@ jobs:
           grep -q 'moveNoteToFolder' js/folders.js
           grep -q 'folderNavList' index.html
           grep -q 'folders' js/firestore.js
-          grep -q 'snapnotes-v51' sw.js
+          grep -Eq 'const CACHE_NAME = "snapnotes-v[0-9]+";' sw.js
           test -f assets/icons/snapnotes-notification.png
           test -f assets/icons/snapnotes-notification-badge.svg
           grep -q 'icon: "./assets/icons/snapnotes-notification.png"' js/app.js

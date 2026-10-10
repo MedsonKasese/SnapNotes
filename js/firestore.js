@@ -175,6 +175,9 @@ export async function loadFromCloud(uid) {
         }
 
         await syncToCloud();
+        // Auth may have changed before cloud notes finished loading; retry now that
+        // the merged local/cloud note list is available.
+        window.retryPendingAttachmentUploads?.();
 
         if (merged.length) {
             window.showToast("Notes synced", "success");
