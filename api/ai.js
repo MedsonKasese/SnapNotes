@@ -2,7 +2,7 @@ import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
-const MODEL = "gemini-3.5-flash-lite";
+const MODEL = (process.env.GEMINI_MODEL || "gemini-3.5-flash-lite").trim();
 const MAX_NOTE_COUNT = 8;
 const MAX_NOTE_CHARS = 1500;
 const MAX_PROMPT_CHARS = 1200;
@@ -108,7 +108,7 @@ export default async function handler(req, res) {
       console.error("Gemini API request failed:", JSON.stringify({ status, message: providerMessage }));
       if (status === 429) return send(res, 429, { error: "The AI service has reached its current quota. Please wait and try again." });
       if (status === 401 || status === 403) return send(res, 502, { error: "Gemini rejected the server API key or its permissions. Check GEMINI_API_KEY in Vercel." });
-      if (status === 404) return send(res, 502, { error: "The configured Gemini model was not found or is unavailable for this API key. Check the model name and API access." });
+      if (status === 404) return send(res, 502, { error: `Gemini model "${MODEL}" is unavailable to this API key. Check that the model is supported for your Gemini API project, or set GEMINI_MODEL in Vercel to an available model. The server logs include Google's diagnostic message.` });
       if (status === 400) return send(res, 502, { error: "Gemini rejected the request. Check the configured model and request format." });
       return send(res, 502, { error: "Gemini returned an error (HTTP " + status + "). Check the Vercel function logs for the provider message." });
     }
