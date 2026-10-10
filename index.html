@@ -135,15 +135,21 @@ Then write your notes below..."
             </div>
 
             <div class="editor-footer">
+                <div class="editor-footer-actions">
+                    <button id="askMyNotesBtn" class="ai-editor-button" type="button" aria-label="Ask My Notes AI" title="Ask My Notes">
+                        <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                        <span>Ask My Notes</span>
+                    </button>
+                    <button id="saveNoteBtn" class="primary-action" type="button">
+                        <i class="fa-solid fa-check"></i>
+                        Save note
+                    </button>
+                </div>
                 <div class="editor-status" id="draftStatus" aria-live="polite"><i class="fa-regular fa-floppy-disk"></i><span>Drafts save automatically</span><span id="editorCharacterCount" class="editor-character-count">0/1500</span></div>
                 <p class="editor-hint">
                     <i class="fa-solid fa-lightbulb"></i>
                     Start the first line with <strong>##</strong> to make it your note title.
                 </p>
-                <button id="saveNoteBtn" class="primary-action" type="button">
-                    <i class="fa-solid fa-check"></i>
-                    Save note
-                </button>
             </div>
         </section>
 
@@ -436,6 +442,34 @@ Then write your notes below..."
         </div>
     </div>
 
+    <div id="askMyNotesDialog" class="ai-dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="askMyNotesTitle" aria-hidden="true" hidden>
+        <section class="ai-dialog">
+            <div class="ai-dialog-heading">
+                <div><p class="eyebrow">SnapNotes AI</p><h2 id="askMyNotesTitle">Ask My Notes</h2></div>
+                <button id="askMyNotesClose" class="ai-dialog-close" type="button" aria-label="Close Ask My Notes" title="Close">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+            </div>
+            <p class="ai-dialog-description">Improve the note you're editing or ask a question about your regular notes.</p>
+            <label class="ai-prompt-label" for="askMyNotesPrompt">What would you like help with?</label>
+            <textarea id="askMyNotesPrompt" rows="3" maxlength="1200" placeholder="e.g. Make this clearer, or Where did I write about my internship?"></textarea>
+            <p class="ai-privacy-note"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> You'll be asked before note text is sent to Google Gemini. Private, archived and trashed notes are excluded.</p>
+            <p id="askMyNotesStatus" class="ai-status" role="status" aria-live="polite">Sign in to get started.</p>
+            <div class="ai-dialog-actions">
+                <button id="askMyNotesImprove" class="primary-action" type="button">Improve this note</button>
+                <button id="askMyNotesSearch" class="secondary-action" type="button">Ask my notes</button>
+            </div>
+            <section id="askMyNotesResult" class="ai-result" hidden>
+                <h3>Suggested improvement</h3><div id="askMyNotesResultText" class="ai-result-text"></div>
+                <div class="ai-dialog-actions"><button id="askMyNotesApply" class="primary-action" type="button">Apply to editor</button><button id="askMyNotesCopy" class="secondary-action" type="button">Copy text</button></div>
+            </section>
+            <section id="askMyNotesAnswer" class="ai-result" hidden>
+                <h3>Answer</h3><p id="askMyNotesAnswerText" class="ai-answer-text"></p>
+                <h3>Sources</h3><ul id="askMyNotesSources" class="ai-source-list"></ul>
+            </section>
+        </section>
+    </div>
+
     <div id="shareTemplate" aria-hidden="true">
         <div id="shareTitle"></div>
         <div id="shareBody"></div>
@@ -451,10 +485,12 @@ Then write your notes below..."
     <script src="js/storage.js"></script>
     <script src="js/notes.js"></script>
     <script src="js/reminder-utils.js"></script>
+    <script src="js/ai-format.js"></script>
     <script type="module" src="js/firebaseConfig.js"></script>
     <script type="module" src="js/firestore.js"></script>
     <script type="module" src="js/auth.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/ai.js"></script>
     <script>
         window.addEventListener("offline", () => window.showToast?.("You're offline. Local changes are still available.", "warning"));
         window.addEventListener("online", () => window.showToast?.("You're back online. Syncing changes...", "success"));

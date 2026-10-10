@@ -988,3 +988,43 @@
     color: var(--muted-color);
     font-size: 11px;
 }
+
+
+/* Ask My Notes and Save note share a row above the draft guidance. */
+.editor-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 9px;
+}
+.editor-footer-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 9px;
+    width: 100%;
+}
+.editor-footer-actions > button {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+}
+.editor-footer .editor-status,
+.editor-footer .editor-hint {
+    align-self: stretch;
+    grid-column: auto;
+    grid-row: auto;
+    white-space: normal;
+}
+.editor-footer .primary-action {
+    grid-column: auto;
+    grid-row: auto;
+}
+@media (max-width: 420px) {
+    .editor-footer-actions {
+        gap: 7px;
+    }
+    .editor-footer-actions > button {
+        padding: 9px 7px;
+        font-size: 12px;
+    }
+}
