@@ -451,9 +451,17 @@ Then write your notes below..."
                 </button>
             </div>
             <p class="ai-dialog-description">Improve the note you're editing or ask a question about your regular notes.</p>
-            <label class="ai-prompt-label" for="askMyNotesPrompt">What would you like help with?</label>
+            <div class="ai-prompt-label-row">
+                <label class="ai-prompt-label" for="askMyNotesPrompt">What would you like help with?</label>
+                <button id="askMyNotesInfo" class="ai-info-button" type="button" aria-label="How Ask My Notes uses your content" aria-expanded="false" aria-controls="askMyNotesInfoTooltip" title="How Ask My Notes uses your content">
+                    <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                </button>
+                <div id="askMyNotesInfoTooltip" class="ai-info-tooltip" role="tooltip" hidden>
+                    Ask My Notes sends the content needed for your request to Google Gemini. Private, archived, trashed and conflicting notes are excluded from note search. Do not send information you are not comfortable sharing with an AI service.
+                </div>
+            </div>
             <textarea id="askMyNotesPrompt" rows="3" maxlength="1200" placeholder="e.g. Make this clearer, or Where did I write about my internship?"></textarea>
-            <p class="ai-privacy-note"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> You'll be asked before note text is sent to Google Gemini. Private, archived and trashed notes are excluded.</p>
+            <p class="ai-privacy-note"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Review the information tooltip before sending a request.</p>
             <p id="askMyNotesStatus" class="ai-status" role="status" aria-live="polite">Sign in to get started.</p>
             <div class="ai-dialog-actions">
                 <button id="askMyNotesImprove" class="primary-action" type="button">Improve this note</button>

@@ -69,6 +69,10 @@ jobs:
           grep -q 'retryPendingAttachmentUploads' js/notes.js
           grep -q 'attachment-section-title' styles/main.css
           grep -q 'body.dark-mode .attachment-section-title' styles/main.css
+          grep -q 'askMyNotesInfoTooltip' index.html
+          grep -q 'setInfoTooltip' js/ai.js
+          grep -q 'ai-info-tooltip' styles/main.css
+          ! grep -q 'window.confirm' js/ai.js
           grep -q 'firebase-storage.js' js/attachments.js
           grep -q 'js/attachments.js' index.html
           grep -q 'prepareNoteAttachments' js/attachments.js
