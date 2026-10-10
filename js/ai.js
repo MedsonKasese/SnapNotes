@@ -51,6 +51,35 @@
     return editor.innerText.trim().slice(0, 1500);
   }
 
+  function normalizeImprovedNote(value) {
+    const text = String(value || "").replace(/\r\n?/g, "\n").trim();
+    if (!text) return "";
+
+    const lines = text.split("\n");
+    const firstIndex = lines.findIndex(line => line.trim());
+    if (firstIndex < 0) return "";
+
+    const firstLine = lines[firstIndex].trim();
+    const heading = firstLine.match(/^#{1,6}\s+(.+?)\s*#*$/);
+    if (heading) {
+      // SnapNotes recognises the first line beginning with "##" as the title.
+      // Gemini often returns a Markdown H1 ("# Title"), which otherwise saves
+      // as an untitled note. Normalise only the first heading; keep body headings.
+      lines[firstIndex] = "## " + heading[1].trim();
+      return lines.join("\n").trim();
+    }
+
+    // If the model omits a heading, retain the title already present in the editor.
+    const currentFirstLine = editor.innerText.replace(/\r/g, "").split("\n")
+      .find(line => line.trim())?.trim() || "";
+    const currentHeading = currentFirstLine.match(/^##\s*(.*?)\s*#*$/);
+    if (currentHeading && currentHeading[1].trim()) {
+      return ["## " + currentHeading[1].trim(), "", text].join("\n").trim();
+    }
+
+    return text;
+  }
+
   function getEligibleNotes() {
     return (Array.isArray(window.notes) ? window.notes : [])
       .filter(note => note && note.isPrivate !== true && !note.deletedAt && !note.archived &&
@@ -114,7 +143,7 @@
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || "The AI request failed. Please try again.");
       if (action === "improve") {
-        lastImprovement = String(payload.result || "").trim();
+        lastImprovement = normalizeImprovedNote(payload.result);
         if (!lastImprovement) throw new Error("The AI returned an empty result.");
         resultText.textContent = lastImprovement;
         resultPanel.hidden = false;
@@ -150,7 +179,9 @@
   searchButton.addEventListener("click", () => requestAI("search"));
   applyButton.addEventListener("click", () => {
     if (!lastImprovement) return;
-    editor.textContent = lastImprovement;
+    // Re-normalise before applying so an edited preview can never turn a
+    // Markdown H1 into an untitled SnapNotes note.
+    editor.textContent = normalizeImprovedNote(lastImprovement);
     editor.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText" }));
     editor.focus();
     setStatus("Improvement applied to the editor. Save the note to keep it.");
