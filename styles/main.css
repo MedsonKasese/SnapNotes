@@ -734,3 +734,29 @@ body.dark-mode .smart-share-preview {
     .ai-dialog { padding: 18px; border-radius: 20px 20px 14px 14px; max-height: 92vh; }
     .ai-dialog-actions { grid-template-columns: 1fr; }
 }
+
+
+/* Ask My Notes dialog close icon */
+.ai-dialog { position: relative; }
+.ai-dialog-heading { padding-right: 36px; }
+.ai-dialog-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: inline-grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    background: var(--surface-soft);
+    color: var(--text-color);
+    font-size: 16px;
+    cursor: pointer;
+}
+.ai-dialog-close:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+.ai-editor-button { margin-bottom: 0; }
