@@ -17,28 +17,13 @@ function normalizeAskMyNotesResult(value, preservedTitle = "") {
         bodyLines.splice(firstIndex, 1);
     }
 
-    if (title) {
-        const repeatedTitleIndex = bodyLines.findIndex(line => {
-            const plain = line.trim().replace(/^title\s*:\s*/i, "").trim();
-            return plain.toLowerCase() === title.toLowerCase() ||
-                markdownHeadingText(line).toLowerCase() === title.toLowerCase();
-        });
-        if (repeatedTitleIndex >= 0) bodyLines.splice(repeatedTitleIndex, 1);
-
-        const leadingHeadingIndex = bodyLines.findIndex(line => line.trim());
-        if (leadingHeadingIndex >= 0 && /^#{1,6}\s*/.test(bodyLines[leadingHeadingIndex].trim())) {
-            bodyLines.splice(leadingHeadingIndex, 1);
-        }
-    }
-
-    const finalTitle = title || (() => {
-        const index = bodyLines.findIndex(line => line.trim());
-        return index >= 0 ? markdownHeadingText(bodyLines[index]) : "";
-    })();
-    if (!title && finalTitle) {
-        const index = bodyLines.findIndex(line => line.trim());
-        bodyLines.splice(index, 1);
-    }
+    // The first Markdown heading is the AI's editable title. Normalize any
+    // heading level to SnapNotes' required `## Title` format. If the model
+    // follows the older body-only contract, retain the editor's title.
+    const titleIndex = bodyLines.findIndex(line => line.trim());
+    const returnedTitle = titleIndex >= 0 ? markdownHeadingText(bodyLines[titleIndex]) : "";
+    const finalTitle = returnedTitle || title;
+    if (returnedTitle) bodyLines.splice(titleIndex, 1);
 
     const body = bodyLines.join("\n").trim();
     return finalTitle ? `## ${finalTitle}${body ? `\n\n${body}` : ""}` : body;

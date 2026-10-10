@@ -86,6 +86,11 @@ test("AI improvements strip code fences without losing line breaks", () => {
   assert(result === "## My title\n\nNew body", "AI code-fenced output was not normalised");
 });
 
+test("AI improvements allow an edited title and normalize its heading", () => {
+  const result = window.normalizeAskMyNotesResult("# Better title\n\nImproved body.", "Original title");
+  assert(result === "## Better title\n\nImproved body.", "AI-edited title was not normalized");
+});
+
 test("attachment creation requires an authenticated account", () => {
   assert(window.prepareNoteAttachments.length >= 2, "attachment preparation API is incomplete");
 });
