@@ -190,6 +190,7 @@ resetPasswordBtn?.addEventListener("click", async () => {
 });
 
 signupBtn.addEventListener("click", async () => {
+    if (signupFullName.hidden) { signupFullName.hidden = false; signupBtn.textContent = "Register with email"; signupFullName.focus(); return; }
     const email = emailInput.value.trim();
     const password = passwordInput.value;
     const fullName = signupFullName.value.trim().replace(/\\s+/g, " ");
@@ -212,6 +213,8 @@ signupBtn.addEventListener("click", async () => {
 });
 
 signinBtn.addEventListener("click", async () => {
+    signupFullName.hidden = true;
+    signupBtn.textContent = "Create Account";
     const email = emailInput.value.trim();
     const password = passwordInput.value;
 
@@ -338,6 +341,9 @@ function closeModal() {
     authModal.classList.remove("show");
     authModal.setAttribute("aria-hidden", "true");
     emailInput.value = "";
+    signupFullName.value = "";
+    signupFullName.hidden = true;
+    signupBtn.textContent = "Create Account";
     passwordInput.value = "";
     passwordInput.type = "password";
     togglePasswordBtn?.setAttribute("aria-pressed", "false");
