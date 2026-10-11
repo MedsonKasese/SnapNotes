@@ -287,6 +287,21 @@ Then write your notes below..."
                 <div class="settings-account" id="settingsAccount"></div>
             </section>
 
+            <section class="settings-section settings-security-section" aria-labelledby="securityCenterTitle">
+                <div class="settings-section-heading">
+                    <div>
+                        <p class="settings-section-title" id="securityCenterTitle">Security Center</p>
+                        <p class="settings-section-description">Review your account protection and recovery options.</p>
+                    </div>
+                </div>
+                <div id="securityCenterSummary" class="security-center-summary" role="status" aria-live="polite"></div>
+                <div class="security-center-actions">
+                    <button id="securityRefreshBtn" class="secondary-action" type="button"><i class="fa-solid fa-rotate"></i> Refresh status</button>
+                    <button id="securityVerifyBtn" class="secondary-action" type="button" hidden>Send verification email</button>
+                    <button id="securityResetBtn" class="secondary-action" type="button" hidden>Send password reset link</button>
+                </div>
+                <p id="securityCenterFeedback" class="settings-section-description" role="status" aria-live="polite"></p>
+            </section>
             <section class="settings-section settings-appearance-section" aria-labelledby="appearanceTitle">
                 <div class="settings-section-heading">
                     <div>
@@ -420,6 +435,7 @@ Then write your notes below..."
                 <p class="eyebrow">SnapNotes account</p>
                 <h3 id="authTitle">Sign in to sync notes</h3>
             </div>
+            <input type="text" id="signupFullName" placeholder="Full name (required for registration)" autocomplete="name" maxlength="80" hidden>
             <input type="email" id="emailInput" placeholder="Email" autocomplete="email" required>
             <div class="password-field">
                 <input type="password" id="passwordInput" placeholder="Password" autocomplete="current-password" required>
@@ -440,6 +456,19 @@ Then write your notes below..."
                 Resend verification email
             </button>
             <button id="closeModalBtn" type="button" class="cancel-button">Cancel</button>
+        </div>
+    </div>
+
+    <div id="profileEditModal" class="auth-modal" aria-hidden="true">
+        <div class="auth-sheet" role="dialog" aria-modal="true" aria-labelledby="profileEditTitle">
+            <div class="modal-heading"><h3 id="profileEditTitle">Edit account details</h3><p class="settings-description">Update your display name and profile picture.</p></div>
+            <label for="profileNameInput">Full name</label>
+            <input id="profileNameInput" type="text" autocomplete="name" maxlength="80" placeholder="Your full name">
+            <label for="profilePhotoInput">Profile photo (JPEG, PNG or WebP, up to 2 MB)</label>
+            <input id="profilePhotoInput" type="file" accept="image/jpeg,image/png,image/webp">
+            <p id="profileEditFeedback" role="status" aria-live="polite"></p>
+            <button id="profileSaveBtn" type="button">Save changes</button>
+            <button id="profileCancelBtn" class="cancel-button" type="button">Cancel</button>
         </div>
     </div>
 

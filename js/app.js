@@ -1002,11 +1002,25 @@ function openSettings() {
                         : `<span>${initials}</span>`}
                 </div>
                 <div class="settings-account-details">
-                    <strong>${user.displayName || "SnapNotes user"}</strong>
+                    <strong>${user.displayName || (user.email ? user.email.split("@")[0] : "SnapNotes user")}</strong>
                     <span>${user.email || provider}</span>
                     <small>${provider}</small>
                 </div>
             `;
+            const editable = user.providerData?.some(item => item.providerId === "password");
+            settingsAccount.onclick = editable ? () => window.openSnapNotesProfileEditor?.() : null;
+            settingsAccount.onkeydown = editable ? event => {
+                if (event.key === "Enter" || event.key === " ") { event.preventDefault(); settingsAccount.click(); }
+            } : null;
+            if (editable) {
+                settingsAccount.setAttribute("role", "button");
+                settingsAccount.tabIndex = 0;
+                settingsAccount.title = "Edit name and profile photo";
+            } else {
+                settingsAccount.removeAttribute("role");
+                settingsAccount.removeAttribute("tabindex");
+                settingsAccount.removeAttribute("title");
+            }
         } else {
             settingsAccount.innerHTML = `
                 <div class="settings-account-avatar"><span><i class="fa-solid fa-user"></i></span></div>
@@ -1035,6 +1049,8 @@ function openSettings() {
     }
 
     refreshAccountDeletionStatus(user);
+    document.getElementById("securityCenterFeedback").textContent = "";
+    window.refreshSecurityCenter?.();
 
     settingsModal.classList.add("show");
     settingsModal.setAttribute("aria-hidden", "false");
@@ -1150,3 +1166,7 @@ window.openNotesView = openNotesView;
 window.applyNoteFilters = applyNoteFilters;
 window.updateNavigationCounts = updateNavigationCounts;
 window.closeNoteMenus = closeNoteMenus;
+
+window.addEventListener("snapnotes:profile-updated", () => {
+    if (document.getElementById("settingsModal")?.classList.contains("show")) openSettings();
+});

@@ -794,3 +794,19 @@ body.dark-mode .smart-share-preview {
 
 #askMyNotesLibraryBtn { width: auto; min-height: 44px; margin: 0; }
 .saved-note-ai-button { display: inline-grid; place-items: center; width: 44px; height: 44px; margin-right: auto; border: 1px solid var(--border-color); border-radius: 50%; background: var(--surface-soft); color: var(--primary-color); cursor: pointer; }
+
+/* Security Center follows the existing Settings visual hierarchy. */
+.security-center-summary { display: flex; flex-direction: column; gap: 5px; padding: 10px 0; color: var(--text-color); overflow-wrap: anywhere; }
+.security-center-summary strong { font-size: 14px; }
+.security-center-summary span, .security-center-summary small { font-size: 13px; }
+.security-center-summary small { color: var(--text-secondary, var(--text-color)); opacity: .8; }
+.security-center-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.security-center-actions button { min-height: 40px; }
+#securityCenterFeedback:empty { display: none; }
+
+#settingsAccount[role="button"] { cursor: pointer; border-radius: 10px; }
+#settingsAccount[role="button"]:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 3px; }
+#profileEditModal .auth-sheet { max-width: 420px; }
+#profileEditModal label { display: block; margin: 10px 0 5px; font-size: 13px; }
+#profileEditModal input { width: 100%; }
+#profileEditFeedback { font-size: 13px; }

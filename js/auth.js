@@ -10,10 +10,14 @@ import {
     sendEmailVerification,
     sendPasswordResetEmail,
     signOut,
+    updateProfile,
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
+import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js";
+import { app } from "./firebaseConfig.js";
 import { getAccountDeletionStatus, loadFromCloud } from "./firestore.js";
 
+const signupFullName = document.getElementById("signupFullName");
 const emailInput = document.getElementById("emailInput");
 const passwordInput = document.getElementById("passwordInput");
 const togglePasswordBtn = document.getElementById("togglePasswordBtn");
@@ -30,6 +34,124 @@ const userAvatarInitials = document.getElementById("userAvatarInitials");
 const authModal = document.getElementById("authModal");
 const closeModalBtn = document.getElementById("closeModalBtn");
 let accountDeletionTimer = null;
+
+
+const profileModal = document.getElementById("profileEditModal");
+const profileNameInput = document.getElementById("profileNameInput");
+const profilePhotoInput = document.getElementById("profilePhotoInput");
+const profileFeedback = document.getElementById("profileEditFeedback");
+const profileSaveBtn = document.getElementById("profileSaveBtn");
+let profileBusy = false;
+
+function refreshProfileUI(user) {
+    if (!user) return;
+    const initials = user.displayName
+        ? user.displayName.trim().split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase()
+        : (user.email || "U").slice(0, 2).toUpperCase();
+    if (userAvatarInitials) {
+        userAvatarInitials.textContent = initials;
+        userAvatarInitials.hidden = Boolean(user.photoURL);
+    }
+    if (userAvatarImage) {
+        userAvatarImage.hidden = !user.photoURL;
+        userAvatarImage.src = user.photoURL || "";
+        userAvatarImage.alt = (user.displayName || "Account") + " profile picture";
+    }
+    if (userAvatar) userAvatar.title = "Signed in as " + (user.displayName || user.email);
+    window.dispatchEvent(new CustomEvent("snapnotes:profile-updated"));
+}
+window.openSnapNotesProfileEditor = () => {
+    const user = auth.currentUser;
+    if (!user || !profileModal) return;
+    profileNameInput.value = user.displayName || "";
+    profilePhotoInput.value = "";
+    profileFeedback.textContent = "";
+    profileModal.classList.add("show");
+    profileModal.setAttribute("aria-hidden", "false");
+    profileNameInput.focus();
+};
+function closeProfileEditor() {
+    if (profileBusy) return;
+    profileModal.classList.remove("show");
+    profileModal.setAttribute("aria-hidden", "true");
+}
+document.getElementById("profileCancelBtn")?.addEventListener("click", closeProfileEditor);
+profileModal?.addEventListener("click", event => { if (event.target === profileModal) closeProfileEditor(); });
+profileSaveBtn?.addEventListener("click", async () => {
+    if (profileBusy) return;
+    const user = auth.currentUser;
+    if (!user) return;
+    if (!user.providerData?.some(provider => provider.providerId === "password")) {
+        profileFeedback.textContent = "Profile editing here is available for email accounts.";
+        return;
+    }
+    const name = profileNameInput.value.trim().replace(/\s+/g, " ");
+    const photo = profilePhotoInput.files?.[0];
+    if (!name) { profileFeedback.textContent = "Enter your full name."; return; }
+    if (photo && (!["image/jpeg", "image/png", "image/webp"].includes(photo.type) || photo.size > 2 * 1024 * 1024)) {
+        profileFeedback.textContent = "Choose a JPEG, PNG or WebP photo smaller than 2 MB.";
+        return;
+    }
+    profileBusy = true;
+    profileSaveBtn.disabled = true;
+    profileFeedback.textContent = photo ? "Uploading profile photo…" : "Saving profile…";
+    try {
+        let photoURL = user.photoURL;
+        if (photo) {
+            const storage = getStorage(app);
+            const fileRef = storageRef(storage, "profile-photos/" + user.uid + "/avatar");
+            await new Promise((resolve, reject) => {
+                const task = uploadBytesResumable(fileRef, photo, { contentType: photo.type, cacheControl: "public,max-age=3600" });
+                let finished = false;
+                const timeout = setTimeout(() => {
+                    if (finished) return;
+                    finished = true;
+                    task.cancel();
+                    reject(Object.assign(new Error("Upload timed out"), { code: "storage/upload-timeout" }));
+                }, 45000);
+                task.on("state_changed", snapshot => {
+                    if (finished) return;
+                    const percent = Math.round(snapshot.bytesTransferred / snapshot.totalBytes * 100);
+                    profileFeedback.textContent = "Uploading profile photo… " + percent + "%";
+                }, error => {
+                    if (finished) return;
+                    finished = true;
+                    clearTimeout(timeout);
+                    reject(error);
+                }, () => {
+                    if (finished) return;
+                    finished = true;
+                    clearTimeout(timeout);
+                    resolve();
+                });
+            });
+            profileFeedback.textContent = "Photo uploaded. Updating account…";
+            photoURL = await getDownloadURL(fileRef);
+        }
+        await updateProfile(user, { displayName: name, photoURL });
+        refreshProfileUI(user);
+        profileFeedback.textContent = "Profile updated.";
+        window.showToast?.("Account details updated.", "success");
+        profileBusy = false;
+        closeProfileEditor();
+    } catch (error) {
+        const code = String(error?.code || "");
+        const message = code === "storage/unauthorized" || code === "storage/unauthenticated"
+            ? "Photo upload denied by Firebase Storage permissions. Ask the app administrator to enable owner-only profile photo uploads."
+            : code === "storage/bucket-not-found" || code === "storage/object-not-found"
+                ? "Profile photo storage is not configured correctly. Contact the app administrator."
+                : code === "storage/quota-exceeded"
+                    ? "Photo storage quota exceeded. Please try again later."
+                    : code === "storage/upload-timeout" || code === "storage/retry-limit-exceeded" || code === "storage/canceled" || !navigator.onLine
+                        ? "Photo upload interrupted. Check your internet connection and retry."
+                        : "Photo upload failed (" + (code || "unknown error") + "). Please try again.";
+        profileFeedback.textContent = message;
+        console.error("Profile update failed:", error);
+    } finally {
+        profileBusy = false;
+        profileSaveBtn.disabled = false;
+    }
+});
 
 function accountCacheKey(uid) {
     return `SnapNotesAccount:${uid}`;
@@ -103,16 +225,20 @@ resetPasswordBtn?.addEventListener("click", async () => {
 });
 
 signupBtn.addEventListener("click", async () => {
+    if (signupFullName.hidden) { signupFullName.hidden = false; signupBtn.textContent = "Register with email"; signupFullName.focus(); return; }
     const email = emailInput.value.trim();
     const password = passwordInput.value;
+    const fullName = signupFullName.value.trim().replace(/\\s+/g, " ");
 
-    if (!email || !password) {
+    if (!fullName || !email || !password) {
         window.showToast("Please fill out all fields.", "warning");
         return;
     }
 
     try {
         const credential = await createUserWithEmailAndPassword(auth, email, password);
+        await updateProfile(credential.user, { displayName: fullName });
+        refreshProfileUI(credential.user);
         await sendEmailVerification(credential.user);
         showVerificationState(credential.user);
         window.showToast("Verification email sent. Check your inbox.", "success");
@@ -122,6 +248,8 @@ signupBtn.addEventListener("click", async () => {
 });
 
 signinBtn.addEventListener("click", async () => {
+    signupFullName.hidden = true;
+    signupBtn.textContent = "Create Account";
     const email = emailInput.value.trim();
     const password = passwordInput.value;
 
@@ -199,9 +327,7 @@ userAvatar.addEventListener("click", () => {
     if (!user) return;
 
     const isGoogleUser = user.providerData?.some(provider => provider.providerId === "google.com");
-    const accountName = isGoogleUser
-        ? (user.displayName || "this account")
-        : (user.email ? user.email.split("@")[0] : "this account");
+    const accountName = user.displayName || (user.email ? user.email.split("@")[0] : "this account");
 
     if (!confirm(`Log out ${accountName}?`)) return;
 
@@ -250,6 +376,9 @@ function closeModal() {
     authModal.classList.remove("show");
     authModal.setAttribute("aria-hidden", "true");
     emailInput.value = "";
+    signupFullName.value = "";
+    signupFullName.hidden = true;
+    signupBtn.textContent = "Create Account";
     passwordInput.value = "";
     passwordInput.type = "password";
     togglePasswordBtn?.setAttribute("aria-pressed", "false");
@@ -411,3 +540,82 @@ function handleAuthError(error) {
 
     window.showToast(message, "warning");
 }
+
+/* Security Center uses the active Firebase session; no passwords are stored locally. */
+const securitySummary = document.getElementById("securityCenterSummary");
+const securityFeedback = document.getElementById("securityCenterFeedback");
+const securityVerify = document.getElementById("securityVerifyBtn");
+const securityReset = document.getElementById("securityResetBtn");
+const securityRefresh = document.getElementById("securityRefreshBtn");
+let securityBusy = false;
+
+function securityMessage(message) {
+    if (securityFeedback) securityFeedback.textContent = message;
+}
+
+async function refreshSecurityCenter(forceReload = false) {
+    if (!securitySummary) return;
+    const user = auth.currentUser;
+    if (!user) {
+        securitySummary.textContent = "Local mode: no cloud account is signed in. Notes on this device are not protected by a SnapNotes account password.";
+        securityVerify.hidden = true;
+        securityReset.hidden = true;
+        return;
+    }
+    if (forceReload) {
+        try { await user.reload(); }
+        catch (error) { securityMessage("Could not refresh account status. Check your connection."); }
+    }
+    const google = user.providerData?.some(provider => provider.providerId === "google.com");
+    const password = user.providerData?.some(provider => provider.providerId === "password");
+    securitySummary.replaceChildren();
+    const heading = document.createElement("strong");
+    heading.textContent = google ? "Google sign-in" : password ? "Email and password" : "Connected account";
+    const email = document.createElement("span");
+    email.textContent = user.email || "No email address available";
+    const verification = document.createElement("span");
+    verification.textContent = user.emailVerified ? "Email verified" : "Email not verified";
+    const explanation = document.createElement("small");
+    explanation.textContent = google && !password
+        ? "Your Google account manages your password and sign-in security. Review it in Google Account settings."
+        : "Keep your email accessible for account recovery. Password reset links are sent by Firebase Authentication.";
+    securitySummary.append(heading, email, verification, explanation);
+    securityVerify.hidden = Boolean(user.emailVerified || !user.email);
+    securityReset.hidden = !password || !user.email;
+}
+window.refreshSecurityCenter = refreshSecurityCenter;
+
+securityRefresh?.addEventListener("click", async () => {
+    if (securityBusy) return;
+    securityBusy = true;
+    securityRefresh.disabled = true;
+    securityMessage("Checking account status…");
+    try { await refreshSecurityCenter(true); if (auth.currentUser) securityMessage("Security status updated."); }
+    finally { securityBusy = false; securityRefresh.disabled = false; }
+});
+securityVerify?.addEventListener("click", async () => {
+    const user = auth.currentUser;
+    if (!user || user.emailVerified || securityBusy) return;
+    securityBusy = true;
+    securityVerify.disabled = true;
+    securityMessage("Sending verification email…");
+    try {
+        await sendEmailVerification(user);
+        securityMessage("Verification email sent. Check your inbox and spam folder.");
+    } catch (error) {
+        securityMessage(error.code === "auth/too-many-requests" ? "Too many attempts. Try again later." : "Could not send verification email. Try again later.");
+    } finally { securityBusy = false; securityVerify.disabled = false; }
+});
+securityReset?.addEventListener("click", async () => {
+    const user = auth.currentUser;
+    if (!user?.email || securityBusy || !user.providerData?.some(p => p.providerId === "password")) return;
+    securityBusy = true;
+    securityReset.disabled = true;
+    securityMessage("Sending password reset link…");
+    try {
+        await sendPasswordResetEmail(auth, user.email);
+        securityMessage("Password reset link sent. Check your inbox.");
+    } catch (error) {
+        securityMessage(error.code === "auth/too-many-requests" ? "Too many attempts. Try again later." : "Could not send the password reset link.");
+    } finally { securityBusy = false; securityReset.disabled = false; }
+});
