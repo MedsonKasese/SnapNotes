@@ -803,3 +803,10 @@ body.dark-mode .smart-share-preview {
 .security-center-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .security-center-actions button { min-height: 40px; }
 #securityCenterFeedback:empty { display: none; }
+
+#settingsAccount[role="button"] { cursor: pointer; border-radius: 10px; }
+#settingsAccount[role="button"]:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 3px; }
+#profileEditModal .auth-sheet { max-width: 420px; }
+#profileEditModal label { display: block; margin: 10px 0 5px; font-size: 13px; }
+#profileEditModal input { width: 100%; }
+#profileEditFeedback { font-size: 13px; }
