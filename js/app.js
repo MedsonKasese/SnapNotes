@@ -1035,6 +1035,8 @@ function openSettings() {
     }
 
     refreshAccountDeletionStatus(user);
+    document.getElementById("securityCenterFeedback").textContent = "";
+    window.refreshSecurityCenter?.();
 
     settingsModal.classList.add("show");
     settingsModal.setAttribute("aria-hidden", "false");
