@@ -791,3 +791,6 @@ body.dark-mode .smart-share-preview {
     color: var(--primary-color);
 }
 .ai-editor-button { margin-bottom: 0; }
+
+#askMyNotesLibraryBtn { width: auto; min-height: 44px; margin: 0; }
+.saved-note-ai-button { display: inline-grid; place-items: center; width: 44px; height: 44px; margin-right: auto; border: 1px solid var(--border-color); border-radius: 50%; background: var(--surface-soft); color: var(--primary-color); cursor: pointer; }

@@ -20,19 +20,27 @@
   let lastImprovement = "";
   let lastAction = "";
   let busy = false;
+  let savedEditContext = null;
+  const libraryButton = document.getElementById("askMyNotesLibraryBtn");
+  window.openAskMyNotesForSavedEdit = context => {
+    savedEditContext = context;
+    openDialog("improve", true);
+  };
 
   function setStatus(message, error = false) {
     status.textContent = message;
     status.classList.toggle("is-error", error);
   }
 
-  function openDialog(action = "improve") {
+  function openDialog(action = "improve", savedEdit = false) {
+    if (!savedEdit) savedEditContext = null;
     if (!window.firebaseAuth?.currentUser) {
       window.showToast?.("Sign in to use Ask My Notes.", "warning");
       document.getElementById("loginBtn")?.click();
       return;
     }
     lastAction = action;
+    improveButton.hidden = action === "search";
     promptInput.value = action === "improve"
       ? "Improve the wording and organise this note while preserving my meaning."
       : "";
@@ -97,8 +105,12 @@
       promptInput.focus();
       return;
     }
-    const noteParts = readEditorTitleAndBody();
-    const text = noteParts.body || editor.innerText.trim().slice(0, 1500);
+    if (action === "improve" && savedEditContext) {
+      const note = window.notes?.find(item => item.id === savedEditContext.noteId);
+      if (!note || note.isPrivate || note.deletedAt) { setStatus("This note cannot be sent to AI.", true); return; }
+    }
+    const noteParts = action === "improve" && savedEditContext ? savedEditContext.read() : readEditorTitleAndBody();
+    const text = action === "improve" && savedEditContext ? noteParts.text.slice(0, 1500) : (noteParts.body || editor.innerText.trim().slice(0, 1500));
     if (action === "improve" && !text) {
       setStatus("Write something in the editor before asking AI to improve it.", true);
       return;
@@ -157,8 +169,10 @@
   }
 
   editorButton.addEventListener("click", () => openDialog("improve"));
+  libraryButton?.addEventListener("click", () => openDialog("search"));
   document.getElementById("askMyNotesClose")?.addEventListener("click", closeDialog);
   dialog.addEventListener("click", event => { if (event.target === dialog) closeDialog(); });
+  document.addEventListener("keydown", event => { if (event.key === "Escape" && !dialog.hidden && infoTooltip?.hidden) closeDialog(); });
   function setInfoTooltip(open) {
     if (!infoButton || !infoTooltip) return;
     infoTooltip.hidden = !open;
@@ -184,10 +198,19 @@
     if (!lastImprovement) return;
     // Re-normalise before applying so an edited preview can never turn a
     // Markdown H1 into an untitled SnapNotes note.
-    editor.textContent = window.normalizeAskMyNotesResult(lastImprovement, readEditorTitleAndBody().title);
-    editor.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText" }));
-    editor.focus();
-    setStatus("Improvement applied to the editor. Save the note to keep it.");
+    if (savedEditContext) {
+      const original = savedEditContext.read();
+      const normalized = window.normalizeAskMyNotesResult(lastImprovement, original.title);
+      const lines = normalized.replace(/\r/g, "").split("\n");
+      const match = lines[0]?.match(/^##\s*(.*)$/);
+      savedEditContext.apply({ title: match ? match[1].trim() : original.title, text: match ? lines.slice(1).join("\n").trim() : normalized.trim() });
+    } else {
+      editor.textContent = window.normalizeAskMyNotesResult(lastImprovement, readEditorTitleAndBody().title);
+      editor.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText" }));
+      editor.focus();
+    }
+    closeDialog();
+    window.showToast?.("Improvement applied. Save to keep the change in Edit history.", "success");
     resultPanel.hidden = true;
   });
   copyButton.addEventListener("click", async () => {
