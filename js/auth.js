@@ -10,10 +10,14 @@ import {
     sendEmailVerification,
     sendPasswordResetEmail,
     signOut,
+    updateProfile,
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js";
+import { app } from "./firebaseConfig.js";
 import { getAccountDeletionStatus, loadFromCloud } from "./firestore.js";
 
+const signupFullName = document.getElementById("signupFullName");
 const emailInput = document.getElementById("emailInput");
 const passwordInput = document.getElementById("passwordInput");
 const togglePasswordBtn = document.getElementById("togglePasswordBtn");
@@ -105,14 +109,17 @@ resetPasswordBtn?.addEventListener("click", async () => {
 signupBtn.addEventListener("click", async () => {
     const email = emailInput.value.trim();
     const password = passwordInput.value;
+    const fullName = signupFullName.value.trim().replace(/\\s+/g, " ");
 
-    if (!email || !password) {
+    if (!fullName || !email || !password) {
         window.showToast("Please fill out all fields.", "warning");
         return;
     }
 
     try {
         const credential = await createUserWithEmailAndPassword(auth, email, password);
+        await updateProfile(credential.user, { displayName: fullName });
+        refreshProfileUI(credential.user);
         await sendEmailVerification(credential.user);
         showVerificationState(credential.user);
         window.showToast("Verification email sent. Check your inbox.", "success");
@@ -199,9 +206,7 @@ userAvatar.addEventListener("click", () => {
     if (!user) return;
 
     const isGoogleUser = user.providerData?.some(provider => provider.providerId === "google.com");
-    const accountName = isGoogleUser
-        ? (user.displayName || "this account")
-        : (user.email ? user.email.split("@")[0] : "this account");
+    const accountName = user.displayName || (user.email ? user.email.split("@")[0] : "this account");
 
     if (!confirm(`Log out ${accountName}?`)) return;
 
