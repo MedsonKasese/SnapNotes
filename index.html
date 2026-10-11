@@ -435,6 +435,7 @@ Then write your notes below..."
                 <p class="eyebrow">SnapNotes account</p>
                 <h3 id="authTitle">Sign in to sync notes</h3>
             </div>
+            <input type="text" id="signupFullName" placeholder="Full name (required for registration)" autocomplete="name" maxlength="80" hidden>
             <input type="email" id="emailInput" placeholder="Email" autocomplete="email" required>
             <div class="password-field">
                 <input type="password" id="passwordInput" placeholder="Password" autocomplete="current-password" required>
@@ -455,6 +456,19 @@ Then write your notes below..."
                 Resend verification email
             </button>
             <button id="closeModalBtn" type="button" class="cancel-button">Cancel</button>
+        </div>
+    </div>
+
+    <div id="profileEditModal" class="auth-modal" aria-hidden="true">
+        <div class="auth-sheet" role="dialog" aria-modal="true" aria-labelledby="profileEditTitle">
+            <div class="modal-heading"><h3 id="profileEditTitle">Edit account details</h3><p class="settings-description">Update your display name and profile picture.</p></div>
+            <label for="profileNameInput">Full name</label>
+            <input id="profileNameInput" type="text" autocomplete="name" maxlength="80" placeholder="Your full name">
+            <label for="profilePhotoInput">Profile photo (JPEG, PNG or WebP, up to 2 MB)</label>
+            <input id="profilePhotoInput" type="file" accept="image/jpeg,image/png,image/webp">
+            <p id="profileEditFeedback" role="status" aria-live="polite"></p>
+            <button id="profileSaveBtn" type="button">Save changes</button>
+            <button id="profileCancelBtn" class="cancel-button" type="button">Cancel</button>
         </div>
     </div>
 
