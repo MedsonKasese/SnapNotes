@@ -13,7 +13,7 @@ import {
     updateProfile,
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js";
+import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js";
 import { app } from "./firebaseConfig.js";
 import { getAccountDeletionStatus, loadFromCloud } from "./firestore.js";
 
@@ -100,7 +100,31 @@ profileSaveBtn?.addEventListener("click", async () => {
         if (photo) {
             const storage = getStorage(app);
             const fileRef = storageRef(storage, "profile-photos/" + user.uid + "/avatar");
-            await uploadBytes(fileRef, photo, { contentType: photo.type, cacheControl: "public,max-age=3600" });
+            await new Promise((resolve, reject) => {
+                const task = uploadBytesResumable(fileRef, photo, { contentType: photo.type, cacheControl: "public,max-age=3600" });
+                let finished = false;
+                const timeout = setTimeout(() => {
+                    if (finished) return;
+                    finished = true;
+                    task.cancel();
+                    reject(Object.assign(new Error("Upload timed out"), { code: "storage/upload-timeout" }));
+                }, 45000);
+                task.on("state_changed", snapshot => {
+                    if (finished) return;
+                    const percent = Math.round(snapshot.bytesTransferred / snapshot.totalBytes * 100);
+                    profileFeedback.textContent = "Uploading profile photo… " + percent + "%";
+                }, error => {
+                    if (finished) return;
+                    finished = true;
+                    clearTimeout(timeout);
+                    reject(error);
+                }, () => {
+                    if (finished) return;
+                    finished = true;
+                    clearTimeout(timeout);
+                    resolve();
+                });
+            });
             profileFeedback.textContent = "Photo uploaded. Updating account…";
             photoURL = await getDownloadURL(fileRef);
         }
@@ -118,7 +142,7 @@ profileSaveBtn?.addEventListener("click", async () => {
                 ? "Profile photo storage is not configured correctly. Contact the app administrator."
                 : code === "storage/quota-exceeded"
                     ? "Photo storage quota exceeded. Please try again later."
-                    : code === "storage/retry-limit-exceeded" || code === "storage/canceled" || !navigator.onLine
+                    : code === "storage/upload-timeout" || code === "storage/retry-limit-exceeded" || code === "storage/canceled" || !navigator.onLine
                         ? "Photo upload interrupted. Check your internet connection and retry."
                         : "Photo upload failed (" + (code || "unknown error") + "). Please try again.";
         profileFeedback.textContent = message;
