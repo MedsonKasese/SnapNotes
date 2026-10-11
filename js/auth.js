@@ -411,3 +411,82 @@ function handleAuthError(error) {
 
     window.showToast(message, "warning");
 }
+
+/* Security Center uses the active Firebase session; no passwords are stored locally. */
+const securitySummary = document.getElementById("securityCenterSummary");
+const securityFeedback = document.getElementById("securityCenterFeedback");
+const securityVerify = document.getElementById("securityVerifyBtn");
+const securityReset = document.getElementById("securityResetBtn");
+const securityRefresh = document.getElementById("securityRefreshBtn");
+let securityBusy = false;
+
+function securityMessage(message) {
+    if (securityFeedback) securityFeedback.textContent = message;
+}
+
+async function refreshSecurityCenter(forceReload = false) {
+    if (!securitySummary) return;
+    const user = auth.currentUser;
+    if (!user) {
+        securitySummary.textContent = "Local mode: no cloud account is signed in. Notes on this device are not protected by a SnapNotes account password.";
+        securityVerify.hidden = true;
+        securityReset.hidden = true;
+        return;
+    }
+    if (forceReload) {
+        try { await user.reload(); }
+        catch (error) { securityMessage("Could not refresh account status. Check your connection."); }
+    }
+    const google = user.providerData?.some(provider => provider.providerId === "google.com");
+    const password = user.providerData?.some(provider => provider.providerId === "password");
+    securitySummary.replaceChildren();
+    const heading = document.createElement("strong");
+    heading.textContent = google ? "Google sign-in" : password ? "Email and password" : "Connected account";
+    const email = document.createElement("span");
+    email.textContent = user.email || "No email address available";
+    const verification = document.createElement("span");
+    verification.textContent = user.emailVerified ? "Email verified" : "Email not verified";
+    const explanation = document.createElement("small");
+    explanation.textContent = google && !password
+        ? "Your Google account manages your password and sign-in security. Review it in Google Account settings."
+        : "Keep your email accessible for account recovery. Password reset links are sent by Firebase Authentication.";
+    securitySummary.append(heading, email, verification, explanation);
+    securityVerify.hidden = Boolean(user.emailVerified || !user.email);
+    securityReset.hidden = !password || !user.email;
+}
+window.refreshSecurityCenter = refreshSecurityCenter;
+
+securityRefresh?.addEventListener("click", async () => {
+    if (securityBusy) return;
+    securityBusy = true;
+    securityRefresh.disabled = true;
+    securityMessage("Checking account status…");
+    try { await refreshSecurityCenter(true); if (auth.currentUser) securityMessage("Security status updated."); }
+    finally { securityBusy = false; securityRefresh.disabled = false; }
+});
+securityVerify?.addEventListener("click", async () => {
+    const user = auth.currentUser;
+    if (!user || user.emailVerified || securityBusy) return;
+    securityBusy = true;
+    securityVerify.disabled = true;
+    securityMessage("Sending verification email…");
+    try {
+        await sendEmailVerification(user);
+        securityMessage("Verification email sent. Check your inbox and spam folder.");
+    } catch (error) {
+        securityMessage(error.code === "auth/too-many-requests" ? "Too many attempts. Try again later." : "Could not send verification email. Try again later.");
+    } finally { securityBusy = false; securityVerify.disabled = false; }
+});
+securityReset?.addEventListener("click", async () => {
+    const user = auth.currentUser;
+    if (!user?.email || securityBusy || !user.providerData?.some(p => p.providerId === "password")) return;
+    securityBusy = true;
+    securityReset.disabled = true;
+    securityMessage("Sending password reset link…");
+    try {
+        await sendPasswordResetEmail(auth, user.email);
+        securityMessage("Password reset link sent. Check your inbox.");
+    } catch (error) {
+        securityMessage(error.code === "auth/too-many-requests" ? "Too many attempts. Try again later." : "Could not send the password reset link.");
+    } finally { securityBusy = false; securityReset.disabled = false; }
+});
