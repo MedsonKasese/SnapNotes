@@ -35,6 +35,89 @@ const authModal = document.getElementById("authModal");
 const closeModalBtn = document.getElementById("closeModalBtn");
 let accountDeletionTimer = null;
 
+
+const profileModal = document.getElementById("profileEditModal");
+const profileNameInput = document.getElementById("profileNameInput");
+const profilePhotoInput = document.getElementById("profilePhotoInput");
+const profileFeedback = document.getElementById("profileEditFeedback");
+const profileSaveBtn = document.getElementById("profileSaveBtn");
+let profileBusy = false;
+
+function refreshProfileUI(user) {
+    if (!user) return;
+    const initials = user.displayName
+        ? user.displayName.trim().split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase()
+        : (user.email || "U").slice(0, 2).toUpperCase();
+    if (userAvatarInitials) {
+        userAvatarInitials.textContent = initials;
+        userAvatarInitials.hidden = Boolean(user.photoURL);
+    }
+    if (userAvatarImage) {
+        userAvatarImage.hidden = !user.photoURL;
+        userAvatarImage.src = user.photoURL || "";
+        userAvatarImage.alt = (user.displayName || "Account") + " profile picture";
+    }
+    if (userAvatar) userAvatar.title = "Signed in as " + (user.displayName || user.email);
+    window.dispatchEvent(new CustomEvent("snapnotes:profile-updated"));
+}
+window.openSnapNotesProfileEditor = () => {
+    const user = auth.currentUser;
+    if (!user || !profileModal) return;
+    profileNameInput.value = user.displayName || "";
+    profilePhotoInput.value = "";
+    profileFeedback.textContent = "";
+    profileModal.classList.add("show");
+    profileModal.setAttribute("aria-hidden", "false");
+    profileNameInput.focus();
+};
+function closeProfileEditor() {
+    if (profileBusy) return;
+    profileModal.classList.remove("show");
+    profileModal.setAttribute("aria-hidden", "true");
+}
+document.getElementById("profileCancelBtn")?.addEventListener("click", closeProfileEditor);
+profileModal?.addEventListener("click", event => { if (event.target === profileModal) closeProfileEditor(); });
+profileSaveBtn?.addEventListener("click", async () => {
+    if (profileBusy) return;
+    const user = auth.currentUser;
+    if (!user) return;
+    if (!user.providerData?.some(provider => provider.providerId === "password")) {
+        profileFeedback.textContent = "Profile editing here is available for email accounts.";
+        return;
+    }
+    const name = profileNameInput.value.trim().replace(/\s+/g, " ");
+    const photo = profilePhotoInput.files?.[0];
+    if (!name) { profileFeedback.textContent = "Enter your full name."; return; }
+    if (photo && (!["image/jpeg", "image/png", "image/webp"].includes(photo.type) || photo.size > 2 * 1024 * 1024)) {
+        profileFeedback.textContent = "Choose a JPEG, PNG or WebP photo smaller than 2 MB.";
+        return;
+    }
+    profileBusy = true;
+    profileSaveBtn.disabled = true;
+    profileFeedback.textContent = "Saving profile…";
+    try {
+        let photoURL = user.photoURL;
+        if (photo) {
+            const storage = getStorage(app);
+            const fileRef = storageRef(storage, "profile-photos/" + user.uid + "/avatar");
+            await uploadBytes(fileRef, photo, { contentType: photo.type });
+            photoURL = await getDownloadURL(fileRef);
+        }
+        await updateProfile(user, { displayName: name, photoURL });
+        refreshProfileUI(user);
+        profileFeedback.textContent = "Profile updated.";
+        window.showToast?.("Account details updated.", "success");
+        profileBusy = false;
+        closeProfileEditor();
+    } catch (error) {
+        profileFeedback.textContent = "Could not save profile. Check your connection and photo storage permissions.";
+        console.error("Profile update failed:", error);
+    } finally {
+        profileBusy = false;
+        profileSaveBtn.disabled = false;
+    }
+});
+
 function accountCacheKey(uid) {
     return `SnapNotesAccount:${uid}`;
 }
