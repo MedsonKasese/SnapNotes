@@ -94,13 +94,14 @@ profileSaveBtn?.addEventListener("click", async () => {
     }
     profileBusy = true;
     profileSaveBtn.disabled = true;
-    profileFeedback.textContent = "Saving profile…";
+    profileFeedback.textContent = photo ? "Uploading profile photo…" : "Saving profile…";
     try {
         let photoURL = user.photoURL;
         if (photo) {
             const storage = getStorage(app);
             const fileRef = storageRef(storage, "profile-photos/" + user.uid + "/avatar");
-            await uploadBytes(fileRef, photo, { contentType: photo.type });
+            await uploadBytes(fileRef, photo, { contentType: photo.type, cacheControl: "public,max-age=3600" });
+            profileFeedback.textContent = "Photo uploaded. Updating account…";
             photoURL = await getDownloadURL(fileRef);
         }
         await updateProfile(user, { displayName: name, photoURL });
@@ -110,7 +111,17 @@ profileSaveBtn?.addEventListener("click", async () => {
         profileBusy = false;
         closeProfileEditor();
     } catch (error) {
-        profileFeedback.textContent = "Could not save profile. Check your connection and photo storage permissions.";
+        const code = String(error?.code || "");
+        const message = code === "storage/unauthorized" || code === "storage/unauthenticated"
+            ? "Photo upload denied by Firebase Storage permissions. Ask the app administrator to enable owner-only profile photo uploads."
+            : code === "storage/bucket-not-found" || code === "storage/object-not-found"
+                ? "Profile photo storage is not configured correctly. Contact the app administrator."
+                : code === "storage/quota-exceeded"
+                    ? "Photo storage quota exceeded. Please try again later."
+                    : code === "storage/retry-limit-exceeded" || code === "storage/canceled" || !navigator.onLine
+                        ? "Photo upload interrupted. Check your internet connection and retry."
+                        : "Photo upload failed (" + (code || "unknown error") + "). Please try again.";
+        profileFeedback.textContent = message;
         console.error("Profile update failed:", error);
     } finally {
         profileBusy = false;
