@@ -760,3 +760,11 @@ body.dark-mode .smart-share-preview {
     color: var(--primary-color);
 }
 .ai-editor-button { margin-bottom: 0; }
+
+/* AI actions: library toolbar and compact editor shortcut */
+#askMyNotesLibraryBtn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+#askMyNotesBtn.ai-editor-button { width: 44px; min-width: 44px; height: 44px; padding: 0; border-radius: 50%; }
+#askMyNotesBtn.ai-editor-button span { display: none; }
+#askMyNotesBtn.ai-editor-button i { font-size: 19px; }
+.editor-footer-actions { align-items: center; }
+@media (max-width: 480px) { #askMyNotesLibraryBtn { font-size: .82rem; padding: 9px; } }
