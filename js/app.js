@@ -1166,3 +1166,7 @@ window.openNotesView = openNotesView;
 window.applyNoteFilters = applyNoteFilters;
 window.updateNavigationCounts = updateNavigationCounts;
 window.closeNoteMenus = closeNoteMenus;
+
+window.addEventListener("snapnotes:profile-updated", () => {
+    if (document.getElementById("settingsModal")?.classList.contains("show")) openSettings();
+});
