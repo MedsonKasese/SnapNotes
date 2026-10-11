@@ -435,6 +435,26 @@ function startEditing(card, note) {
     saveButton.type = "button";
     saveButton.textContent = "Save";
 
+    if (!note.isPrivate) {
+        const aiButton = document.createElement("button");
+        aiButton.type = "button";
+        aiButton.className = "saved-note-ai-button";
+        aiButton.setAttribute("aria-label", "Improve saved note with AI");
+        aiButton.title = "Improve saved note with AI";
+        aiButton.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i>';
+        aiButton.addEventListener("click", () => {
+            const current = { title: titleInput.value.trim(), text: bodyInput.innerText.trim() };
+            const original = { title: note.title || "", text: getNoteBodyText(note).trim() };
+            if (current.title === original.title && current.text === original.text &&
+                !confirm("This note has not been edited. Improve it anyway? Your original version will be preserved in Edit history when you save.")) return;
+            window.openAskMyNotesForSavedEdit?.({
+                noteId: note.id,
+                read: () => ({ title: titleInput.value.trim(), text: bodyInput.innerText.trim() }),
+                apply: ({ title, text }) => { titleInput.value = title; bodyInput.textContent = text; }
+            });
+        });
+        actions.append(aiButton);
+    }
     actions.append(cancelButton, saveButton);
 
     content.replaceChildren(titleInput, bodyInput, metadata, actions);
