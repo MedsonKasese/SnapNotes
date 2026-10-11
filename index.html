@@ -287,6 +287,21 @@ Then write your notes below..."
                 <div class="settings-account" id="settingsAccount"></div>
             </section>
 
+            <section class="settings-section settings-security-section" aria-labelledby="securityCenterTitle">
+                <div class="settings-section-heading">
+                    <div>
+                        <p class="settings-section-title" id="securityCenterTitle">Security Center</p>
+                        <p class="settings-section-description">Review your account protection and recovery options.</p>
+                    </div>
+                </div>
+                <div id="securityCenterSummary" class="security-center-summary" role="status" aria-live="polite"></div>
+                <div class="security-center-actions">
+                    <button id="securityRefreshBtn" class="secondary-action" type="button"><i class="fa-solid fa-rotate"></i> Refresh status</button>
+                    <button id="securityVerifyBtn" class="secondary-action" type="button" hidden>Send verification email</button>
+                    <button id="securityResetBtn" class="secondary-action" type="button" hidden>Send password reset link</button>
+                </div>
+                <p id="securityCenterFeedback" class="settings-section-description" role="status" aria-live="polite"></p>
+            </section>
             <section class="settings-section settings-appearance-section" aria-labelledby="appearanceTitle">
                 <div class="settings-section-heading">
                     <div>
