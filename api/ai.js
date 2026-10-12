@@ -1,3 +1,4 @@
+import { parseNoteSearchResponse } from "./ai-response.js";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
@@ -95,7 +96,7 @@ export default async function handler(req, res) {
       signal: AbortSignal.timeout(25000),
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: contents }] }],
-        generationConfig: { temperature: 0.25, maxOutputTokens: action === "improve" ? 1200 : 1800 }
+        generationConfig: { temperature: 0.25, maxOutputTokens: action === "improve" ? 1200 : 2400, ...(action === "search" ? { responseMimeType: "application/json" } : {}) }
       })
     });
 
@@ -119,18 +120,24 @@ export default async function handler(req, res) {
     if (!output) return send(res, 502, { error: "The AI returned an empty response. Please try again." });
 
     if (action === "improve") return send(res, 200, { result: output });
+    let parsed;
     try {
-      const parsed = JSON.parse(output.replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\s*\`\`\`$/, ""));
-      const allowed = new Map(eligibleNotes.map(item => [item.id, item]));
-      const sources = Array.isArray(parsed.sources) ? parsed.sources.slice(0, 5).filter(source => allowed.has(String(source.id))).map(source => ({
-        id: String(source.id),
-        title: allowed.get(String(source.id)).title,
-        excerpt: String(source.excerpt || "").slice(0, 280)
-      })) : [];
-      return send(res, 200, { answer: String(parsed.answer || "No answer found.").slice(0, 3000), sources });
-    } catch {
-      return send(res, 200, { answer: output.slice(0, 3000), sources: [] });
+      parsed = parseNoteSearchResponse(output);
+    } catch (error) {
+      // A truncated/malformed provider response must not leak raw JSON into the UI.
+      // Ask the user to retry rather than presenting a serialized object as prose.
+      console.warn("Gemini note-search response could not be parsed:", error.message);
+      return send(res, 502, { error: "The AI returned an incomplete or invalid answer. Please try asking again." });
     }
+    const allowed = new Map(eligibleNotes.map(item => [item.id, item]));
+    const sources = parsed.sources.slice(0, 5).filter(source =>
+      source && typeof source === "object" && allowed.has(String(source.id))
+    ).map(source => ({
+      id: String(source.id),
+      title: allowed.get(String(source.id)).title,
+      excerpt: String(source.excerpt || "").slice(0, 280)
+    }));
+    return send(res, 200, { answer: parsed.answer.slice(0, 3000), sources });
   } catch (error) {
     if (error?.name === "AbortError" || error?.name === "TimeoutError") {
       return send(res, 504, { error: "The AI request took too long. Check your connection and try again." });
