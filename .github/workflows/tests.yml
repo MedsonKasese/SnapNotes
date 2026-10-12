@@ -91,5 +91,8 @@ jobs:
           grep -q 'PBKDF2-SHA-256' js/private-notes.js
           grep -q 'CACHE_NAME = "snapnotes-v' sw.js
 
+      - name: Test Gemini response parsing
+        run: node --test tests/ai-response.test.mjs
+
       - name: Validate test harness
         run: test -f tests/test.html
