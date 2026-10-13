@@ -534,6 +534,8 @@ function handleAuthError(error) {
         message = "Google sign-in is not enabled in the Firebase project.";
     } else if (error.code === "auth/account-exists-with-different-credential") {
         message = "An account already exists with this email using another sign-in method.";
+    }else if(error.code === "auth/internal-error"){
+       message = "An internal error occured. please try again later."
     } else if (error.code) {
         message = `Google sign-in failed (${error.code}). Check Firebase Authentication settings.`;
     }

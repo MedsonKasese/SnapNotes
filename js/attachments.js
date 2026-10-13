@@ -157,7 +157,7 @@ function addPendingAttachments(files) {
     const incoming = Array.from(files || []);
     const available = Math.max(0, MAX_ATTACHMENTS_PER_NOTE - pendingAttachmentFiles.length);
     if (!available) {
-        window.showToast?.("A note can have up to 5 attachments.", "warning");
+        window.showToast?.("A note can have up to 5 attachments. Upgrade to PRO to add more attachments.", "warning");
         return;
     }
 

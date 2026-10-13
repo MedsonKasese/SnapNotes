@@ -385,6 +385,8 @@ Then write your notes below..."
                         <p class="settings-section-description">Follow Medson and stay connected.</p>
                     </div>
                 </div>
+              <!--SOCIAL LINKS-->
+              
                 <div class="settings-social-links" aria-label="Social links">
                     <a href="https://x.com/KaseseMedson" title="X/Twitter" target="_blank" rel="noopener noreferrer" aria-label="Follow Medson on X (Twitter)">
                         <i class="fab fa-x-twitter"></i>
@@ -428,7 +430,7 @@ Then write your notes below..."
     <div id="noteDetailModal" class="note-detail-modal" aria-hidden="true"></div>
 
     <div id="toast" role="status" aria-live="polite"></div>
-
+           <!--AUTHENTICATION MODAL-->
     <div id="authModal" class="auth-modal" aria-hidden="true">
         <div class="auth-sheet" role="dialog" aria-modal="true" aria-labelledby="authTitle">
             <div class="modal-heading">
@@ -444,13 +446,14 @@ Then write your notes below..."
                 </button>
             </div>
             <button id="resetPasswordBtn" class="password-reset-button" type="button">Forgot password?</button>
+            <button id="signinBtn" type="button">Sign In</button>
+            <button id="signupBtn" type="button" class="secondary-auth">Create Account</button>
+            <div class="auth-divider"><span>or</span></div>
             <button id="googleSignInBtn" type="button" class="google-auth">
                 <i class="fa-brands fa-google"></i>
                 Continue with Google
             </button>
-            <div class="auth-divider"><span>or</span></div>
-            <button id="signinBtn" type="button">Sign In</button>
-            <button id="signupBtn" type="button" class="secondary-auth">Create Account</button>
+            
             <div id="verificationStatus" class="verification-status" hidden></div>
             <button id="resendVerificationBtn" type="button" class="verification-button" hidden>
                 Resend verification email
