@@ -13,8 +13,6 @@ import {
     updateProfile,
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
-import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js";
-import { app } from "./firebaseConfig.js";
 import { getAccountDeletionStatus, loadFromCloud } from "./firestore.js";
 
 const signupFullName = document.getElementById("signupFullName");
@@ -97,54 +95,70 @@ profileSaveBtn?.addEventListener("click", async () => {
     profileFeedback.textContent = photo ? "Uploading profile photo…" : "Saving profile…";
     try {
         let photoURL = user.photoURL;
+        let newAvatarKey = null;
+        const previousPhotoURL = user.photoURL;
         if (photo) {
-            const storage = getStorage(app);
-            const fileRef = storageRef(storage, "profile-photos/" + user.uid + "/avatar");
-            await new Promise((resolve, reject) => {
-                const task = uploadBytesResumable(fileRef, photo, { contentType: photo.type, cacheControl: "public,max-age=3600" });
-                let finished = false;
-                const timeout = setTimeout(() => {
-                    if (finished) return;
-                    finished = true;
-                    task.cancel();
-                    reject(Object.assign(new Error("Upload timed out"), { code: "storage/upload-timeout" }));
-                }, 45000);
-                task.on("state_changed", snapshot => {
-                    if (finished) return;
-                    const percent = Math.round(snapshot.bytesTransferred / snapshot.totalBytes * 100);
-                    profileFeedback.textContent = "Uploading profile photo… " + percent + "%";
-                }, error => {
-                    if (finished) return;
-                    finished = true;
-                    clearTimeout(timeout);
-                    reject(error);
-                }, () => {
-                    if (finished) return;
-                    finished = true;
-                    clearTimeout(timeout);
-                    resolve();
-                });
+            profileFeedback.textContent = "Preparing secure profile photo upload…";
+            const token = await user.getIdToken();
+            const signResponse = await fetch("/api/storage/sign-upload", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+                body: JSON.stringify({ purpose: "avatar", contentType: photo.type, size: photo.size })
             });
-            profileFeedback.textContent = "Photo uploaded. Updating account…";
-            photoURL = await getDownloadURL(fileRef);
+            const signed = await signResponse.json().catch(() => ({}));
+            if (!signResponse.ok) throw new Error(signed.error || "Could not prepare the profile photo upload.");
+            profileFeedback.textContent = "Uploading profile photo…";
+            const uploadResponse = await fetch(signed.uploadUrl, {
+                method: "PUT",
+                headers: signed.headers,
+                body: photo
+            });
+            if (!uploadResponse.ok) throw new Error("Profile photo upload failed (HTTP " + uploadResponse.status + ").");
+            const completeResponse = await fetch("/api/storage/complete-upload", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+                body: JSON.stringify({
+                    purpose: "avatar",
+                    objectKey: signed.objectKey,
+                    expectedSize: photo.size,
+                    contentType: photo.type
+                })
+            });
+            const completed = await completeResponse.json().catch(() => ({}));
+            if (!completeResponse.ok) throw new Error(completed.error || "The uploaded profile photo could not be verified.");
+            newAvatarKey = completed.objectKey;
+            const avatarUrl = new URL("/api/storage/avatar", window.location.origin);
+            avatarUrl.searchParams.set("uid", user.uid);
+            avatarUrl.searchParams.set("key", newAvatarKey);
+            photoURL = avatarUrl.toString();
         }
         await updateProfile(user, { displayName: name, photoURL });
         refreshProfileUI(user);
+        // Delete an older R2 avatar only after Firebase Auth points at the new one.
+        if (newAvatarKey && previousPhotoURL) {
+            try {
+                const previous = new URL(previousPhotoURL);
+                const previousKey = previous.pathname === "/api/storage/avatar" ? previous.searchParams.get("key") : null;
+                if (previousKey && previousKey !== newAvatarKey) {
+                    const latestToken = await user.getIdToken();
+                    await fetch("/api/storage/delete-object", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + latestToken },
+                        body: JSON.stringify({ purpose: "avatar", objectKey: previousKey })
+                    });
+                }
+            } catch (cleanupError) {
+                console.warn("Could not clean up previous profile photo:", cleanupError);
+            }
+        }
         profileFeedback.textContent = "Profile updated.";
         window.showToast?.("Account details updated.", "success");
         profileBusy = false;
         closeProfileEditor();
     } catch (error) {
-        const code = String(error?.code || "");
-        const message = code === "storage/unauthorized" || code === "storage/unauthenticated"
-            ? "Photo upload denied by Firebase Storage permissions. Ask the app administrator to enable owner-only profile photo uploads."
-            : code === "storage/bucket-not-found" || code === "storage/object-not-found"
-                ? "Profile photo storage is not configured correctly. Contact the app administrator."
-                : code === "storage/quota-exceeded"
-                    ? "Photo storage quota exceeded. Please try again later."
-                    : code === "storage/upload-timeout" || code === "storage/retry-limit-exceeded" || code === "storage/canceled" || !navigator.onLine
-                        ? "Photo upload interrupted. Check your internet connection and retry."
-                        : "Photo upload failed (" + (code || "unknown error") + "). Please try again.";
+        const message = !navigator.onLine
+            ? "Photo upload interrupted. Check your internet connection and retry."
+            : error?.message || "Profile photo upload failed. Please try again.";
         profileFeedback.textContent = message;
         console.error("Profile update failed:", error);
     } finally {
