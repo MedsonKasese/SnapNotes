@@ -28,7 +28,7 @@ self.addEventListener("notificationclick", event => {
   );
 });
 
-const CACHE_NAME = "snapnotes-v63";
+const CACHE_NAME = "snapnotes-v64";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -52,7 +52,7 @@ const APP_SHELL = [
   "./js/auth.js",
   "./assets/icons/snapnotes-icon.png",
   "./assets/icons/snapnotes-notification.png",
-  "./assets/icons/snapnotes-notification-badge.svg"
+  "./assets/icons/snapnotes-notification-badge.png"
 ];
 
 self.addEventListener("install", event => {
