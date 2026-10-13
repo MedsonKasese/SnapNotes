@@ -892,7 +892,7 @@ async function showReminderNotification(note) {
             await registration.showNotification(note.title || "SnapNotes reminder", {
                 body: note.text || "You set a reminder for this note.",
                 icon: "./assets/icons/snapnotes-notification.png",
-                badge: "./assets/icons/snapnotes-notification-badge.svg",
+                badge: "./assets/icons/snapnotes-notification-badge.png",
                 tag: `snapnotes-reminder-${note.id}`,
                 data: { noteId: note.id }
             });
