@@ -410,19 +410,12 @@ async function removeNoteAttachment(noteId, attachmentId) {
     const attachment = note?.attachments?.find(item => item.id === attachmentId);
     await deleteAttachmentFile(attachmentId).catch(() => {});
 
-    if (attachment?.storagePath && window.firebaseAuth?.currentUser) {
+    if (attachment?.storagePath && attachment.storageProvider === "r2" && window.firebaseAuth?.currentUser) {
         try {
-            if (attachment.storageProvider === "r2") {
-                await requestStorageApi("delete-object", {
-                    objectKey: attachment.storagePath,
-                    purpose: "attachment"
-                });
-            } else {
-                // Best-effort cleanup for legacy Firebase Storage references.
-                const { getStorage, ref, deleteObject } =
-                    await import("https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js");
-                await deleteObject(ref(getStorage(), attachment.storagePath));
-            }
+            await requestStorageApi("delete-object", {
+                objectKey: attachment.storagePath,
+                purpose: "attachment"
+            });
         } catch (error) {
             console.warn("Could not remove cloud attachment:", error);
             window.showToast?.("The attachment was removed from this note, but cloud cleanup may need a retry.", "warning");
