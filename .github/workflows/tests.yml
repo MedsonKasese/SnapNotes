@@ -17,6 +17,12 @@ jobs:
           node --check js/notes.js
           node --check js/storage.js
           node --check js/auth.js
+          node --check lib/r2-storage.js
+          node --check api/storage/sign-upload.js
+          node --check api/storage/complete-upload.js
+          node --check api/storage/sign-download.js
+          node --check api/storage/delete-object.js
+          node --check api/storage/avatar.js
           node --check js/firestore.js
           node --check js/private-notes.js
           node --check js/attachments.js
@@ -73,7 +79,19 @@ jobs:
           grep -q 'setInfoTooltip' js/ai.js
           grep -q 'ai-info-tooltip' styles/main.css
           ! grep -q 'window.confirm' js/ai.js
-          grep -q 'firebase-storage.js' js/attachments.js
+          grep -q 'sign-upload' js/attachments.js
+          grep -q 'sign-download' js/attachments.js
+          grep -q 'storageProvider = "r2"' js/attachments.js
+          ! grep -q 'firebase-storage.js' js/attachments.js
+          ! grep -q 'firebase-storage.js' js/auth.js
+          grep -q 'R2_ACCESS_KEY_ID' lib/r2-storage.js
+          grep -q 'verifyIdToken' lib/r2-storage.js
+          test -f api/storage/sign-upload.js
+          test -f api/storage/complete-upload.js
+          test -f api/storage/sign-download.js
+          test -f api/storage/delete-object.js
+          test -f api/storage/avatar.js
+          test -f docs/R2_SETUP.md
           grep -q 'js/attachments.js' index.html
           grep -q 'prepareNoteAttachments' js/attachments.js
           grep -q 'loadFolders' js/folders.js

@@ -208,20 +208,56 @@ function renderPendingAttachments() {
     });
 }
 
-async function uploadAttachmentToCloud(noteId, attachment, file) {
+async function requestStorageApi(path, payload) {
     const user = window.firebaseAuth?.currentUser;
-    if (!user) throw new Error("Sign in to sync attachments.");
-    if (!navigator.onLine) throw new Error("Offline. Attachment will stay on this device until the connection returns.");
+    if (!user) throw new Error("Sign in to sync files.");
+    const token = await user.getIdToken();
+    const response = await fetch("/api/storage/" + path, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + token
+        },
+        body: JSON.stringify(payload)
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "Cloud storage request failed.");
+    return result;
+}
 
-    const { getStorage, ref, uploadBytes, getDownloadURL } =
-        await import("https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js");
-    const storage = getStorage();
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const storagePath = "users/" + user.uid + "/attachments/" + noteId + "/" + attachment.id + "-" + safeName;
-    const storageRef = ref(storage, storagePath);
-    await uploadBytes(storageRef, file, { contentType: file.type || "application/octet-stream" });
-    attachment.storagePath = storagePath;
-    attachment.downloadUrl = await getDownloadURL(storageRef);
+async function uploadFileToR2(file, purpose, identifiers = {}) {
+    const signed = await requestStorageApi("sign-upload", {
+        purpose,
+        contentType: file.type,
+        size: file.size,
+        ...identifiers
+    });
+    const uploaded = await fetch(signed.uploadUrl, {
+        method: "PUT",
+        headers: signed.headers,
+        body: file
+    });
+    if (!uploaded.ok) throw new Error("Cloud upload failed (HTTP " + uploaded.status + ").");
+    await requestStorageApi("complete-upload", {
+        purpose,
+        objectKey: signed.objectKey,
+        expectedSize: file.size,
+        contentType: file.type
+    });
+    return signed.objectKey;
+}
+
+async function uploadAttachmentToCloud(noteId, attachment, file) {
+    if (!window.firebaseAuth?.currentUser) throw new Error("Sign in to sync attachments.");
+    if (!navigator.onLine) throw new Error("Offline. Attachment will stay on this device until the connection returns.");
+    const objectKey = await uploadFileToR2(file, "attachment", {
+        noteId: String(noteId),
+        attachmentId: String(attachment.id)
+    });
+    attachment.storageProvider = "r2";
+    attachment.storagePath = objectKey;
+    // Signed URLs are short-lived and must never be saved into synced note metadata.
+    attachment.downloadUrl = null;
     attachment.uploadStatus = "synced";
     attachment.uploadError = null;
     attachment.uploadedAt = new Date().toISOString();
@@ -355,6 +391,16 @@ async function resolveAttachmentUrl(attachment) {
         const blob = await getAttachmentFile(attachment.id).catch(() => null);
         if (blob) return URL.createObjectURL(blob);
     }
+    if (attachment?.storageProvider === "r2" && attachment.storagePath && window.firebaseAuth?.currentUser) {
+        try {
+            const result = await requestStorageApi("sign-download", { objectKey: attachment.storagePath });
+            return result.url || "";
+        } catch (error) {
+            console.warn("Could not get a secure attachment URL:", error.message);
+            return "";
+        }
+    }
+    // Backwards compatibility for attachments created before the R2 migration.
     if (attachment?.downloadUrl) return attachment.downloadUrl;
     return "";
 }
@@ -364,13 +410,15 @@ async function removeNoteAttachment(noteId, attachmentId) {
     const attachment = note?.attachments?.find(item => item.id === attachmentId);
     await deleteAttachmentFile(attachmentId).catch(() => {});
 
-    if (attachment?.storagePath && window.firebaseAuth?.currentUser) {
+    if (attachment?.storagePath && attachment.storageProvider === "r2" && window.firebaseAuth?.currentUser) {
         try {
-            const { getStorage, ref, deleteObject } =
-                await import("https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js");
-            await deleteObject(ref(getStorage(), attachment.storagePath));
+            await requestStorageApi("delete-object", {
+                objectKey: attachment.storagePath,
+                purpose: "attachment"
+            });
         } catch (error) {
             console.warn("Could not remove cloud attachment:", error);
+            window.showToast?.("The attachment was removed from this note, but cloud cleanup may need a retry.", "warning");
         }
     }
     if (note?.attachments) note.attachments = note.attachments.filter(item => item.id !== attachmentId);
