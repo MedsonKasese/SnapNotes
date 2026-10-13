@@ -82,9 +82,10 @@ jobs:
           grep -q 'folders' js/firestore.js
           grep -Eq 'const CACHE_NAME = "snapnotes-v[0-9]+";' sw.js
           test -f assets/icons/snapnotes-notification.png
-          test -f assets/icons/snapnotes-notification-badge.svg
+          test -f assets/icons/snapnotes-notification-badge.png
+          ! grep -q 'snapnotes-notification-badge.svg' js/app.js
           grep -q 'icon: "./assets/icons/snapnotes-notification.png"' js/app.js
-          grep -q 'badge: "./assets/icons/snapnotes-notification-badge.svg"' js/app.js
+          grep -q 'badge: "./assets/icons/snapnotes-notification-badge.png"' js/app.js
           grep -q 'data-view="private"' index.html
           grep -q 'isPrivate' js/notes.js
           grep -q 'AES-GCM' js/private-notes.js
