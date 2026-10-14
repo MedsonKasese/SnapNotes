@@ -13,8 +13,6 @@ import {
     updateProfile,
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
-import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js";
-import { app } from "./firebaseConfig.js";
 import { getAccountDeletionStatus, loadFromCloud } from "./firestore.js";
 
 const signupFullName = document.getElementById("signupFullName");
@@ -97,55 +95,63 @@ profileSaveBtn?.addEventListener("click", async () => {
     profileFeedback.textContent = photo ? "Uploading profile photo…" : "Saving profile…";
     try {
         let photoURL = user.photoURL;
+        const previousPhotoURL = photoURL;
+        let newAvatarKey = null;
         if (photo) {
-            const storage = getStorage(app);
-            const fileRef = storageRef(storage, "profile-photos/" + user.uid + "/avatar");
-            await new Promise((resolve, reject) => {
-                const task = uploadBytesResumable(fileRef, photo, { contentType: photo.type, cacheControl: "public,max-age=3600" });
-                let finished = false;
-                const timeout = setTimeout(() => {
-                    if (finished) return;
-                    finished = true;
-                    task.cancel();
-                    reject(Object.assign(new Error("Upload timed out"), { code: "storage/upload-timeout" }));
-                }, 45000);
-                task.on("state_changed", snapshot => {
-                    if (finished) return;
-                    const percent = Math.round(snapshot.bytesTransferred / snapshot.totalBytes * 100);
-                    profileFeedback.textContent = "Uploading profile photo… " + percent + "%";
-                }, error => {
-                    if (finished) return;
-                    finished = true;
-                    clearTimeout(timeout);
-                    reject(error);
-                }, () => {
-                    if (finished) return;
-                    finished = true;
-                    clearTimeout(timeout);
-                    resolve();
+            const token = await user.getIdToken();
+            const api = async (path, payload) => {
+                const response = await fetch("/api/storage/" + path, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+                    body: JSON.stringify(payload)
                 });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(result.error || "Photo storage request failed.");
+                return result;
+            };
+            profileFeedback.textContent = "Preparing profile photo upload…";
+            const signed = await api("sign-upload", {
+                purpose: "avatar", contentType: photo.type, size: photo.size
             });
-            profileFeedback.textContent = "Photo uploaded. Updating account…";
-            photoURL = await getDownloadURL(fileRef);
+            profileFeedback.textContent = "Uploading profile photo…";
+            const uploaded = await fetch(signed.uploadUrl, {
+                method: "PUT", headers: { "Content-Type": photo.type, "x-upsert": "false" }, body: photo
+            });
+            if (!uploaded.ok) throw new Error("Photo upload failed (HTTP " + uploaded.status + ").");
+            await api("complete-upload", {
+                purpose: "avatar", objectKey: signed.objectKey,
+                expectedSize: photo.size, contentType: photo.type
+            });
+            newAvatarKey = signed.objectKey;
+            const avatar = new URL("/api/storage/avatar", window.location.origin);
+            avatar.searchParams.set("uid", user.uid);
+            avatar.searchParams.set("key", newAvatarKey);
+            photoURL = avatar.toString();
         }
         await updateProfile(user, { displayName: name, photoURL });
         refreshProfileUI(user);
+        if (newAvatarKey && previousPhotoURL) {
+            try {
+                const previous = new URL(previousPhotoURL);
+                const previousKey = previous.pathname === "/api/storage/avatar" ? previous.searchParams.get("key") : null;
+                if (previousKey && previousKey !== newAvatarKey) {
+                    const token = await user.getIdToken();
+                    await fetch("/api/storage/delete-object", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+                        body: JSON.stringify({ purpose: "avatar", objectKey: previousKey })
+                    });
+                }
+            } catch (error) { console.warn("Previous profile photo cleanup failed:", error); }
+        }
         profileFeedback.textContent = "Profile updated.";
         window.showToast?.("Account details updated.", "success");
         profileBusy = false;
         closeProfileEditor();
     } catch (error) {
-        const code = String(error?.code || "");
-        const message = code === "storage/unauthorized" || code === "storage/unauthenticated"
-            ? "Photo upload denied by Firebase Storage permissions. Ask the app administrator to enable owner-only profile photo uploads."
-            : code === "storage/bucket-not-found" || code === "storage/object-not-found"
-                ? "Profile photo storage is not configured correctly. Contact the app administrator."
-                : code === "storage/quota-exceeded"
-                    ? "Photo storage quota exceeded. Please try again later."
-                    : code === "storage/upload-timeout" || code === "storage/retry-limit-exceeded" || code === "storage/canceled" || !navigator.onLine
-                        ? "Photo upload interrupted. Check your internet connection and retry."
-                        : "Photo upload failed (" + (code || "unknown error") + "). Please try again.";
-        profileFeedback.textContent = message;
+        profileFeedback.textContent = !navigator.onLine
+            ? "You're offline. Reconnect and retry the profile photo."
+            : error?.message || "Could not update your profile. Please retry.";
         console.error("Profile update failed:", error);
     } finally {
         profileBusy = false;

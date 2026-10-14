@@ -208,20 +208,36 @@ function renderPendingAttachments() {
     });
 }
 
-async function uploadAttachmentToCloud(noteId, attachment, file) {
+async function storageApi(path, body) {
     const user = window.firebaseAuth?.currentUser;
-    if (!user) throw new Error("Sign in to sync attachments.");
-    if (!navigator.onLine) throw new Error("Offline. Attachment will stay on this device until the connection returns.");
+    if (!user) throw new Error("Sign in to sync files.");
+    const response = await fetch("/api/storage/" + path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + await user.getIdToken() },
+        body: JSON.stringify(body)
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "Storage request failed.");
+    return result;
+}
 
-    const { getStorage, ref, uploadBytes, getDownloadURL } =
-        await import("https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js");
-    const storage = getStorage();
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const storagePath = "users/" + user.uid + "/attachments/" + noteId + "/" + attachment.id + "-" + safeName;
-    const storageRef = ref(storage, storagePath);
-    await uploadBytes(storageRef, file, { contentType: file.type || "application/octet-stream" });
-    attachment.storagePath = storagePath;
-    attachment.downloadUrl = await getDownloadURL(storageRef);
+async function uploadAttachmentToCloud(noteId, attachment, file) {
+    if (!navigator.onLine) throw new Error("Offline. The attachment is saved on this device.");
+    const signed = await storageApi("sign-upload", {
+        purpose: "attachment", noteId: String(noteId), attachmentId: String(attachment.id),
+        contentType: file.type, size: file.size
+    });
+    const uploaded = await fetch(signed.uploadUrl, {
+        method: "PUT", headers: { "Content-Type": file.type, "x-upsert": "false" }, body: file
+    });
+    if (!uploaded.ok) throw new Error("Upload failed (HTTP " + uploaded.status + ").");
+    await storageApi("complete-upload", {
+        purpose: "attachment", objectKey: signed.objectKey,
+        expectedSize: file.size, contentType: file.type
+    });
+    attachment.storageProvider = "supabase";
+    attachment.storagePath = signed.objectKey;
+    attachment.downloadUrl = null; // Signed URLs expire; never store them in Firestore.
     attachment.uploadStatus = "synced";
     attachment.uploadError = null;
     attachment.uploadedAt = new Date().toISOString();
@@ -355,6 +371,16 @@ async function resolveAttachmentUrl(attachment) {
         const blob = await getAttachmentFile(attachment.id).catch(() => null);
         if (blob) return URL.createObjectURL(blob);
     }
+    if (attachment?.storageProvider === "supabase" && attachment.storagePath) {
+        try {
+            const signed = await storageApi("sign-download", { objectKey: attachment.storagePath });
+            return signed.url || "";
+        } catch (error) {
+            console.warn("Secure attachment download unavailable:", error);
+            return "";
+        }
+    }
+    // Keep existing Firebase URLs readable if they are still available.
     if (attachment?.downloadUrl) return attachment.downloadUrl;
     return "";
 }
@@ -364,13 +390,12 @@ async function removeNoteAttachment(noteId, attachmentId) {
     const attachment = note?.attachments?.find(item => item.id === attachmentId);
     await deleteAttachmentFile(attachmentId).catch(() => {});
 
-    if (attachment?.storagePath && window.firebaseAuth?.currentUser) {
+    if (attachment?.storagePath && attachment.storageProvider === "supabase" && window.firebaseAuth?.currentUser) {
         try {
-            const { getStorage, ref, deleteObject } =
-                await import("https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js");
-            await deleteObject(ref(getStorage(), attachment.storagePath));
+            await storageApi("delete-object", { purpose: "attachment", objectKey: attachment.storagePath });
         } catch (error) {
-            console.warn("Could not remove cloud attachment:", error);
+            console.warn("Cloud attachment cleanup failed:", error);
+            window.showToast?.("Removed from note; cloud cleanup may need another attempt.", "warning");
         }
     }
     if (note?.attachments) note.attachments = note.attachments.filter(item => item.id !== attachmentId);

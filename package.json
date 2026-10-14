@@ -5,6 +5,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "firebase-admin": "^13.5.0"
+    "firebase-admin": "^13.5.0",
+    "@supabase/supabase-js": "^2.57.0"
   }
 }
