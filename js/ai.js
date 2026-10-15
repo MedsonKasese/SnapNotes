@@ -152,17 +152,17 @@
           const reference = document.createElement("button");
           reference.type = "button";
           reference.className = "ai-source-reference";
-          reference.textContent = title;
-          reference.setAttribute("aria-label", `Open source note: ${title}`);
-          reference.addEventListener("click", async () => {
-            const note = window.notes?.find(item => String(item.id) === String(source.id));
-            if (!note) {
-              setStatus("This source is not in your current library yet. Sync your notes and try again.", true);
-              return;
-            }
-            closeDialog();
-            await window.openNoteDetail?.(String(source.id));
-          });
+            reference.textContent = title;
+            reference.setAttribute("aria-label", `Open source note: ${title}`);
+            reference.addEventListener("click", async () => {
+              const note = window.notes?.find(item => String(item.id) === String(source.id));
+              if (!note || note.isPrivate || note.archived || note.deletedAt || note.syncConflict) {
+                setStatus("This source is no longer available in your regular library.", true);
+                return;
+              }
+              closeDialog();
+              await window.openNoteDetail?.(note.id);
+            });
           const excerpt = document.createElement("p");
           excerpt.textContent = source.excerpt || "";
           item.append(reference, excerpt);
