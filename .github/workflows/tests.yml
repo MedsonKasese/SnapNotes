@@ -28,6 +28,14 @@ jobs:
           node --check js/attachments.js
           node --check js/folders.js
           node --check js/version-history.js
+          node --check js/note-sync.js
+          node --check js/cloud-session.js
+          node --check js/private-note-utils.js
+          node --check js/attachment-cleanup.js
+          node --check js/settings-account.js
+          node --check api/ai.js
+          node --check api/ai-notes.js
+          node --check api/cron/delete-scheduled-accounts.js
       - name: Validate required PWA files
         run: |
           test -f manifest.json
@@ -44,7 +52,7 @@ jobs:
           grep -q 'noteDetailModal' index.html
           grep -q 'function parseTags' js/app.js
           grep -q 'function openNoteDetail' js/notes.js
-          grep -q 'syncConflict' js/firestore.js
+          grep -q 'syncConflict' js/note-sync.js
           grep -q 'CACHE_NAME = "snapnotes-v' sw.js
           grep -q 'showNotification' js/app.js
           grep -q 'notificationclick' sw.js
@@ -102,10 +110,17 @@ jobs:
           grep -q 'isPrivate' js/notes.js
           grep -q 'AES-GCM' js/private-notes.js
           grep -q 'PBKDF2-SHA-256' js/private-notes.js
+          grep -q 'privateNoteMetadataNeedsMigration' js/firestore.js
+          grep -q 'accountDeletionTombstones' js/firestore.js
+          grep -q 'accountDeletionTombstones' api/cron/delete-scheduled-accounts.js
+          grep -q 'tagLegacyAttachmentFilesForUser' js/attachments.js
+          grep -q 'tagLegacyAttachmentFilesForUser' js/private-notes.js
+          grep -q 'SnapNotesAccountCleanupPending:' js/auth.js
+          grep -q 'SnapNotesAccountAttachmentIds:' js/auth.js
           grep -q 'CACHE_NAME = "snapnotes-v' sw.js
 
-      - name: Test Gemini response parsing
-        run: node --test tests/ai-response.test.mjs
+      - name: Run behavioral regression tests
+        run: npm test
 
       - name: Validate test harness
         run: test -f tests/test.html

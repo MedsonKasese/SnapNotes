@@ -865,18 +865,28 @@ async function checkDueReminders() {
     let changed = false;
 
     for (const note of notes) {
-        if (!note.reminderAt || note.reminderNotified || note.deletedAt) continue;
-        const due = Date.parse(note.reminderAt);
+        const readable = window.getReadablePrivateNote?.(note) || note;
+        if (note.isPrivate && !window.isPrivateNotesUnlocked?.()) continue;
+        if (!readable.reminderAt || readable.reminderNotified || note.deletedAt) continue;
+        const due = Date.parse(readable.reminderAt);
         if (Number.isNaN(due) || due > now) continue;
 
         if ("Notification" in window && Notification.permission === "granted") {
-            const shown = await showReminderNotification(note);
-            if (!shown) showToast(`Reminder: ${note.title || "Untitled note"}`, "update");
+            const shown = await showReminderNotification(readable);
+            if (!shown) showToast(`Reminder: ${readable.title || "Untitled note"}`, "update");
         } else {
-            showToast(`Reminder: ${note.title || "Untitled note"}`, "update");
+            showToast(`Reminder: ${readable.title || "Untitled note"}`, "update");
         }
-        note.reminderNotified = true;
-        changed = true;
+        if (note.isPrivate) {
+            try {
+                changed = Boolean(await window.markPrivateReminderNotified?.(note.id)) || changed;
+            } catch (error) {
+                console.warn("Could not update encrypted private reminder state:", error);
+            }
+        } else {
+            note.reminderNotified = true;
+            changed = true;
+        }
     }
 
     if (changed) {
@@ -986,27 +996,7 @@ function openSettings() {
 
     if (settingsAccount) {
         if (user) {
-            const initials = user.displayName
-                ? user.displayName.trim().split(/\\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase()
-                : user.email
-                    ? user.email.substring(0, 2).toUpperCase()
-                    : "U";
-            const provider = user.providerData?.some(item => item.providerId === "google.com")
-                ? "Google account"
-                : "Email account";
-
-            settingsAccount.innerHTML = `
-                <div class="settings-account-avatar">
-                    ${user.photoURL
-                        ? `<img src="${user.photoURL}" alt="" referrerpolicy="no-referrer">`
-                        : `<span>${initials}</span>`}
-                </div>
-                <div class="settings-account-details">
-                    <strong>${user.displayName || (user.email ? user.email.split("@")[0] : "SnapNotes user")}</strong>
-                    <span>${user.email || provider}</span>
-                    <small>${provider}</small>
-                </div>
-            `;
+            window.renderSettingsAccount?.(settingsAccount, user);
             const editable = user.providerData?.some(item => item.providerId === "password");
             settingsAccount.onclick = editable ? () => window.openSnapNotesProfileEditor?.() : null;
             settingsAccount.onkeydown = editable ? event => {
@@ -1022,13 +1012,12 @@ function openSettings() {
                 settingsAccount.removeAttribute("title");
             }
         } else {
-            settingsAccount.innerHTML = `
-                <div class="settings-account-avatar"><span><i class="fa-solid fa-user"></i></span></div>
-                <div class="settings-account-details">
-                    <strong>Local mode</strong>
-                    <span>Your notes are stored on this device</span>
-                </div>
-            `;
+            window.renderSettingsAccount?.(settingsAccount, null);
+            settingsAccount.onclick = null;
+            settingsAccount.onkeydown = null;
+            settingsAccount.removeAttribute("role");
+            settingsAccount.removeAttribute("tabindex");
+            settingsAccount.removeAttribute("title");
         }
     }
 
@@ -1079,12 +1068,18 @@ async function refreshAccountDeletionStatus(user = window.firebaseAuth?.currentU
             return;
         }
 
+        if (deletion.status === "processing") {
+            await window.clearLocalAccountDataForDeletion?.(user);
+        }
+
         const remainingDays = Math.max(0, Math.ceil((Date.parse(deletion.scheduledFor) - Date.now()) / (24 * 60 * 60 * 1000)));
         status.textContent = remainingDays > 0
             ? `Your account is scheduled for permanent deletion in ${remainingDays} ${remainingDays === 1 ? "day" : "days"}.`
-            : "Your account deletion is due and will be processed shortly.";
+            : deletion.status === "processing"
+                ? "Secure server cleanup is processing your deletion request."
+                : "Your account deletion is due. Secure server cleanup will retry automatically.";
         deleteButton.hidden = true;
-        cancelButton.hidden = false;
+        cancelButton.hidden = deletion.status === "processing";
     } catch (error) {
         console.error("Could not load account deletion status:", error);
         status.textContent = "Account deletion status is temporarily unavailable.";

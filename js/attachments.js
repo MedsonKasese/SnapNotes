@@ -2,6 +2,8 @@
 // NOTE ATTACHMENTS
 // =========================
 
+import { enqueueAndProcessAttachmentCleanup, processAttachmentCleanupQueue } from "./attachment-cleanup.js";
+
 const ATTACHMENT_DB = "SnapNotesAttachments";
 const ATTACHMENT_STORE = "files";
 const MAX_ATTACHMENTS_PER_NOTE = 5;
@@ -38,8 +40,10 @@ function updateAttachmentAccess() {
 window.addEventListener("snapnotes:auth-changed", () => {
     updateAttachmentAccess();
     retryPendingAttachmentUploads();
+    retryPendingAttachmentCleanup();
 });
 window.addEventListener("online", retryPendingAttachmentUploads);
+window.addEventListener("online", retryPendingAttachmentCleanup);
 document.addEventListener("DOMContentLoaded", updateAttachmentAccess);
 
 function openAttachmentPicker(input) {
@@ -70,6 +74,7 @@ async function putAttachmentFile(id, file) {
         const tx = db.transaction(ATTACHMENT_STORE, "readwrite");
         tx.objectStore(ATTACHMENT_STORE).put({
             id,
+            uid: window.firebaseAuth?.currentUser?.uid || null,
             blob: file,
             updatedAt: new Date().toISOString()
         });
@@ -98,6 +103,94 @@ async function deleteAttachmentFile(id) {
         tx.objectStore(ATTACHMENT_STORE).delete(id);
         tx.oncomplete = () => { db.close(); resolve(); };
         tx.onerror = () => { db.close(); reject(tx.error); };
+    });
+}
+
+async function tagLegacyAttachmentFilesForUser(uid, attachmentIds = []) {
+    if (!uid || !Array.isArray(attachmentIds) || !attachmentIds.length) return 0;
+    if (window.snapNotesDataUid !== uid || window.firebaseAuth?.currentUser?.uid !== uid) return 0;
+    const ids = new Set(attachmentIds.filter(id => typeof id === "string" && id));
+    if (!ids.size) return 0;
+    const db = await openAttachmentDb();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(ATTACHMENT_STORE, "readwrite");
+        const request = tx.objectStore(ATTACHMENT_STORE).openCursor();
+        let tagged = 0;
+        request.onsuccess = () => {
+            const cursor = request.result;
+            if (!cursor) return;
+            if (window.snapNotesDataUid !== uid || window.firebaseAuth?.currentUser?.uid !== uid) return;
+            if (!cursor.value?.uid && ids.has(cursor.value?.id)) {
+                cursor.update({ ...cursor.value, uid });
+                tagged++;
+            }
+            cursor.continue();
+        };
+        tx.oncomplete = () => { db.close(); resolve(tagged); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+        tx.onabort = () => { db.close(); reject(tx.error || new Error("Legacy attachment ownership migration was cancelled.")); };
+    });
+}
+
+async function deleteLocalAttachmentFilesForUser(uid, attachmentIds = []) {
+    if (!uid) return 0;
+    const legacyIds = new Set(Array.isArray(attachmentIds) ? attachmentIds.filter(id => typeof id === "string" && id) : []);
+    const db = await openAttachmentDb();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(ATTACHMENT_STORE, "readwrite");
+        const request = tx.objectStore(ATTACHMENT_STORE).openCursor();
+        let removed = 0;
+        request.onsuccess = () => {
+            const cursor = request.result;
+            if (!cursor) return;
+            if (cursor.value?.uid === uid || (!cursor.value?.uid && legacyIds.has(cursor.value?.id))) {
+                cursor.delete();
+                removed++;
+            }
+            cursor.continue();
+        };
+        tx.oncomplete = () => { db.close(); resolve(removed); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+        tx.onabort = () => { db.close(); reject(tx.error || new Error("Local attachment cleanup was cancelled.")); };
+    });
+}
+
+function clearAttachmentCleanupQueueForUser(uid) {
+    if (!uid) return;
+    try {
+        const queue = JSON.parse(localStorage.getItem("SnapNotesAttachmentCleanup") || "[]");
+        if (!Array.isArray(queue)) return;
+        const ownedPrefix = `users/${uid}/`;
+        localStorage.setItem("SnapNotesAttachmentCleanup", JSON.stringify(queue.filter(item =>
+            item?.uid !== uid && !(typeof item?.storagePath === "string" && item.storagePath.startsWith(ownedPrefix))
+        )));
+    } catch (error) {
+        console.warn("Could not clear stale local attachment cleanup entries:", error);
+    }
+}
+
+async function runAttachmentCleanup(attachments) {
+    const user = window.firebaseAuth?.currentUser;
+    return enqueueAndProcessAttachmentCleanup(attachments, {
+        storage: localStorage,
+        currentUid: user?.uid || null,
+        removeLocal: deleteAttachmentFile,
+        removeRemote: objectKey => storageApi("delete-object", { purpose: "attachment", objectKey })
+    });
+}
+
+async function cleanupAttachmentsForNotes(notes) {
+    const attachments = (Array.isArray(notes) ? notes : [])
+        .flatMap(note => Array.isArray(note?.attachments) ? note.attachments : []);
+    return runAttachmentCleanup(attachments);
+}
+
+async function retryPendingAttachmentCleanup() {
+    return processAttachmentCleanupQueue({
+        storage: localStorage,
+        currentUid: window.firebaseAuth?.currentUser?.uid || null,
+        removeLocal: deleteAttachmentFile,
+        removeRemote: objectKey => storageApi("delete-object", { purpose: "attachment", objectKey })
     });
 }
 
@@ -298,8 +391,11 @@ async function retryPendingAttachmentUploads(options = {}) {
         let uploadedCount = 0;
         let failedCount = 0;
         const uploadedIds = [];
+        const privateAttachmentUpdates = new Map();
 
-        for (const note of window.notes) {
+        for (const rawNote of window.notes) {
+            if (rawNote?.isPrivate && !window.isPrivateNotesUnlocked?.()) continue;
+            const note = window.getReadablePrivateNote?.(rawNote) || rawNote;
             if (!Array.isArray(note.attachments)) continue;
             for (const attachment of note.attachments) {
                 if (options.attachmentId && attachment.id !== options.attachmentId) continue;
@@ -326,6 +422,7 @@ async function retryPendingAttachmentUploads(options = {}) {
                     changed = true;
                     uploadedCount++;
                     uploadedIds.push(attachment.id);
+                    if (rawNote?.isPrivate) privateAttachmentUpdates.set(rawNote.id, note.attachments);
                 } catch (error) {
                     attachment.uploadStatus = "pending";
                     attachment.uploadError = getAttachmentUploadErrorMessage(error);
@@ -336,6 +433,13 @@ async function retryPendingAttachmentUploads(options = {}) {
         }
 
         if (changed) {
+            for (const [noteId, attachments] of privateAttachmentUpdates) {
+                const saved = await window.savePrivateAttachmentMetadata?.(noteId, attachments);
+                if (!saved) {
+                    failedCount++;
+                    window.showToast?.("A private attachment uploaded but its encrypted metadata could not be saved. Keep Private Notes unlocked and retry.", "warning");
+                }
+            }
             await window.saveNotes?.();
             window.renderNotes?.();
         }
@@ -388,17 +492,17 @@ async function resolveAttachmentUrl(attachment) {
 async function removeNoteAttachment(noteId, attachmentId) {
     const note = (window.notes || []).find(item => item.id === noteId);
     const attachment = note?.attachments?.find(item => item.id === attachmentId);
-    await deleteAttachmentFile(attachmentId).catch(() => {});
-
-    if (attachment?.storagePath && attachment.storageProvider === "supabase" && window.firebaseAuth?.currentUser) {
-        try {
-            await storageApi("delete-object", { purpose: "attachment", objectKey: attachment.storagePath });
-        } catch (error) {
-            console.warn("Cloud attachment cleanup failed:", error);
-            window.showToast?.("Removed from note; cloud cleanup may need another attempt.", "warning");
-        }
+    if (!attachment) return false;
+    const result = await runAttachmentCleanup([attachment]);
+    if (!result.persisted) {
+        window.showToast?.("Could not safely queue attachment cleanup. The attachment is still on the note.", "warning");
+        return false;
     }
     if (note?.attachments) note.attachments = note.attachments.filter(item => item.id !== attachmentId);
+    if (result.pendingCount) {
+        window.showToast?.("Removed from the note. Cloud cleanup is queued and will retry when available.", "warning");
+    }
+    return true;
 }
 
 async function renderNoteAttachments(container, attachments = [], options = {}) {
@@ -549,5 +653,11 @@ window.resetPendingAttachments = resetPendingAttachments;
 window.getPendingAttachments = () => [...pendingAttachmentFiles];
 window.prepareNoteAttachments = prepareNoteAttachments;
 window.retryPendingAttachmentUploads = retryPendingAttachmentUploads;
+window.retryPendingAttachmentCleanup = retryPendingAttachmentCleanup;
+window.cleanupAttachmentsForNotes = cleanupAttachmentsForNotes;
+window.queueAttachmentCleanup = runAttachmentCleanup;
+window.deleteLocalAttachmentFilesForUser = deleteLocalAttachmentFilesForUser;
+window.tagLegacyAttachmentFilesForUser = tagLegacyAttachmentFilesForUser;
+window.clearAttachmentCleanupQueueForUser = clearAttachmentCleanupQueueForUser;
 window.renderNoteAttachments = renderNoteAttachments;
 window.removeNoteAttachment = removeNoteAttachment;

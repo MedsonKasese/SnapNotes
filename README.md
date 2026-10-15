@@ -2,65 +2,69 @@
 
 **Save Your Mind.**
 
-SnapNotes is a modern, feature-rich note-taking web application meticulously crafted with vanilla HTML, CSS, and JavaScript. Designed for simplicity and efficiency, it provides a seamless experience for organizing your thoughts and tasks without the overhead of external frameworks or libraries.
+SnapNotes is a vanilla HTML, CSS, and JavaScript note-taking app for capturing and organizing notes. It supports local browser storage and, when configured and signed in, Firebase-based cloud sync.
 
-**View Live:** https://snapnotesmw.vercel.app
+**Live app:** [snapnotesmw.vercel.app](https://snapnotesmw.vercel.app)
 
 ## Features
 
-SnapNotes offers a comprehensive set of features to enhance your note-taking experience:
-
 | Feature | Description |
 |---|---|
-| **localStorage Persistence** | Notes are automatically saved and retrieved from your browser's local storage, ensuring your data persists across sessions. |
-| **Persistent Timestamps** | Each note displays its creation date and time, formatted as "Created On: DD Month YYYY at HH:MM AM/PM", for easy tracking. |
-| **Dark Mode with Theme Memory** | Toggle between light and dark themes. Your preference is saved in local storage and applied automatically on subsequent visits. |
-| **Inline Editing** | Edit notes directly within their cards. Press `Enter` to save changes or `Escape` to cancel, eliminating disruptive pop-up prompts. |
-| **Delete Confirmation Dialog** | A clear confirmation dialog prevents accidental deletion of notes. |
-| **Toast Notifications** | Receive subtle, type-based (success, warning, delete, update) toast notifications for all key actions, providing immediate feedback. |
-| **Real-time Search/Filter** | Instantly search and filter your notes as you type, making it easy to find specific information quickly. |
-| **Category System** | Organize notes into predefined categories: General, Work, Personal, Ideas, and Important. |
-| **Color-Coded Borders** | Each category is visually distinguished with a unique color-coded border for quick identification. |
-| **Category Filtering Dropdown** | Filter notes by category using a convenient dropdown menu. |
-| **Pin/Unpin Notes** | Pin important notes to the top of your list for easy access; unpinned notes return to their original position. |
-| **Character Limit with Live Counter** | Notes are limited to 200 characters, with a live counter to help you stay concise. |
-| **Empty State Message** | A friendly message is displayed when no notes exist, guiding new users. |
-| **Note Counter Display** | Keep track of your total number of notes with a clear counter display. |
-| **Fade-in Animations** | Enjoy a smooth user experience with subtle fade-in animations when notes are added or updated. |
-| **Ellipsis Menu (⋮)** | Each note card features a discreet ellipsis (⋮) button, revealing a dropdown with Share, Edit, and Delete options for a cleaner UI. |
-| **Share Functionality** | Share your notes effortlessly. On mobile devices, this utilizes the native Web Share API; otherwise, it provides a clipboard copy as a fallback. |
-| **Drag and Drop Reordering** | Reorder your notes by dragging and dropping them into your preferred position. Supports both desktop (mouse) and mobile (touch) interactions. |
-| **Modular Code Structure** | The application is built with a clean, modular code structure (`storage.js`, `notes.js`, `app.js`), promoting maintainability and scalability. |
+| Notes and formatting | Create and edit notes with formatted text; each note is limited to **1,500 characters**. |
+| Search and organization | Search notes, filter by category, tags, pinned state, archive, Trash, and folders. |
+| Reminders | Set one-time reminders, with browser/service-worker notifications where supported. |
+| Private Notes | Protect private note content and metadata with a passphrase-derived AES-GCM key. The passphrase stays in the browser and cannot be recovered. |
+| Attachments | Store supported images, PDFs, and text files locally first; signed-in users can sync them through private Supabase Storage. |
+| Cloud sync | Sync notes and folders across signed-in devices. The library is written in bounded Firestore pages rather than one unbounded account document. |
+| Ask My Notes | Search eligible regular notes with the configured Gemini API; private, archived, trashed, and conflict-copy notes are excluded. |
+| Account security | Edit account profile details, schedule account deletion with a 10-day cancellation window, and manage sign-in security. |
+| Local-first use | Notes are saved in browser storage when signed out or offline. |
 
-## Tech Stack
+## Local development
 
-SnapNotes is built using fundamental web technologies, demonstrating the power of vanilla development:
+Serve the repository over HTTP so browser modules load correctly:
 
-- **HTML5**: For semantic structure and content organization.
-- **CSS3**: For styling, responsive design, and dynamic visual effects, including custom properties and animations.
-- **JavaScript (ES6+)**: For all application logic, DOM manipulation, local storage management, and interactive features.
+```bash
+git clone https://github.com/MedsonKasese/SnapNotes.git
+cd SnapNotes
+python3 -m http.server 8000
+```
 
-## How to Use
+Then open <http://localhost:8000>. Basic note editing works locally. Firebase sign-in/cloud sync and server endpoints (Ask My Notes, Supabase attachments, and scheduled account deletion) require a deployment with the server-side configuration below; a static Python server does not run the Vercel API routes.
 
-Getting started with SnapNotes is straightforward:
+Run the automated Node regression suite with:
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/MedsonKasese/SnapNotes.git
-    ```
-2.  **Navigate to the project directory:**
-    ```bash
-    cd SnapNotes
-    ```
-3.  **Open `index.html`:** Simply open the `index.html` file in your preferred web browser.
+```bash
+npm test
+```
 
-No build tools, no dependencies, and no complex setup required. Just open and start taking notes!
+Node.js 20 or newer is required. The Node tests use the built-in test runner; application dependencies are needed when running the API routes in a deployment environment.
 
-## Author
+## Deployment configuration
 
-**Medson Kasese**
+The browser Firebase configuration is in `js/firebaseConfig.js`. Server credentials must be configured as Vercel environment variables and must never be placed in client-side files or committed to Git:
 
-This project was developed by Medson Kasese, showcasing a commitment to clean code and robust vanilla JavaScript development.
+| Variable | Purpose |
+|---|---|
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Firebase Admin credentials for server-side AI, Storage authorization, and scheduled account cleanup. |
+| `SUPABASE_URL` | Supabase project URL. |
+| `SUPABASE_SECRET_KEY` | Server-only Supabase secret API key. |
+| `SUPABASE_STORAGE_BUCKET` | Private bucket name; defaults to `Snapnotes-files`. |
+| `GEMINI_API_KEY` | Enables Ask My Notes. |
+| `GEMINI_MODEL` | Optional Gemini model override. |
+| `CRON_SECRET` | Random Vercel Cron bearer secret; required to authorize scheduled account deletion. Use at least 16 random characters and enable it for Production. |
+
+See [Supabase Storage setup](docs/SUPABASE_STORAGE.md) for bucket, authorization, and deployment details, and [Firestore sync setup](docs/FIRESTORE_SYNC.md) for the owner-only rules needed by paged cloud libraries. Vercel Cron invokes the account-deletion worker daily at 00:00 UTC to remain compatible with Hobby. Hobby timing may drift by up to 59 minutes, so processing can begin about 25 hours after the 10-day grace-period deadline in the worst case. Failed or large storage cleanups continue in retryable daily batches; each run handles one eligible account.
+
+**Local-device limitation:** the server cannot erase browser storage on devices that are offline or never open the app again. When a signed-in device observes that deletion processing has started, SnapNotes clears its matching account cache and UID-tagged IndexedDB attachment blobs; referenced legacy blobs are migrated or removed by attachment ID. Unreferenced legacy attachment orphans and caches on other offline devices may remain locally until those devices are used and cleaned manually.
+
+## Tech stack
+
+- HTML5, CSS3, and JavaScript ES modules
+- Firebase Authentication and Firestore
+- Vercel serverless API routes
+- Supabase private Storage for attachments and profile photos
+- Gemini API for Ask My Notes
 
 ## License
 
