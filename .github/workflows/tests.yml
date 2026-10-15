@@ -18,6 +18,7 @@ jobs:
           node --check js/drafts.js
           node --check js/note-format.js
           node --check js/storage.js
+          node --check js/local-library.js
           node --check js/auth.js
           node --check lib/supabase-storage.js
           node --check api/storage/sign-upload.js

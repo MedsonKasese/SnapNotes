@@ -10,6 +10,7 @@ import { migrateLegacyDraft, readDrafts, removeDraft, upsertDraft } from "../js/
 import { renderSubtitleMarkdownText } from "../js/note-format.js";
 import { hasPrivatePasskey, registerPrivatePasskey, removePrivatePasskey, unlockPrivateKeyWithPasskey } from "../js/private-passkey.js";
 import { webcrypto } from "node:crypto";
+import { createLocalLibraryStore } from "../js/local-library.js";
 
 function memoryStorage() {
   const values = new Map();
@@ -17,6 +18,47 @@ function memoryStorage() {
     getItem(key) { return values.get(key) ?? null; },
     setItem(key, value) { values.set(key, String(value)); },
     removeItem(key) { values.delete(key); }
+  };
+}
+
+function fakeIndexedDB() {
+  const records = new Map();
+  let hasStore = false;
+  const database = {
+    objectStoreNames: { contains: () => hasStore },
+    createObjectStore() { hasStore = true; },
+    transaction() {
+      const transaction = { error: null };
+      transaction.objectStore = () => ({
+        put(value) {
+          records.set(value.id, structuredClone(value));
+          queueMicrotask(() => transaction.oncomplete?.());
+        },
+        get(id) {
+          const request = {};
+          queueMicrotask(() => {
+            request.result = records.has(id) ? structuredClone(records.get(id)) : undefined;
+            request.onsuccess?.();
+          });
+          return request;
+        },
+        delete(id) {
+          records.delete(id);
+          queueMicrotask(() => transaction.oncomplete?.());
+        }
+      });
+      return transaction;
+    }
+  };
+  return {
+    open() {
+      const request = { result: database };
+      queueMicrotask(() => {
+        request.onupgradeneeded?.();
+        request.onsuccess?.();
+      });
+      return request;
+    }
   };
 }
 
@@ -166,6 +208,18 @@ test("passkey PRF wraps and restores the private-note key without removing passw
       else delete globalThis[name];
     }
   }
+});
+
+test("durable local library stores independent account snapshots and deletes them for account cleanup", async () => {
+  const store = createLocalLibraryStore(fakeIndexedDB());
+  const notes = [{ id: "n1", text: "saved offline" }];
+  const folders = [{ id: "f1", name: "Local" }];
+  await store.write("account-a", notes, folders, 1234);
+  notes[0].text = "changed after snapshot";
+  assert.equal((await store.read("account-a")).notes[0].text, "saved offline");
+  assert.equal(await store.read("account-b"), null);
+  await store.remove("account-a");
+  assert.equal(await store.read("account-a"), null);
 });
 
 test("cloud load generation rejects stale A-to-B and A-to-B-to-A responses", () => {

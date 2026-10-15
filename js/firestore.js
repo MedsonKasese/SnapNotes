@@ -265,6 +265,8 @@ export async function loadFromCloud(uid) {
     if (!isCurrentLoad(session)) return;
 
     try {
+        await window.localNotesReady;
+        if (!isCurrentLoad(session)) return;
         const userDocRef = doc(db, "users", uid);
         const tombstone = await getDoc(deletionTombstoneRef(uid));
         if (!isCurrentLoad(session)) return;
@@ -309,8 +311,7 @@ export async function loadFromCloud(uid) {
         if (!isCurrentLoad(session)) return;
         window.snapNotesDataUid = uid;
         window.notes = merged;
-        localStorage.setItem("SnapNotes", JSON.stringify(merged));
-        localStorage.setItem("SnapNotesFolders", JSON.stringify(mergedFolders));
+        await window.persistLocalLibrary?.(uid, merged, mergedFolders, Date.now());
         window.loadFolders?.();
         window.renderNotes?.();
         window.handlePendingNotificationNote?.();
