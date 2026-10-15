@@ -6,20 +6,26 @@ window.SNAPNOTES_MAX_CHARACTERS = MAX_NOTE_CHARACTERS;
 const TRASH_RETENTION_DAYS = 15;
 const TRASH_RETENTION_MS = TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 window.SNAPNOTES_TRASH_RETENTION_DAYS = TRASH_RETENTION_DAYS;
+let trashPurgeRunning = false;
 
 function purgeExpiredTrash(now = Date.now()) {
     const notes = Array.isArray(window.notes) ? window.notes : [];
-    const remaining = notes.filter(note => {
-        if (!note?.deletedAt) return true;
+    const expired = notes.filter(note => {
+        if (!note?.deletedAt) return false;
+        if (note.isPrivate && !window.isPrivateNotesUnlocked?.()) return false;
         const deletedAt = Date.parse(note.deletedAt);
-        return Number.isNaN(deletedAt) || deletedAt + TRASH_RETENTION_MS > now;
+        return !Number.isNaN(deletedAt) && deletedAt + TRASH_RETENTION_MS <= now;
     });
 
-    if (remaining.length === notes.length) return 0;
-    const removedCount = notes.length - remaining.length;
-    window.notes = remaining;
-    saveNotes();
-    return removedCount;
+    if (!expired.length || trashPurgeRunning) return 0;
+    trashPurgeRunning = true;
+    void permanentlyDeleteNotes(expired, { rerender: false, toast: false }).then(deleted => {
+        if (deleted) {
+            renderNotes();
+            updateNavigationCounts();
+        }
+    }).finally(() => { trashPurgeRunning = false; });
+    return expired.length;
 }
 
 function renderNotes(filterText = "", filterCategory = "all", view = window.getActiveNotesView ? window.getActiveNotesView() : "all", folderId = window.activeFolderId || null) {
@@ -73,11 +79,11 @@ function renderNotes(filterText = "", filterCategory = "all", view = window.getA
 
         const matchesSearch = !query || searchTerms.every(term => searchableText.includes(term.toLowerCase()));
         const matchesExcluded = negativeTerms.every(term => !searchableText.includes(term.toLowerCase()));
-        const matchesCategory = requestedCategory === "all" || note.category === requestedCategory;
+        const matchesCategory = requestedCategory === "all" || searchableNote.category === requestedCategory;
         const matchesPinned = !pinnedToken || note.pinned;
         const matchesArchived = !archivedToken || Boolean(note.archived);
         const matchesTrash = !trashToken || Boolean(note.deletedAt);
-        const matchesTags = !tagTokens.length || tagTokens.every(tag => (note.tags || []).map(value => value.toLowerCase()).includes(tag.toLowerCase()));
+        const matchesTags = !tagTokens.length || tagTokens.every(tag => (searchableNote.tags || []).map(value => value.toLowerCase()).includes(tag.toLowerCase()));
         return matchesSearch && matchesExcluded && matchesCategory && matchesPinned && matchesArchived && matchesTrash && matchesTags;
     });
 
@@ -683,18 +689,49 @@ function deleteNote(id) {
     showToast("Note moved to Trash", "delete");
 }
 
-function permanentlyDeleteNote(id) {
-    if (localStorage.getItem("SnapNotesConfirmDelete") !== "false" && !confirm("Delete this note permanently? This cannot be undone.")) return;
-    const deleted = window.notes.find(note => note.id === id);
-    if (deleted) historyStack.push({ id, snapshot: structuredClone(deleted) });
-    window.notes = window.notes.filter(note => note.id !== id);
-    saveNotes();
-    renderNotes();
-    updateNavigationCounts();
-    showToast("Note permanently deleted", "delete");
+async function permanentlyDeleteNotes(notesToDelete, options = {}) {
+    const targets = Array.isArray(notesToDelete) ? notesToDelete : [];
+    const ids = new Set(targets.map(note => note?.id).filter(Boolean));
+    if (!ids.size) return false;
+
+    if (targets.some(note => note?.isPrivate) && !window.isPrivateNotesUnlocked?.()) {
+        if (options.allowUnlock === false || !(await window.unlockPrivateNotes?.())) return false;
+    }
+    const cleanupTargets = targets.map(note => note?.isPrivate
+        ? { ...note, attachments: window.getReadablePrivateNote?.(note)?.attachments || [] }
+        : note);
+
+    const cleanup = window.cleanupAttachmentsForNotes;
+    const hasAttachments = cleanupTargets.some(note => Array.isArray(note?.attachments) && note.attachments.length);
+    if (hasAttachments && typeof cleanup !== "function") {
+        showToast("Attachment cleanup is unavailable; the notes were not permanently deleted.", "warning");
+        return false;
+    }
+    if (typeof cleanup === "function") {
+        const queued = await cleanup(cleanupTargets);
+        if (queued?.persisted === false) {
+            showToast("Could not safely queue attachment cleanup; the notes were not permanently deleted.", "warning");
+            return false;
+        }
+    }
+
+    window.notes = (window.notes || []).filter(note => !ids.has(note.id));
+    await saveNotes();
+    if (options.rerender !== false) {
+        renderNotes();
+        updateNavigationCounts();
+    }
+    if (options.toast !== false) showToast("Note permanently deleted", "delete");
+    return true;
 }
 
-function emptyTrash() {
+async function permanentlyDeleteNote(id) {
+    if (localStorage.getItem("SnapNotesConfirmDelete") !== "false" && !confirm("Delete this note permanently? This cannot be undone.")) return;
+    const deleted = window.notes.find(note => note.id === id);
+    if (deleted) await permanentlyDeleteNotes([deleted]);
+}
+
+async function emptyTrash() {
     const trashCount = (window.notes || []).filter(note => note.deletedAt).length;
     if (!trashCount) {
         showToast("Trash is already empty", "warning");
@@ -705,8 +742,9 @@ function emptyTrash() {
         return;
     }
 
-    window.notes = (window.notes || []).filter(note => !note.deletedAt);
-    saveNotes();
+    const deleted = (window.notes || []).filter(note => note.deletedAt);
+    const completed = await permanentlyDeleteNotes(deleted, { rerender: false, toast: false });
+    if (!completed) return;
     renderNotes("", "all", "trash");
     updateNavigationCounts();
     showToast("Trash emptied", "delete");

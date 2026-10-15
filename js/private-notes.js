@@ -5,6 +5,8 @@
 // The password never leaves the browser and is kept only in memory while private notes
 // are unlocked. Forgetting it means the encrypted content cannot be recovered.
 
+import { buildPrivatePayload, lockedPrivateNote, privateNoteMetadataNeedsMigration, stripPrivateMetadata } from "./private-note-utils.js";
+
 const PRIVATE_CRYPTO_VERSION = 1;
 const PRIVATE_KDF_ITERATIONS = 600000;
 const PRIVATE_MIN_PASSWORD_LENGTH = 12;
@@ -97,7 +99,7 @@ async function decryptPrivatePayload(note, key = privateKey) {
 
 function getPrivateNotes() {
     return (Array.isArray(window.notes) ? window.notes : [])
-        .filter(note => note?.isPrivate && !note.deletedAt && !note.archived);
+        .filter(note => note?.isPrivate);
 }
 
 function getReadablePrivateNote(note) {
@@ -105,20 +107,16 @@ function getReadablePrivateNote(note) {
 
     const decrypted = privateUnlockCache.get(note.id);
     if (!decrypted) {
-        return {
-            ...note,
-            title: "Private note",
-            text: "Unlock Private Notes to view this content.",
-            html: "",
-            category: "general",
-            tags: [],
-            reminderAt: null,
-            reminderNotified: false,
-            time: "Locked"
-        };
+        return lockedPrivateNote(note);
     }
 
-    return { ...note, ...decrypted, isPrivate: true };
+    return {
+        ...note,
+        ...decrypted,
+        attachments: Array.isArray(decrypted.attachments) ? decrypted.attachments : [],
+        folderId: decrypted.folderId || null,
+        isPrivate: true
+    };
 }
 
 function isPrivateNotesUnlocked() {
@@ -218,19 +216,64 @@ async function requestPrivatePassword(mode) {
 async function establishPrivateSession(password, salt) {
     const key = await derivePrivateKey(password, salt);
     const notes = getPrivateNotes();
+    const unlockedNotes = [];
+    let migrated = false;
 
     for (const note of notes) {
-        await decryptPrivatePayload(note, key);
+        const decrypted = await decryptPrivatePayload(note, key);
+        const payload = {
+            ...decrypted,
+            title: Object.hasOwn(decrypted, "title") ? decrypted.title : (note.title || ""),
+            text: Object.hasOwn(decrypted, "text") ? decrypted.text : (note.text || ""),
+            html: Object.hasOwn(decrypted, "html") ? decrypted.html : (note.html || ""),
+            category: Object.hasOwn(decrypted, "category") ? decrypted.category : (note.category || "general"),
+            tags: Array.isArray(decrypted.tags) ? structuredClone(decrypted.tags) : (Array.isArray(note.tags) ? structuredClone(note.tags) : []),
+            time: Object.hasOwn(decrypted, "time") ? decrypted.time : (note.time || ""),
+            reminderAt: Object.hasOwn(decrypted, "reminderAt") ? decrypted.reminderAt : (note.reminderAt || null),
+            reminderNotified: Object.hasOwn(decrypted, "reminderNotified") ? Boolean(decrypted.reminderNotified) : Boolean(note.reminderNotified),
+            folderId: Object.hasOwn(decrypted, "folderId") ? (decrypted.folderId || null) : (note.folderId || null),
+            attachments: Array.isArray(decrypted.attachments)
+                ? structuredClone(decrypted.attachments)
+                : (Array.isArray(note.attachments) ? structuredClone(note.attachments) : []),
+            history: Array.isArray(decrypted.history)
+                ? structuredClone(decrypted.history)
+                : Array.isArray(note.history) ? structuredClone(note.history)
+                    : Array.isArray(note.versions) ? structuredClone(note.versions) : []
+        };
+        unlockedNotes.push({ note, payload, needsMigration: privateNoteMetadataNeedsMigration(note) });
+    }
+
+    for (const entry of unlockedNotes) {
+        if (entry.needsMigration) entry.encryptedData = await encryptPrivatePayload(entry.payload, key, salt);
     }
 
     privateKey = key;
     privateSalt = salt;
     privateUnlockCache.clear();
 
-    for (const note of notes) {
-        const decrypted = await decryptPrivatePayload(note, key);
-        privateUnlockCache.set(note.id, decrypted);
+    for (const { note, payload, needsMigration, encryptedData } of unlockedNotes) {
+        if (needsMigration) {
+            note.privateData = encryptedData;
+            stripPrivateMetadata(note);
+            migrated = true;
+        }
+        privateUnlockCache.set(note.id, payload);
     }
+
+    const uid = window.firebaseAuth?.currentUser?.uid;
+    const attachmentIds = [...new Set(unlockedNotes.flatMap(entry =>
+        (Array.isArray(entry.payload.attachments) ? entry.payload.attachments : [])
+            .map(attachment => attachment?.id)
+            .filter(id => typeof id === "string")
+    ))];
+    try {
+        await window.tagLegacyAttachmentFilesForUser?.(uid, attachmentIds);
+    } catch (error) {
+        console.warn("Could not migrate private attachment ownership:", error);
+    }
+
+    if (migrated) await window.saveNotes?.();
+    window.checkDueReminders?.();
 
     return true;
 }
@@ -294,17 +337,7 @@ async function moveNoteToPrivate(id) {
         const session = await getPasswordForPrivateAction();
         if (!session) return;
 
-        const payload = {
-            title: note.title || "",
-            text: note.text || "",
-            html: note.html || "",
-            category: note.category || "general",
-            tags: Array.isArray(note.tags) ? note.tags : [],
-            time: note.time || "",
-            reminderAt: note.reminderAt || null,
-            reminderNotified: Boolean(note.reminderNotified),
-            history: Array.isArray(note.versions) ? structuredClone(note.versions) : []
-        };
+        const payload = buildPrivatePayload(note);
 
         note.privateData = await encryptPrivatePayload(payload, session.key, session.salt);
         note.isPrivate = true;
@@ -315,6 +348,7 @@ async function moveNoteToPrivate(id) {
         note.tags = [];
         note.time = "Private note";
         note.versions = [];
+        stripPrivateMetadata(note);
         note.updatedAt = new Date().toISOString();
 
         privateUnlockCache.set(note.id, payload);
@@ -350,8 +384,10 @@ async function updatePrivateNote(id, updates) {
             category: String(updates.category || current?.category || "general"),
             tags: Array.isArray(updates.tags) ? updates.tags : (current?.tags || []),
             time: current?.time || "Private note",
+            folderId: current?.folderId || null,
             reminderAt: updates.reminderAt || null,
             reminderNotified: Boolean(updates.reminderNotified),
+            attachments: Array.isArray(updates.attachments) ? structuredClone(updates.attachments) : (current?.attachments || []),
             history: typeof window.appendVersion === "function"
                 ? window.appendVersion(current?.history, current || {})
                 : (Array.isArray(current?.history) ? current.history : [])
@@ -363,9 +399,8 @@ async function updatePrivateNote(id, updates) {
         note.html = "";
         note.category = "general";
         note.tags = [];
-        note.reminderAt = updates.reminderAt || null;
-        note.reminderNotified = Boolean(updates.reminderNotified);
         note.versions = [];
+        stripPrivateMetadata(note);
         note.updatedAt = new Date().toISOString();
         privateUnlockCache.set(id, payload);
 
@@ -393,8 +428,10 @@ async function moveNoteFromPrivate(id) {
             html: payload.html || "",
             category: payload.category || "general",
             tags: Array.isArray(payload.tags) ? payload.tags : [],
-            reminderAt: payload.reminderAt || note.reminderAt || null,
-            reminderNotified: Boolean(payload.reminderNotified ?? note.reminderNotified),
+            folderId: payload.folderId || null,
+            attachments: Array.isArray(payload.attachments) ? structuredClone(payload.attachments) : [],
+            reminderAt: payload.reminderAt || null,
+            reminderNotified: Boolean(payload.reminderNotified),
             time: payload.time || note.time || "",
             versions: Array.isArray(payload.history) ? structuredClone(payload.history) : [],
             isPrivate: false,
@@ -451,6 +488,8 @@ async function restorePrivateNoteVersion(id, version) {
             category: version.category || "general",
             tags: Array.isArray(version.tags) ? [...version.tags] : [],
             time: version.time || current.time || "Private note",
+            folderId: version.folderId || current.folderId || null,
+            attachments: Array.isArray(version.attachments) ? structuredClone(version.attachments) : (current.attachments || []),
             reminderAt: version.reminderAt || null,
             reminderNotified: Boolean(version.reminderNotified),
             history
@@ -463,9 +502,8 @@ async function restorePrivateNoteVersion(id, version) {
         note.category = "general";
         note.tags = [];
         note.time = "Private note";
-        note.reminderAt = payload.reminderAt;
-        note.reminderNotified = payload.reminderNotified;
         note.versions = [];
+        stripPrivateMetadata(note);
         note.updatedAt = new Date().toISOString();
 
         privateUnlockCache.set(id, payload);
@@ -506,10 +544,35 @@ async function duplicatePrivateNote(id) {
     };
 
     duplicate.privateData = await encryptPrivatePayload(payload, privateKey, privateSalt);
+    stripPrivateMetadata(duplicate);
     window.notes.unshift(duplicate);
     privateUnlockCache.set(duplicate.id, payload);
     window.recordNoteCreation?.(duplicate);
     await saveNotes();
+    return true;
+}
+
+async function savePrivateAttachmentMetadata(id, attachments) {
+    const note = window.notes.find(item => item.id === id);
+    const current = privateUnlockCache.get(id);
+    if (!note?.isPrivate || !current || !privateKey || !privateSalt) return false;
+    const payload = { ...current, attachments: Array.isArray(attachments) ? structuredClone(attachments) : [] };
+    note.privateData = await encryptPrivatePayload(payload, privateKey, privateSalt);
+    stripPrivateMetadata(note);
+    note.updatedAt = new Date().toISOString();
+    privateUnlockCache.set(id, payload);
+    return true;
+}
+
+async function markPrivateReminderNotified(id) {
+    const note = window.notes.find(item => item.id === id);
+    const current = privateUnlockCache.get(id);
+    if (!note?.isPrivate || !current || !privateKey || !privateSalt) return false;
+    const payload = { ...current, reminderNotified: true };
+    note.privateData = await encryptPrivatePayload(payload, privateKey, privateSalt);
+    stripPrivateMetadata(note);
+    note.updatedAt = new Date().toISOString();
+    privateUnlockCache.set(id, payload);
     return true;
 }
 
@@ -523,5 +586,7 @@ window.updatePrivateNote = updatePrivateNote;
 window.duplicatePrivateNote = duplicatePrivateNote;
 window.getPrivateVersionHistory = getPrivateVersionHistory;
 window.restorePrivateNoteVersion = restorePrivateNoteVersion;
-window.getPrivateNotesCount = () => getPrivateNotes().length;
+window.savePrivateAttachmentMetadata = savePrivateAttachmentMetadata;
+window.markPrivateReminderNotified = markPrivateReminderNotified;
+window.getPrivateNotesCount = () => getPrivateNotes().filter(note => !note.deletedAt && !note.archived).length;
 window.privateNotesReady = true;

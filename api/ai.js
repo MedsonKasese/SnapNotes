@@ -1,11 +1,10 @@
 import { parseNoteSearchResponse } from "./ai-response.js";
+import { MAX_NOTE_CHARS, safeNotes } from "./ai-notes.js";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
 const MODEL = (process.env.GEMINI_MODEL || "gemini-3.5-flash-lite").trim();
-const MAX_NOTE_COUNT = 8;
-const MAX_NOTE_CHARS = 1500;
 const MAX_PROMPT_CHARS = 1200;
 
 function send(res, status, body) {
@@ -23,21 +22,6 @@ function getAdminAuth() {
   }
   if (!getApps().length) initializeApp({ credential: cert(serviceAccount) });
   return getAuth();
-}
-
-function safeNotes(value) {
-  if (!Array.isArray(value)) return [];
-  return value.slice(0, MAX_NOTE_COUNT).filter(note =>
-    note && typeof note === "object" &&
-    note.isPrivate !== true && !note.deletedAt && !note.archived &&
-    typeof note.text === "string"
-  ).map(note => ({
-    id: String(note.id || "").slice(0, 120),
-    title: String(note.title || "Untitled note").slice(0, 180),
-    text: note.text.slice(0, MAX_NOTE_CHARS),
-    category: String(note.category || "").slice(0, 40),
-    tags: Array.isArray(note.tags) ? note.tags.slice(0, 10).map(tag => String(tag).slice(0, 40)) : []
-  }));
 }
 
 export default async function handler(req, res) {
@@ -77,8 +61,16 @@ export default async function handler(req, res) {
       ].join("\n\n");
     } else {
       // Read the authenticated user's cloud notes on the server rather than trusting a client-supplied note list.
-      const userSnapshot = await getFirestore().collection("users").doc(decoded.uid).get();
-      const cloudNotes = userSnapshot.exists && Array.isArray(userSnapshot.data()?.notes) ? userSnapshot.data().notes : [];
+      const userRef = getFirestore().collection("users").doc(decoded.uid);
+      const userSnapshot = await userRef.get();
+      const userData = userSnapshot.exists ? userSnapshot.data() : {};
+      let cloudNotes = Array.isArray(userData?.notes) ? userData.notes : [];
+      if (userData?.activeLibraryRevision) {
+        const pages = await userRef.collection("libraries").doc(userData.activeLibraryRevision).collection("pages").get();
+        const pagedNotes = pages.docs.sort((a, b) => a.id.localeCompare(b.id))
+          .flatMap(page => Array.isArray(page.data()?.notes) ? page.data().notes : []);
+        cloudNotes = [...cloudNotes, ...pagedNotes];
+      }
       eligibleNotes = safeNotes(cloudNotes);
       if (!eligibleNotes.length) return send(res, 400, { error: "There are no eligible regular notes to search yet. Private, archived and trashed notes are excluded." });
       contents = [

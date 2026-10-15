@@ -4,7 +4,6 @@ import {
     signInWithEmailAndPassword,
     signInWithPopup,
     GoogleAuthProvider,
-    deleteUser,
     setPersistence,
     browserLocalPersistence,
     sendEmailVerification,
@@ -31,7 +30,7 @@ const userAvatarImage = document.getElementById("userAvatarImage");
 const userAvatarInitials = document.getElementById("userAvatarInitials");
 const authModal = document.getElementById("authModal");
 const closeModalBtn = document.getElementById("closeModalBtn");
-let accountDeletionTimer = null;
+let observedAuthUid;
 
 
 const profileModal = document.getElementById("profileEditModal");
@@ -165,6 +164,10 @@ function accountCacheKey(uid) {
 
 function restoreAccountCache(user) {
     if (!user?.uid) return;
+    if (localStorage.getItem(`SnapNotesAccountCleanupPending:${user.uid}`) === "true") {
+        void clearLocalAccountDataForDeletion(user);
+        return;
+    }
     const raw = localStorage.getItem(accountCacheKey(user.uid));
     if (!raw) return;
 
@@ -178,6 +181,10 @@ function restoreAccountCache(user) {
         }
         window.loadNotes?.();
         window.loadFolders?.();
+        const attachmentIds = attachmentIdsForAccount(user.uid);
+        void window.tagLegacyAttachmentFilesForUser?.(user.uid, attachmentIds).catch(error => {
+            console.warn("Could not migrate account-cache attachment ownership:", error);
+        });
     } catch (error) {
         localStorage.removeItem(accountCacheKey(user.uid));
         console.warn("Could not restore the local account cache:", error);
@@ -191,6 +198,134 @@ function cacheAccountBeforeSignOut(user) {
         folders: Array.isArray(window.getFolders?.()) ? window.getFolders() : [],
         savedAt: new Date().toISOString()
     }));
+}
+
+function attachmentIdsForAccount(uid) {
+    const notes = [];
+    if (window.snapNotesDataUid === uid && Array.isArray(window.notes)) notes.push(...window.notes);
+    try {
+        const cached = JSON.parse(localStorage.getItem(accountCacheKey(uid)) || "null");
+        if (Array.isArray(cached?.notes)) notes.push(...cached.notes);
+    } catch {}
+
+    const ids = new Set();
+    for (const note of notes) {
+        let readable = null;
+        try { readable = window.getReadablePrivateNote?.(note); } catch {}
+        for (const attachments of [note?.attachments, readable?.attachments]) {
+            if (!Array.isArray(attachments)) continue;
+            for (const attachment of attachments) if (typeof attachment?.id === "string") ids.add(attachment.id);
+        }
+    }
+    return [...ids];
+}
+
+function queuedAttachmentIdsForAccount(uid) {
+    try {
+        const queue = JSON.parse(localStorage.getItem("SnapNotesAttachmentCleanup") || "[]");
+        if (!Array.isArray(queue)) return [];
+        const prefix = `users/${uid}/`;
+        return queue.filter(item => item?.uid === uid ||
+            (typeof item?.storagePath === "string" && item.storagePath.startsWith(prefix)))
+            .map(item => item?.id)
+            .filter(id => typeof id === "string");
+    } catch {
+        return [];
+    }
+}
+
+async function clearLocalAccountDataForDeletion(user) {
+    const uid = user?.uid;
+    if (!uid || localStorage.getItem(`SnapNotesAccountCleanupDone:${uid}`) === "true") return;
+    const idsKey = `SnapNotesAccountAttachmentIds:${uid}`;
+    let attachmentIds = [];
+    try {
+        attachmentIds = JSON.parse(localStorage.getItem(idsKey) || "[]");
+        if (!Array.isArray(attachmentIds)) attachmentIds = [];
+    } catch { attachmentIds = []; }
+    attachmentIds = [...new Set([
+        ...attachmentIds,
+        ...attachmentIdsForAccount(uid),
+        ...queuedAttachmentIdsForAccount(uid)
+    ])];
+    let attachmentCleanupComplete = false;
+    let attachmentIdsPersisted = false;
+    try {
+        localStorage.setItem(idsKey, JSON.stringify(attachmentIds));
+        attachmentIdsPersisted = true;
+    } catch {
+        // Free the duplicate active-account cache before retrying the small ID-only record.
+        localStorage.removeItem("SnapNotes");
+        localStorage.removeItem("SnapNotesFolders");
+        try {
+            localStorage.setItem(idsKey, JSON.stringify(attachmentIds));
+            attachmentIdsPersisted = true;
+        } catch {}
+    }
+    try {
+        if (typeof window.deleteLocalAttachmentFilesForUser !== "function") {
+            throw new Error("Local attachment cleanup is unavailable.");
+        }
+        await window.deleteLocalAttachmentFilesForUser(uid, attachmentIds);
+        attachmentCleanupComplete = true;
+        localStorage.removeItem(idsKey);
+        localStorage.removeItem(`SnapNotesAccountCleanupPending:${uid}`);
+    } catch (error) {
+        console.warn("Could not remove all local attachment blobs for the deleted account:", error);
+    }
+
+    if (attachmentCleanupComplete || attachmentIdsPersisted) {
+        localStorage.removeItem(accountCacheKey(uid));
+    } else {
+        try { localStorage.setItem(`SnapNotesAccountCleanupPending:${uid}`, "true"); } catch {}
+    }
+    if (attachmentCleanupComplete || attachmentIdsPersisted) {
+        window.clearAttachmentCleanupQueueForUser?.(uid);
+    }
+    localStorage.removeItem(`SnapNotesAccountDeletion:${uid}`);
+    if (window.snapNotesDataUid === uid) {
+        window.notes = [];
+        window.snapNotesDataUid = null;
+        localStorage.removeItem("SnapNotes");
+        localStorage.removeItem("SnapNotesFolders");
+        window.loadFolders?.();
+        window.renderNotes?.("", "all");
+        window.updateNavigationCounts?.();
+    }
+    if (attachmentCleanupComplete) {
+        localStorage.setItem(`SnapNotesAccountCleanupDone:${uid}`, "true");
+    }
+}
+window.clearLocalAccountDataForDeletion = clearLocalAccountDataForDeletion;
+
+async function retryPendingLocalAttachmentCleanup() {
+    if (typeof window.deleteLocalAttachmentFilesForUser !== "function") return;
+    const pendingPrefix = "SnapNotesAccountCleanupPending:";
+    const pendingUids = Object.keys(localStorage)
+        .filter(key => key.startsWith(pendingPrefix))
+        .map(key => key.slice(pendingPrefix.length))
+        .filter(Boolean);
+    for (const uid of pendingUids) {
+        await clearLocalAccountDataForDeletion({ uid });
+    }
+
+    const prefix = "SnapNotesAccountAttachmentIds:";
+    const keys = Object.keys(localStorage).filter(key => key.startsWith(prefix));
+    for (const key of keys) {
+        const uid = key.slice(prefix.length);
+        if (!uid) continue;
+        try {
+            await clearLocalAccountDataForDeletion({ uid });
+        } catch (error) {
+            console.warn("Will retry local attachment cleanup for a deleted account:", error);
+        }
+    }
+}
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => void retryPendingLocalAttachmentCleanup());
+} else {
+    void retryPendingLocalAttachmentCleanup();
 }
 
 // Keep Firebase Auth persistent across page reloads and PWA sessions.
@@ -234,7 +369,7 @@ signupBtn.addEventListener("click", async () => {
     if (signupFullName.hidden) { signupFullName.hidden = false; signupBtn.textContent = "Register with email"; signupFullName.focus(); return; }
     const email = emailInput.value.trim();
     const password = passwordInput.value;
-    const fullName = signupFullName.value.trim().replace(/\\s+/g, " ");
+    const fullName = signupFullName.value.trim().replace(/\s+/g, " ");
 
     if (!fullName || !email || !password) {
         window.showToast("Please fill out all fields.", "warning");
@@ -417,49 +552,74 @@ function isMobileAuthEnvironment() {
         window.matchMedia("(display-mode: standalone)").matches;
 }
 
-function clearAccountDeletionTimer() {
-    if (accountDeletionTimer) {
-        clearTimeout(accountDeletionTimer);
-        accountDeletionTimer = null;
-    }
-}
-
-async function processScheduledAccountDeletion(user) {
-    clearAccountDeletionTimer();
+async function reportScheduledAccountDeletion(user) {
     try {
         const deletion = await getAccountDeletionStatus(user.uid);
         if (auth.currentUser?.uid !== user.uid || !deletion?.scheduledFor) return;
-
-        const delay = Date.parse(deletion.scheduledFor) - Date.now();
-        if (delay > 0) {
-            accountDeletionTimer = setTimeout(() => processScheduledAccountDeletion(user), Math.min(delay, 2_147_000_000));
-            return;
+        if (Date.parse(deletion.scheduledFor) <= Date.now()) {
+            if (deletion.status === "processing") await clearLocalAccountDataForDeletion(user);
+            window.showToast?.(deletion.status === "processing"
+                ? "Your account deletion is being securely processed."
+                : "Your scheduled account deletion is due and will be processed by the server.", "warning");
         }
-
-        await deleteUser(user);
-        localStorage.removeItem("SnapNotes");
-        window.notes = [];
-        window.renderNotes?.("", "all");
-        window.updateNavigationCounts?.();
-        window.showToast("Your account has been permanently deleted.", "warning");
     } catch (error) {
-        if (error.code === "auth/requires-recent-login") {
-            window.showToast("Your account is due for deletion. Sign in again to complete it.", "warning");
-        } else {
-            console.error("Scheduled account deletion failed:", error);
+        if (auth.currentUser?.uid === user.uid) console.warn("Could not check scheduled account deletion:", error);
+    }
+}
+
+function resetNoteStateForAuthTransition(nextUid, user) {
+    const previousUid = observedAuthUid;
+    if (previousUid === nextUid) return;
+    if (previousUid === undefined && !nextUid) {
+        observedAuthUid = null;
+        window.snapNotesDataUid = null;
+        return;
+    }
+
+    if (previousUid === null && nextUid) {
+        localStorage.setItem("SnapNotesLocalCache", JSON.stringify({
+            notes: Array.isArray(window.notes) ? window.notes : [],
+            folders: Array.isArray(window.getFolders?.()) ? window.getFolders() : []
+        }));
+    }
+
+    if (previousUid && localStorage.getItem(`SnapNotesAccountCleanupDone:${previousUid}`) !== "true") {
+        cacheAccountBeforeSignOut({ uid: previousUid });
+    } else if (previousUid) {
+        localStorage.removeItem(accountCacheKey(previousUid));
+    }
+    window.clearPrivateUnlock?.();
+    window.notes = [];
+    localStorage.removeItem("SnapNotes");
+    localStorage.removeItem("SnapNotesFolders");
+    window.snapNotesDataUid = nextUid || null;
+    observedAuthUid = nextUid;
+
+    if (user) {
+        restoreAccountCache(user);
+    } else {
+        try {
+            const localCache = JSON.parse(localStorage.getItem("SnapNotesLocalCache") || "null");
+            if (Array.isArray(localCache?.notes)) localStorage.setItem("SnapNotes", JSON.stringify(localCache.notes));
+            if (Array.isArray(localCache?.folders)) localStorage.setItem("SnapNotesFolders", JSON.stringify(localCache.folders));
+        } catch (error) {
+            console.warn("Could not restore signed-out local notes:", error);
         }
+        window.loadNotes?.();
+        window.loadFolders?.();
+        window.updateNavigationCounts?.();
     }
 }
 
 onAuthStateChanged(auth, user => {
+    resetNoteStateForAuthTransition(user?.uid || null, user);
     window.dispatchEvent(new CustomEvent("snapnotes:auth-changed", { detail: { user } }));
     resetGoogleButton();
 
     if (user) {
-        restoreAccountCache(user);
-        processScheduledAccountDeletion(user);
+        reportScheduledAccountDeletion(user);
         const initials = user.displayName
-            ? user.displayName.trim().split(/\\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase()
+            ? user.displayName.trim().split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase()
             : user.email
                 ? user.email.substring(0, 2).toUpperCase()
                 : "U";
@@ -493,7 +653,6 @@ onAuthStateChanged(auth, user => {
 
         loadFromCloud(user.uid);
     } else {
-        clearAccountDeletionTimer();
         userAvatar.hidden = true;
         if (userAvatarImage) {
             userAvatarImage.hidden = true;

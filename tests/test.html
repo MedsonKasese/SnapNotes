@@ -4,12 +4,13 @@
 <body>
 <h1>SnapNotes automated tests</h1>
 <pre id="results">Running...</pre>
-<script src="../js/attachments.js"></script>
+<script type="module" src="../js/attachments.js"></script>
 <script src="../js/folders.js"></script>
 <script src="../js/reminder-utils.js"></script>
 <script src="../js/ai-format.js"></script>
 <script src="../js/version-history.js"></script>
-<script>
+<script type="module">
+import { buildPrivatePayload, lockedPrivateNote } from "../js/private-note-utils.js";
 const results = [];
 function test(name, fn) {
   try { fn(); results.push("PASS  " + name); }
@@ -304,9 +305,12 @@ test("private sharing requires an explicit public-copy warning", () => {
   assert(warning.includes("public copy") && warning.includes("private note"), "private sharing warning is missing");
 });
 
-test("private reminder scheduling remains available outside encrypted content", () => {
-  const note = { isPrivate: true, reminderAt: new Date(Date.now() + 60000).toISOString(), reminderNotified: false };
-  assert(note.isPrivate && note.reminderAt && note.reminderNotified === false, "private reminder schedule contract is invalid");
+test("locked private-note metadata is masked and included only in encryption payload", () => {
+  const note = { isPrivate: true, reminderAt: "2026-10-15T09:00:00Z", reminderNotified: false, folderId: "secret-folder", attachments: [{ id: "a1", name: "secret.pdf" }] };
+  const payload = buildPrivatePayload(note);
+  const locked = lockedPrivateNote(note);
+  assert(payload.reminderAt === note.reminderAt && payload.attachments[0].name === "secret.pdf", "private metadata was not preserved for encryption");
+  assert(locked.reminderAt === null && locked.folderId === null && locked.attachments.length === 0, "locked note exposes private metadata");
 });
 
 document.getElementById("results").textContent = results.join("\n") + "\n\n" +
