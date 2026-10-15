@@ -5,6 +5,7 @@
 <h1>SnapNotes automated tests</h1>
 <pre id="results">Running...</pre>
 <script type="module" src="../js/attachments.js"></script>
+<script type="module" src="../js/checklist-utils.js"></script>
 <script src="../js/folders.js"></script>
 <script src="../js/reminder-utils.js"></script>
 <script src="../js/ai-format.js"></script>
@@ -39,6 +40,16 @@ test("rich-text and one-line AI subtitle markup converts to a safe heading", () 
   assert(oneLine.includes('<h3 class="note-subtitle">AI subtitle</h3>'), "one-line AI subtitle conversion is missing");
 });
 
+test("checklist tasks render as accessible, stateful checkbox controls", () => {
+  const container = document.createElement("div");
+  container.textContent = "☐ Pending task\n☑ Finished task";
+  window.renderInteractiveChecklist(container, "note-1");
+  const checkboxes = container.querySelectorAll('[data-checklist-toggle][role="checkbox"]');
+  assert(checkboxes.length === 2, "checklist controls were not rendered");
+  assert(checkboxes[0].getAttribute("aria-checked") === "false" && checkboxes[0].dataset.checklistIndex === "0", "incomplete item state or index is wrong");
+  assert(checkboxes[1].getAttribute("aria-checked") === "true" && container.querySelectorAll(".checklist-item-text.is-complete").length === 1, "completed item styling or state is wrong");
+});
+
 test("attachment limits are defined", () => {
   assert(window.MAX_ATTACHMENTS_PER_NOTE === 5, "attachment count limit is incorrect");
   assert(window.MAX_ATTACHMENT_SIZE === 10 * 1024 * 1024, "attachment size limit is incorrect");
@@ -46,6 +57,8 @@ test("attachment limits are defined", () => {
 
 test("attachment module exposes note attachment preparation", () => {
   assert(typeof window.prepareNoteAttachments === "function", "attachment preparation API is missing");
+  assert(typeof window.protectPrivateAttachmentsForPrivate === "function", "private attachment protection API is missing");
+  assert(typeof window.duplicatePrivateAttachments === "function", "private attachment duplication API is missing");
 });
 
 

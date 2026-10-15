@@ -20,6 +20,7 @@ const ALLOWED_ATTACHMENT_TYPES = new Set([
 let pendingAttachmentFiles = [];
 let attachmentUploadPromise = null;
 let attachmentRetryQueued = false;
+const privateAttachmentObjectUrls = new Set();
 
 function isAttachmentUserSignedIn() {
     return Boolean(window.firebaseAuth?.currentUser);
@@ -337,6 +338,153 @@ async function uploadAttachmentToCloud(noteId, attachment, file) {
     return attachment;
 }
 
+async function readAttachmentBlob(attachment) {
+    if (attachment?.id) {
+        const local = await getAttachmentFile(attachment.id).catch(() => null);
+        if (local) return local;
+    }
+
+    let url = "";
+    if (attachment?.storagePath) {
+        const signed = await storageApi("sign-download", { objectKey: attachment.storagePath });
+        url = signed.url || "";
+    } else if (attachment?.downloadUrl) {
+        url = attachment.downloadUrl;
+    }
+    if (!url) return null;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("Could not download an attachment for private protection.");
+    const bytes = await response.arrayBuffer();
+    return new Blob([bytes], { type: attachment.type || response.headers.get("content-type") || "application/octet-stream" });
+}
+
+async function protectPrivateAttachmentsForPrivate(noteId, attachments = []) {
+    const protectedAttachments = [];
+    const originals = [];
+    const createdIds = [];
+    try {
+        for (const attachment of Array.isArray(attachments) ? attachments : []) {
+            if (!attachment || attachment.encrypted === true) {
+                if (attachment) protectedAttachments.push(attachment);
+                continue;
+            }
+            if (attachment.downloadUrl && !attachment.storagePath) {
+                throw new Error("This note has a legacy attachment URL that SnapNotes cannot safely remove. Remove and re-add that file before moving the note to Private.");
+            }
+            if (attachment.storagePath && !navigator.onLine) {
+                throw new Error("Connect to the internet to protect and replace this note's synced attachments before moving it to Private.");
+            }
+            const source = await readAttachmentBlob(attachment);
+            if (!source) throw new Error("An attachment is not available on this device. Open the note on the device where it was added, then try again.");
+            const encrypted = await window.encryptPrivateAttachmentBlob?.(source);
+            if (!encrypted?.blob || !encrypted.iv) throw new Error("Private attachment encryption is unavailable. Unlock Private Notes and try again.");
+
+            const id = crypto.randomUUID();
+            await putAttachmentFile(id, encrypted.blob);
+            createdIds.push(id);
+            protectedAttachments.push({
+                id,
+                name: String(attachment.name || "Attachment"),
+                type: String(attachment.type || source.type || "application/octet-stream"),
+                size: Number(attachment.size) || source.size,
+                createdAt: attachment.createdAt || new Date().toISOString(),
+                storageProvider: null,
+                storagePath: null,
+                downloadUrl: null,
+                uploadStatus: "pending",
+                uploadError: null,
+                encrypted: true,
+                encryptionIv: encrypted.iv
+            });
+            originals.push(attachment.storagePath && !attachment.storageProvider
+                ? { ...attachment, storageProvider: "supabase" }
+                : attachment);
+        }
+    } catch (error) {
+        await Promise.all(createdIds.map(id => deleteAttachmentFile(id).catch(() => {})));
+        throw error;
+    }
+    return { attachments: protectedAttachments, originals };
+}
+
+async function unprotectPrivateAttachmentsFromPrivate(noteId, attachments = []) {
+    const restoredAttachments = [];
+    const originals = [];
+    const createdIds = [];
+    try {
+        for (const attachment of Array.isArray(attachments) ? attachments : []) {
+            if (!attachment?.encrypted) {
+                if (attachment) restoredAttachments.push(attachment);
+                continue;
+            }
+            const ciphertext = await readAttachmentBlob(attachment);
+            if (!ciphertext) throw new Error("A private attachment is not available. Try again on the device where it was added, or while online.");
+            const plaintext = await window.decryptPrivateAttachmentBlob?.(ciphertext, attachment.encryptionIv, attachment.type);
+            if (!plaintext) throw new Error("Could not decrypt a private attachment. Unlock Private Notes and try again.");
+            const id = crypto.randomUUID();
+            await putAttachmentFile(id, plaintext);
+            createdIds.push(id);
+            const { encrypted, encryptionIv, ...metadata } = attachment;
+            restoredAttachments.push({
+                ...metadata,
+                id,
+                size: plaintext.size,
+                storageProvider: null,
+                storagePath: null,
+                downloadUrl: null,
+                uploadStatus: "pending",
+                uploadError: null
+            });
+            originals.push(attachment.storagePath && !attachment.storageProvider
+                ? { ...attachment, storageProvider: "supabase" }
+                : attachment);
+        }
+    } catch (error) {
+        await Promise.all(createdIds.map(id => deleteAttachmentFile(id).catch(() => {})));
+        throw error;
+    }
+    return { attachments: restoredAttachments, originals };
+}
+
+async function duplicatePrivateAttachments(attachments = []) {
+    const duplicatedAttachments = [];
+    const createdIds = [];
+    try {
+        for (const attachment of Array.isArray(attachments) ? attachments : []) {
+            if (!attachment) continue;
+            const stored = await readAttachmentBlob(attachment);
+            if (!stored) throw new Error("A private attachment is not available to duplicate on this device.");
+            const plaintext = attachment.encrypted
+                ? await window.decryptPrivateAttachmentBlob?.(stored, attachment.encryptionIv, attachment.type)
+                : stored;
+            if (!plaintext) throw new Error("Could not decrypt a private attachment for duplication.");
+            const encrypted = await window.encryptPrivateAttachmentBlob?.(plaintext);
+            if (!encrypted?.blob || !encrypted.iv) throw new Error("Private attachment encryption is unavailable.");
+            const id = crypto.randomUUID();
+            await putAttachmentFile(id, encrypted.blob);
+            createdIds.push(id);
+            duplicatedAttachments.push({
+                id,
+                name: String(attachment.name || "Attachment"),
+                type: String(attachment.type || plaintext.type || "application/octet-stream"),
+                size: plaintext.size,
+                createdAt: new Date().toISOString(),
+                storageProvider: null,
+                storagePath: null,
+                downloadUrl: null,
+                uploadStatus: "pending",
+                uploadError: null,
+                encrypted: true,
+                encryptionIv: encrypted.iv
+            });
+        }
+    } catch (error) {
+        await Promise.all(createdIds.map(id => deleteAttachmentFile(id).catch(() => {})));
+        throw error;
+    }
+    return duplicatedAttachments;
+}
+
 async function prepareNoteAttachments(noteId, files, existing = []) {
     const attachments = Array.isArray(existing) ? [...existing] : [];
     const incoming = Array.from(files || []);
@@ -471,6 +619,20 @@ async function retryPendingAttachmentUploads(options = {}) {
 }
 
 async function resolveAttachmentUrl(attachment) {
+    if (attachment?.encrypted === true) {
+        try {
+            const ciphertext = await readAttachmentBlob(attachment);
+            if (!ciphertext) return "";
+            const plaintext = await window.decryptPrivateAttachmentBlob?.(ciphertext, attachment.encryptionIv, attachment.type);
+            if (!plaintext) return "";
+            const url = URL.createObjectURL(plaintext);
+            privateAttachmentObjectUrls.add(url);
+            return url;
+        } catch (error) {
+            console.warn("Private attachment could not be opened:", error?.message || error);
+            return "";
+        }
+    }
     if (attachment?.id) {
         const blob = await getAttachmentFile(attachment.id).catch(() => null);
         if (blob) return URL.createObjectURL(blob);
@@ -487,6 +649,11 @@ async function resolveAttachmentUrl(attachment) {
     // Keep existing Firebase URLs readable if they are still available.
     if (attachment?.downloadUrl) return attachment.downloadUrl;
     return "";
+}
+
+function clearPrivateAttachmentObjectUrls() {
+    for (const url of privateAttachmentObjectUrls) URL.revokeObjectURL(url);
+    privateAttachmentObjectUrls.clear();
 }
 
 async function removeNoteAttachment(noteId, attachmentId) {
@@ -652,10 +819,14 @@ window.addPendingAttachments = addPendingAttachments;
 window.resetPendingAttachments = resetPendingAttachments;
 window.getPendingAttachments = () => [...pendingAttachmentFiles];
 window.prepareNoteAttachments = prepareNoteAttachments;
+window.protectPrivateAttachmentsForPrivate = protectPrivateAttachmentsForPrivate;
+window.unprotectPrivateAttachmentsFromPrivate = unprotectPrivateAttachmentsFromPrivate;
+window.duplicatePrivateAttachments = duplicatePrivateAttachments;
 window.retryPendingAttachmentUploads = retryPendingAttachmentUploads;
 window.retryPendingAttachmentCleanup = retryPendingAttachmentCleanup;
 window.cleanupAttachmentsForNotes = cleanupAttachmentsForNotes;
 window.queueAttachmentCleanup = runAttachmentCleanup;
+window.clearPrivateAttachmentObjectUrls = clearPrivateAttachmentObjectUrls;
 window.deleteLocalAttachmentFilesForUser = deleteLocalAttachmentFilesForUser;
 window.tagLegacyAttachmentFilesForUser = tagLegacyAttachmentFilesForUser;
 window.clearAttachmentCleanupQueueForUser = clearAttachmentCleanupQueueForUser;

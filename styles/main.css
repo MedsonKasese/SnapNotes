@@ -759,6 +759,9 @@ body.dark-mode .smart-share-preview {
 .ai-result-text, .ai-answer-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.55; font-size: .92rem; }
 .ai-source-list { display: grid; gap: 10px; padding-left: 20px; }
 .ai-source-list li { padding-left: 3px; }
+.ai-source-reference { padding: 0; border: 0; background: none; color: var(--primary-color); font: inherit; font-weight: 700; text-align: left; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.ai-source-reference:hover { color: var(--primary-dark); }
+.ai-source-reference:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; border-radius: 2px; }
 .ai-source-list p { margin: 4px 0 0; color: var(--muted-color); font-size: .84rem; line-height: 1.45; }
 @media (max-width: 480px) {
     .ai-dialog-overlay { align-items: flex-end; padding: 8px; }

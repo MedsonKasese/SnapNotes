@@ -347,6 +347,18 @@ Then write your notes below..."
                     </span>
                     <input type="checkbox" id="confirmDeleteSetting" checked>
                 </label>
+                <label class="settings-option" for="privateLockSetting">
+                    <span class="settings-option-leading">
+                        <span class="settings-option-icon"><i class="fa-solid fa-lock"></i></span>
+                        <span>Lock Private Notes</span>
+                    </span>
+                    <select id="privateLockSetting" aria-label="When Private Notes lock">
+                        <option value="immediate">Immediately after leaving</option>
+                        <option value="1m">After 1 minute</option>
+                        <option value="5m">After 5 minutes</option>
+                        <option value="app-close">When the app closes</option>
+                    </select>
+                </label>
             </section>
 
             <section class="settings-section settings-info-section" aria-labelledby="aboutTitle">
@@ -529,6 +541,7 @@ Then write your notes below..."
     <script src="js/folders.js"></script>
     <script src="js/version-history.js"></script>
     <script type="module" src="js/private-notes.js"></script>
+    <script type="module" src="js/checklist-utils.js"></script>
     <script type="module" src="js/storage.js"></script>
     <script type="module" src="js/note-deletions.js"></script>
     <script src="js/notes.js"></script>

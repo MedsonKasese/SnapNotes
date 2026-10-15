@@ -16,11 +16,11 @@ Never place either secret in browser JavaScript, commit them, or share them in i
 
 - Users must be signed in. The server verifies the Firebase ID token with Firebase Admin.
 - The UI asks for consent before sending note text to Google Gemini.
-- The feature is intended to exclude private, archived, and trashed notes. The server also rejects a note explicitly marked `isPrivate: true`.
-- Improve results are previewed and are not written into the editor until the user chooses Apply. The user must still save the note.
+- Search reads the signed-in user's cloud library on the server and excludes private, archived, trashed, and conflict-copy notes before they are sent to Gemini. The server also rejects an entry explicitly marked `isPrivate: true`.
+- Improve results are previewed and are not written into the editor until the user chooses Apply. Replacing existing text requires an additional confirmation, and the user must still save the note.
 - When applying an improvement, the first Markdown heading is normalised to SnapNotes' `## Title` convention so a Gemini `# Title` response is saved as a titled note instead of `Untitled`. Other headings in the note body are preserved.
-- Search returns an answer and source excerpts from the eligible notes provided by the browser.
-- This is an initial implementation. Client-provided note metadata is not a substitute for server-side database authorization; do not treat the endpoint as a security boundary for arbitrary user-supplied notes. Never submit private content.
+- Search returns an answer and source excerpts; each source title is a link that opens the matching note in the library.
+- The improve action sends the selected note text from the browser. Do not manually submit private content or treat user-selected note text as server-verified data.
 
 If the endpoint returns a model-unavailable error, check the Vercel function logs for Google's provider message and confirm the model is available to the configured API key. You can change `GEMINI_MODEL` in Vercel without editing application code, then redeploy.
 
