@@ -8,6 +8,7 @@ import { enqueueAndProcessAttachmentCleanup, ATTACHMENT_CLEANUP_KEY } from "../j
 import { renderSettingsAccount } from "../js/settings-account.js";
 import { migrateLegacyDraft, readDrafts, removeDraft, upsertDraft } from "../js/drafts.js";
 import { renderSubtitleMarkdownText } from "../js/note-format.js";
+import { replaceChecklistMarker } from "../js/checklist-utils.js";
 import { hasPrivatePasskey, registerPrivatePasskey, removePrivatePasskey, unlockPrivateKeyWithPasskey } from "../js/private-passkey.js";
 import { webcrypto } from "node:crypto";
 import { createLocalLibraryStore } from "../js/local-library.js";
@@ -129,6 +130,12 @@ test("recovery drafts support multiple entries and update the same draft in plac
 test("double-asterisk subtitle lines render as safe headings without changing ordinary text", () => {
   const html = renderSubtitleMarkdownText("Intro\n**Highlights**\n**<script>alert(1)</script>**\n**not a subtitle** trailing");
   assert.equal(html, "Intro<br><h3 class=\"note-subtitle\">Highlights</h3><br><h3 class=\"note-subtitle\">&lt;script&gt;alert(1)&lt;/script&gt;</h3><br>**not a subtitle** trailing");
+});
+
+test("checklist toggles update one marker while preserving text and markup", () => {
+  assert.equal(replaceChecklistMarker("☐ First\n☐ Second", 1, true), "☐ First\n☑ Second");
+  assert.equal(replaceChecklistMarker("<div>☐ First</div><div>☑ Second</div>", 0, true), "<div>☑ First</div><div>☑ Second</div>");
+  assert.equal(replaceChecklistMarker("☐ First", 4, true), "☐ First");
 });
 
 test("Ask My Notes filters ineligible entries before applying its eight-note limit", () => {

@@ -194,6 +194,7 @@ function createNoteElement(note) {
     } else {
         body.textContent = bodyText;
     }
+    window.renderInteractiveChecklist?.(body, note.id);
 
     content.appendChild(title);
     content.appendChild(body);
@@ -623,8 +624,10 @@ async function openNoteDetail(id) {
                 <button type="button" class="primary-action" data-detail-close>Close</button>
             </div>
         </div>`;
+    modal.dataset.noteId = String(id);
     modal.classList.add("show");
     modal.setAttribute("aria-hidden", "false");
+    window.renderInteractiveChecklist?.(modal.querySelector(".note-detail-body"), note.id);
     window.renderNoteAttachments?.(modal.querySelector("[data-note-attachments]"), note.attachments || []);
     modal.querySelectorAll("[data-detail-close]").forEach(button => button.addEventListener("click", closeNoteDetail));
     modal.querySelector("[data-detail-edit]").addEventListener("click", () => {
@@ -642,6 +645,7 @@ function closeNoteDetail() {
     modal.classList.remove("show");
     modal.setAttribute("aria-hidden", "true");
     modal.innerHTML = "";
+    delete modal.dataset.noteId;
 }
 
 function escapeHtml(value) {
@@ -650,6 +654,52 @@ function escapeHtml(value) {
 
 window.openNoteDetail = openNoteDetail;
 window.closeNoteDetail = closeNoteDetail;
+
+async function toggleChecklistItem(noteId, index, wasComplete) {
+    const rawNote = (window.notes || []).find(item => String(item.id) === String(noteId));
+    if (!rawNote) return false;
+    const note = window.getReadablePrivateNote?.(rawNote) || rawNote;
+    const complete = !wasComplete;
+    const text = window.replaceChecklistMarker?.(note.text, index, complete) ?? note.text;
+    const html = window.replaceChecklistMarker?.(note.html, index, complete) ?? note.html;
+    if (text === note.text && html === note.html) return false;
+
+    if (rawNote.isPrivate) {
+        const saved = await window.updatePrivateNote?.(rawNote.id, {
+            title: note.title,
+            text,
+            html,
+            category: note.category,
+            tags: note.tags,
+            reminderAt: note.reminderAt,
+            reminderNotified: note.reminderNotified,
+            attachments: note.attachments
+        });
+        if (!saved) return false;
+    } else {
+        recordHistory(rawNote.id);
+        rawNote.text = text;
+        rawNote.html = html;
+        rawNote.updatedAt = new Date().toISOString();
+        await saveNotes();
+    }
+
+    renderNotes();
+    if (typeof window.updateNavigationCounts === "function") window.updateNavigationCounts();
+    const modal = document.getElementById("noteDetailModal");
+    if (modal?.classList.contains("show") && modal.dataset.noteId === String(noteId)) {
+        await openNoteDetail(noteId);
+    }
+    return true;
+}
+
+document.addEventListener("click", event => {
+    const checkbox = event.target.closest("[data-checklist-toggle]");
+    if (!checkbox) return;
+    event.preventDefault();
+    event.stopPropagation();
+    void toggleChecklistItem(checkbox.dataset.noteId, Number(checkbox.dataset.checklistIndex), checkbox.getAttribute("aria-checked") === "true");
+});
 
 function viewForNote(note) {
     if (note.deletedAt) return "trash";

@@ -44,6 +44,31 @@
     overflow-wrap: anywhere;
 }
 
+.checklist-checkbox {
+    display: inline-grid;
+    width: 1.15em;
+    height: 1.15em;
+    margin: 0 0.42em 0 0;
+    padding: 0;
+    vertical-align: -0.16em;
+    place-items: center;
+    border: 1.5px solid var(--muted-color);
+    border-radius: 4px;
+    background: var(--surface-color);
+    color: var(--primary-dark);
+    cursor: pointer;
+}
+
+.checklist-checkbox[aria-checked="true"] {
+    border-color: var(--primary-color);
+    background: color-mix(in srgb, var(--primary-color) 12%, var(--surface-color));
+}
+
+.checklist-checkbox-mark { font-size: 0.78em; font-weight: 800; line-height: 1; }
+.checklist-item-text.is-complete { color: var(--muted-color); font-style: italic; text-decoration: line-through; text-decoration-thickness: 1px; }
+.note-card-body .checklist-checkbox:focus-visible,
+.note-detail-body .checklist-checkbox:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+
 .note-card-body:empty {
     display: none;
 }
