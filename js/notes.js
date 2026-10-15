@@ -31,6 +31,10 @@ function purgeExpiredTrash(now = Date.now()) {
 function renderNotes(filterText = "", filterCategory = "all", view = window.getActiveNotesView ? window.getActiveNotesView() : "all", folderId = window.activeFolderId || null) {
     const notesContainer = document.getElementById("notesContainer");
     if (!notesContainer) return;
+    if (view === "drafts") {
+        window.renderDrafts?.();
+        return;
+    }
     purgeExpiredTrash();
 
     const notes = Array.isArray(window.notes) ? window.notes : [];
@@ -185,6 +189,8 @@ function createNoteElement(note) {
     const bodyText = getNoteBodyText(note);
     if (note.html && typeof window.sanitizeNoteHtml === "function") {
         body.innerHTML = getNoteBodyHtml(note);
+    } else if (typeof window.renderSubtitleMarkdownText === "function") {
+        body.innerHTML = window.renderSubtitleMarkdownText(bodyText);
     } else {
         body.textContent = bodyText;
     }
@@ -471,9 +477,10 @@ function startEditing(card, note) {
     saveButton.addEventListener("click", async () => {
         const title = titleInput.value.trim();
         const body = bodyInput.innerText.replace(/\r/g, "").trim();
-        const html = typeof window.sanitizeNoteHtml === "function"
+        const safeHtml = typeof window.sanitizeNoteHtml === "function"
             ? window.sanitizeNoteHtml(bodyInput.innerHTML)
             : body;
+        const html = window.formatSubtitleMarkdownInHtml?.(safeHtml) || safeHtml;
 
         if (!title && !body) {
             showToast("Note can't be empty.", "warning");
@@ -596,7 +603,7 @@ async function openNoteDetail(id) {
 
     const bodyHtml = note.html && typeof window.sanitizeNoteHtml === "function"
         ? getNoteBodyHtml(note)
-        : String(note.text || "").replace(/\n/g, "<br>");
+        : (window.renderSubtitleMarkdownText?.(String(note.text || "")) || escapeHtml(note.text || "").replace(/\n/g, "<br>"));
     const tags = (note.tags || []).map(tag => `<span class="note-tag">#${escapeHtml(tag)}</span>`).join("");
     modal.innerHTML = `
         <div class="note-detail-sheet" role="dialog" aria-modal="true" aria-labelledby="noteDetailTitle">
@@ -839,7 +846,8 @@ function updateEmptyState(filteredCount, totalCount, invalidCategory = "") {
 function getNoteBodyHtml(note) {
     if (!note?.html) return "";
 
-    return stripMarkdownTitleFromHtml(note.html, note.title);
+    const body = stripMarkdownTitleFromHtml(note.html, note.title);
+    return window.formatSubtitleMarkdownInHtml?.(body) || body;
 }
 
 function stripMarkdownTitleFromHtml(html, title = "") {

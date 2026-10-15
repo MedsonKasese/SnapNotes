@@ -9,6 +9,8 @@
 <script src="../js/reminder-utils.js"></script>
 <script src="../js/ai-format.js"></script>
 <script src="../js/version-history.js"></script>
+<script type="module" src="../js/drafts.js"></script>
+<script type="module" src="../js/note-format.js"></script>
 <script type="module">
 import { buildPrivatePayload, lockedPrivateNote } from "../js/private-note-utils.js";
 const results = [];
@@ -19,6 +21,23 @@ function test(name, fn) {
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 
 test("localStorage is available", () => assert("localStorage" in window, "localStorage missing"));
+
+test("recovery-draft APIs are available for the Library", () => {
+  assert(typeof window.SnapNotesDrafts?.read === "function", "draft storage API is missing");
+  assert(typeof window.SnapNotesDrafts?.upsert === "function", "draft save API is missing");
+});
+
+test("standalone double-asterisk lines render as subtitles", () => {
+  const html = window.renderSubtitleMarkdownText("Intro\n**Next steps**");
+  assert(html.includes('<h3 class="note-subtitle">Next steps</h3>'), "subtitle formatting is missing");
+});
+
+test("rich-text and one-line AI subtitle markup converts to a safe heading", () => {
+  const richText = window.formatSubtitleMarkdownInHtml("<div>**Next steps**</div>");
+  const oneLine = window.formatSubtitleMarkdownInHtml("**AI subtitle**");
+  assert(richText.includes('<h3 class="note-subtitle">Next steps</h3>'), "rich-text subtitle conversion is missing");
+  assert(oneLine.includes('<h3 class="note-subtitle">AI subtitle</h3>'), "one-line AI subtitle conversion is missing");
+});
 
 test("attachment limits are defined", () => {
   assert(window.MAX_ATTACHMENTS_PER_NOTE === 5, "attachment count limit is incorrect");
