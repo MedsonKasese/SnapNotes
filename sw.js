@@ -28,7 +28,7 @@ self.addEventListener("notificationclick", event => {
   );
 });
 
-const CACHE_NAME = "snapnotes-v70";
+const CACHE_NAME = "snapnotes-v71";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -91,6 +91,9 @@ self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
 
   const url = new URL(event.request.url);
+
+  // Never cache API responses, signed URLs, or private user-specific content.
+  if (url.origin === self.location.origin && url.pathname.startsWith("/api/")) return;
 
   if (url.origin !== self.location.origin) {
     event.respondWith(

@@ -1,0 +1,47 @@
+name: Auto-bump SnapNotes PWA cache version
+
+on:
+  push:
+    branches:
+      - '**'
+
+permissions:
+  contents: write
+
+jobs:
+  bump-cache:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: true
+      - name: Bump version when app files change
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The first commit on a new branch is already based on an existing app version.
+          if ! git rev-parse HEAD^ >/dev/null 2>&1; then exit 0; fi
+          changed="$(git diff --name-only HEAD^ HEAD)"
+          if ! printf '%s\n' "$changed" | grep -Eq '^(index\.html|manifest\.json|sw\.js|js/|styles/|assets/|api/|lib/)'; then
+            echo "No app files changed; skipping bump."
+            exit 0
+          fi
+          # An explicit version bump in the same push should not be bumped again.
+          if git diff HEAD^ HEAD -- sw.js | grep -Eq '^\+const CACHE_NAME = "snapnotes-v[0-9]+";'; then
+            echo "Cache version was already bumped; skipping."
+            exit 0
+          fi
+          current="$(sed -nE 's/^const CACHE_NAME = "snapnotes-v([0-9]+)";$/\1/p' sw.js)"
+          if [[ ! "$current" =~ ^[0-9]+$ ]]; then
+            echo "Cannot find numeric SnapNotes cache version in sw.js" >&2
+            exit 1
+          fi
+          next=$((10#$current + 1))
+          sed -i -E "s/^(const CACHE_NAME = \"snapnotes-v)[0-9]+(\";)/\1$next\2/" sw.js
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add sw.js
+          git commit -m "chore(pwa): auto-bump cache to v$next [skip ci]"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

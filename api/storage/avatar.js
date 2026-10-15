@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   try {
     const { data, error } = await storage().createSignedUrl(key, 60);
     if (error || !data?.signedUrl) return send(res, 404, { error: "Profile photo not found." });
-    res.setHeader("Cache-Control", "public, max-age=30");
+    res.setHeader("Cache-Control", "no-store");
     return res.redirect(302, data.signedUrl);
   } catch (error) { return failure(res, error, "Profile photo is unavailable."); }
 }
