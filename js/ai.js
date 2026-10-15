@@ -107,7 +107,7 @@
     }
     if (action === "improve" && savedEditContext) {
       const note = window.notes?.find(item => item.id === savedEditContext.noteId);
-      if (!note || note.isPrivate || note.deletedAt) { setStatus("This note cannot be sent to AI.", true); return; }
+      if (!note || note.isPrivate || note.archived || note.deletedAt || note.syncConflict) { setStatus("This note cannot be sent to AI.", true); return; }
     }
     const noteParts = action === "improve" && savedEditContext ? savedEditContext.read() : readEditorTitleAndBody();
     const text = action === "improve" && savedEditContext ? noteParts.text.slice(0, 1500) : (noteParts.body || editor.innerText.trim().slice(0, 1500));
