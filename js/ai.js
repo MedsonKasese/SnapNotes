@@ -148,11 +148,24 @@
         sources.replaceChildren();
         (Array.isArray(payload.sources) ? payload.sources : []).forEach(source => {
           const item = document.createElement("li");
-          const title = document.createElement("strong");
-          title.textContent = source.title || "Untitled note";
+          const title = source.title || "Untitled note";
+          const reference = document.createElement("button");
+          reference.type = "button";
+          reference.className = "ai-source-reference";
+          reference.textContent = title;
+          reference.setAttribute("aria-label", `Open source note: ${title}`);
+          reference.addEventListener("click", async () => {
+            const note = window.notes?.find(item => String(item.id) === String(source.id));
+            if (!note) {
+              setStatus("This source is not in your current library yet. Sync your notes and try again.", true);
+              return;
+            }
+            closeDialog();
+            await window.openNoteDetail?.(String(source.id));
+          });
           const excerpt = document.createElement("p");
           excerpt.textContent = source.excerpt || "";
-          item.append(title, excerpt);
+          item.append(reference, excerpt);
           sources.append(item);
         });
         answerPanel.hidden = false;
@@ -200,11 +213,14 @@
     // Markdown H1 into an untitled SnapNotes note.
     if (savedEditContext) {
       const original = savedEditContext.read();
+      if ((original.title || original.text) && !window.confirm("Apply this AI suggestion and replace the current title and note text?")) return;
       const normalized = window.normalizeAskMyNotesResult(lastImprovement, original.title);
       const lines = normalized.replace(/\r/g, "").split("\n");
       const match = lines[0]?.match(/^##\s*(.*)$/);
       savedEditContext.apply({ title: match ? match[1].trim() : original.title, text: match ? lines.slice(1).join("\n").trim() : normalized.trim() });
     } else {
+      const original = readEditorTitleAndBody();
+      if ((original.title || original.body) && !window.confirm("Apply this AI suggestion and replace the current title and note text in the editor?")) return;
       editor.textContent = window.normalizeAskMyNotesResult(lastImprovement, readEditorTitleAndBody().title);
       editor.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText" }));
       editor.focus();
