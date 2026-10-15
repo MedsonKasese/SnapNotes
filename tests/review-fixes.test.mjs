@@ -8,6 +8,8 @@ import { enqueueAndProcessAttachmentCleanup, ATTACHMENT_CLEANUP_KEY } from "../j
 import { renderSettingsAccount } from "../js/settings-account.js";
 import { migrateLegacyDraft, readDrafts, removeDraft, upsertDraft } from "../js/drafts.js";
 import { renderSubtitleMarkdownText } from "../js/note-format.js";
+import { hasPrivatePasskey, registerPrivatePasskey, removePrivatePasskey, unlockPrivateKeyWithPasskey } from "../js/private-passkey.js";
+import { webcrypto } from "node:crypto";
 
 function memoryStorage() {
   const values = new Map();
@@ -117,6 +119,53 @@ test("private payload preserves metadata for encryption while locked projection 
   assert.equal("attachments" in source, false);
   assert.equal("folderId" in source, false);
   assert.equal(source.reminderAt, null);
+});
+
+test("passkey PRF wraps and restores the private-note key without removing password fallback", async () => {
+  const descriptors = new Map();
+  const define = (name, value) => {
+    descriptors.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+    Object.defineProperty(globalThis, name, { configurable: true, writable: true, value });
+  };
+  const storage = memoryStorage();
+  const credentialId = Uint8Array.from([1, 2, 3, 4]).buffer;
+  const prfOutput = Uint8Array.from({ length: 32 }, (_, index) => index + 7);
+  define("crypto", webcrypto);
+  define("isSecureContext", true);
+  define("location", { hostname: "localhost" });
+  define("PublicKeyCredential", class {});
+  define("navigator", {
+    credentials: {
+      async create({ publicKey }) {
+        assert.equal(publicKey.rp.id, "localhost");
+        assert.deepEqual(publicKey.extensions, { prf: {} });
+        return { rawId: credentialId, getClientExtensionResults: () => ({ prf: { enabled: true } }) };
+      },
+      async get({ publicKey }) {
+        assert.equal(publicKey.userVerification, "required");
+        assert.ok(publicKey.extensions.prf.eval.first instanceof Uint8Array);
+        return { getClientExtensionResults: () => ({ prf: { results: { first: prfOutput.slice().buffer } } }) };
+      }
+    }
+  });
+
+  try {
+    const original = await webcrypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
+    assert.equal(await registerPrivatePasskey(original, storage), true);
+    assert.equal(hasPrivatePasskey(storage), true);
+    const unlocked = await unlockPrivateKeyWithPasskey(storage);
+    assert.deepEqual(
+      new Uint8Array(await webcrypto.subtle.exportKey("raw", unlocked)),
+      new Uint8Array(await webcrypto.subtle.exportKey("raw", original))
+    );
+    removePrivatePasskey(storage);
+    assert.equal(hasPrivatePasskey(storage), false);
+  } finally {
+    for (const [name, descriptor] of descriptors) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else delete globalThis[name];
+    }
+  }
 });
 
 test("cloud load generation rejects stale A-to-B and A-to-B-to-A responses", () => {

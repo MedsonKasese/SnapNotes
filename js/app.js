@@ -98,6 +98,7 @@ function setupEventListeners() {
     const addBtn = document.getElementById("addBtn");
     const newNoteBtn = document.getElementById("newNoteBtn");
     const emptyTrashBtn = document.getElementById("emptyTrashBtn");
+    const privatePasskeyBtn = document.getElementById("privatePasskeyBtn");
     const logoButton = document.getElementById("logoButton");
     const editorCategory = document.getElementById("editorCategory");
     const drawerNav = document.getElementById("drawerNav");
@@ -173,6 +174,15 @@ function setupEventListeners() {
     addBtn.addEventListener("click", openNewNoteView);
     newNoteBtn.addEventListener("click", openNewNoteView);
     emptyTrashBtn.addEventListener("click", () => window.emptyTrash?.());
+    privatePasskeyBtn?.addEventListener("click", async () => {
+        if (window.hasPrivatePasskey?.()) {
+            if (!confirm("Remove passkey unlocking from this device? Your Private Notes password will still work.")) return;
+            window.disablePrivatePasskey?.();
+        } else {
+            await window.configurePrivatePasskey?.();
+        }
+        updatePrivatePasskeyButton();
+    });
 
     exportNotesBtn.addEventListener("click", exportNotes);
     importNotesBtn.addEventListener("click", () => importNotesInput.click());
@@ -298,6 +308,7 @@ function openNewNoteView() {
     if (activeDraftId) saveDraft();
     window.clearPrivateUnlock?.();
     activeView = "all";
+    updatePrivatePasskeyButton();
     activeCategory = "all";
     activeFolderId = null;
     window.activeFolderId = null;
@@ -323,6 +334,7 @@ function openNotesView(category = activeCategory) {
     saveDraft();
     window.clearPrivateUnlock?.();
     activeView = "all";
+    updatePrivatePasskeyButton();
     activeFolderId = null;
     window.activeFolderId = null;
     activeCategory = category;
@@ -350,6 +362,7 @@ async function selectView(view) {
 
     saveDraft();
     activeView = view;
+    updatePrivatePasskeyButton();
     activeFolderId = null;
     window.activeFolderId = null;
     document.querySelectorAll(".drawer-item").forEach(item => {
@@ -371,6 +384,14 @@ async function selectView(view) {
     document.getElementById("notesViewTitle").textContent = titles[view] || "Notes";
     document.getElementById("notesViewEyebrow").textContent = view === "private" ? "Private library" : "Library";
     applyNoteFilters();
+}
+
+function updatePrivatePasskeyButton() {
+    const button = document.getElementById("privatePasskeyBtn");
+    if (!button) return;
+    const supported = Boolean(window.canUsePrivatePasskey?.());
+    button.hidden = activeView !== "private" || !supported;
+    button.textContent = window.hasPrivatePasskey?.() ? "Remove passkey" : "Set up passkey";
 }
 
 function selectCategory(category) {

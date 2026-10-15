@@ -6,6 +6,7 @@
 // are unlocked. Forgetting it means the encrypted content cannot be recovered.
 
 import { buildPrivatePayload, lockedPrivateNote, privateNoteMetadataNeedsMigration, stripPrivateMetadata } from "./private-note-utils.js";
+import { canUsePrivatePasskey, hasPrivatePasskey, registerPrivatePasskey, removePrivatePasskey, unlockPrivateKeyWithPasskey } from "./private-passkey.js";
 
 const PRIVATE_CRYPTO_VERSION = 1;
 const PRIVATE_KDF_ITERATIONS = 600000;
@@ -47,7 +48,7 @@ async function derivePrivateKey(password, salt) {
         },
         material,
         { name: "AES-GCM", length: 256 },
-        false,
+        true,
         ["encrypt", "decrypt"]
     );
 }
@@ -152,6 +153,7 @@ function createPrivatePasswordModal(mode) {
         <input type="password" class="private-password-input" autocomplete="new-password" placeholder="Password" minlength="${PRIVATE_MIN_PASSWORD_LENGTH}" maxlength="128">
         ${setup ? `<input type="password" class="private-password-confirm" autocomplete="new-password" placeholder="Confirm password" minlength="${PRIVATE_MIN_PASSWORD_LENGTH}" maxlength="128">` : ""}
         <p class="private-password-hint">${setup ? `Use at least ${PRIVATE_MIN_PASSWORD_LENGTH} characters.` : ""}</p>
+        ${!setup && hasPrivatePasskey() ? `<button type="button" class="secondary-action private-passkey-submit">Use passkey or fingerprint</button>` : ""}
         <div class="private-password-actions">
             <button type="button" class="cancel-button private-password-cancel">Cancel</button>
             <button type="button" class="primary-action private-password-submit">${setup ? "Set password" : "Unlock"}</button>
@@ -166,6 +168,7 @@ function createPrivatePasswordModal(mode) {
     const hint = sheet.querySelector(".private-password-hint");
     const submit = sheet.querySelector(".private-password-submit");
     const cancel = sheet.querySelector(".private-password-cancel");
+    const passkeySubmit = sheet.querySelector(".private-passkey-submit");
 
     const cleanup = () => modal.remove();
 
@@ -193,8 +196,10 @@ function createPrivatePasswordModal(mode) {
                 return;
             }
 
-            finish(password);
+            finish({ type: "password", value: password });
         });
+
+        passkeySubmit?.addEventListener("click", () => finish({ type: "passkey" }));
 
         modal.addEventListener("click", event => {
             if (event.target === modal) finish(null);
@@ -215,6 +220,10 @@ async function requestPrivatePassword(mode) {
 
 async function establishPrivateSession(password, salt) {
     const key = await derivePrivateKey(password, salt);
+    return establishPrivateSessionWithKey(key, salt);
+}
+
+async function establishPrivateSessionWithKey(key, salt) {
     const notes = getPrivateNotes();
     const unlockedNotes = [];
     let migrated = false;
@@ -285,10 +294,17 @@ async function unlockPrivateNotes() {
         return false;
     }
 
-    const password = await requestPrivatePassword("unlock");
-    if (!password) return false;
+    const credential = await requestPrivatePassword("unlock");
+    if (!credential) return false;
 
     try {
+        if (credential.type === "passkey") {
+            const key = await unlockPrivateKeyWithPasskey();
+            const salt = base64ToBytes(notes[0].privateData.salt);
+            await establishPrivateSessionWithKey(key, salt);
+            return true;
+        }
+        const password = credential.value;
         const salt = base64ToBytes(notes[0].privateData.salt);
         await establishPrivateSession(password, salt);
         return true;
@@ -308,11 +324,11 @@ async function getPasswordForPrivateAction() {
     }
 
     if (!notes.length) {
-        const password = await requestPrivatePassword("setup");
-        if (!password) return null;
+        const credential = await requestPrivatePassword("setup");
+        if (!credential) return null;
 
         const salt = crypto.getRandomValues(new Uint8Array(16));
-        privateKey = await derivePrivateKey(password, salt);
+        privateKey = await derivePrivateKey(credential.value, salt);
         privateSalt = salt;
         privateUnlockCache.clear();
         return { key: privateKey, salt: privateSalt };
@@ -576,9 +592,40 @@ async function markPrivateReminderNotified(id) {
     return true;
 }
 
+async function configurePrivatePasskey() {
+    if (!privateKey || !privateSalt || !isPrivateNotesUnlocked()) {
+        showToast("Unlock Private Notes with your password before setting up a passkey.", "warning");
+        return false;
+    }
+    if (!canUsePrivatePasskey()) {
+        showToast("Passkeys are not available in this browser. You can still use your password.", "warning");
+        return false;
+    }
+    try {
+        await registerPrivatePasskey(privateKey);
+        showToast("Passkey or fingerprint unlocking is ready on this device.", "success");
+        return true;
+    } catch (error) {
+        console.warn("Could not configure a private-notes passkey:", error);
+        showToast(error?.name === "NotAllowedError"
+            ? "Passkey setup was canceled. Your password remains available."
+            : error?.message || "Could not set up a passkey. Your password remains available.", "warning");
+        return false;
+    }
+}
+
+function disablePrivatePasskey() {
+    removePrivatePasskey();
+    showToast("Passkey unlocking was removed from this device.", "success");
+}
+
 window.getReadablePrivateNote = getReadablePrivateNote;
 window.isPrivateNotesUnlocked = isPrivateNotesUnlocked;
 window.unlockPrivateNotes = unlockPrivateNotes;
+window.hasPrivatePasskey = hasPrivatePasskey;
+window.canUsePrivatePasskey = canUsePrivatePasskey;
+window.configurePrivatePasskey = configurePrivatePasskey;
+window.disablePrivatePasskey = disablePrivatePasskey;
 window.clearPrivateUnlock = clearPrivateUnlock;
 window.moveNoteToPrivate = moveNoteToPrivate;
 window.moveNoteFromPrivate = moveNoteFromPrivate;
