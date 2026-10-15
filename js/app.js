@@ -307,7 +307,7 @@ function setupEventListeners() {
 
 function openNewNoteView() {
     if (activeDraftId) saveDraft();
-    window.clearPrivateUnlock?.();
+    if (activeView === "private") window.schedulePrivateLockOnLeave?.();
     activeView = "all";
     updatePrivatePasskeyButton();
     activeCategory = "all";
@@ -333,7 +333,7 @@ function openNewNoteView() {
 
 function openNotesView(category = activeCategory) {
     saveDraft();
-    window.clearPrivateUnlock?.();
+    if (activeView === "private") window.schedulePrivateLockOnLeave?.();
     activeView = "all";
     updatePrivatePasskeyButton();
     activeFolderId = null;
@@ -355,10 +355,11 @@ function openNotesView(category = activeCategory) {
 
 async function selectView(view) {
     if (view === "private") {
+        window.cancelScheduledPrivateLock?.();
         const unlocked = window.isPrivateNotesUnlocked?.() || await window.unlockPrivateNotes?.();
         if (!unlocked) return;
     } else if (activeView === "private") {
-        window.clearPrivateUnlock?.();
+        window.schedulePrivateLockOnLeave?.();
     }
 
     saveDraft();
@@ -415,7 +416,7 @@ function openFolderView(folderId) {
 
     saveDraft();
     if (activeView === "private") {
-        window.clearPrivateUnlock?.();
+        window.schedulePrivateLockOnLeave?.();
     }
 
     activeFolderId = folderId;
@@ -665,7 +666,7 @@ function openDraft(id) {
     if (tagsInput) tagsInput.value = Array.isArray(draft.tags) ? draft.tags.join(", ") : "";
     if (reminderInput) reminderInput.value = draft.reminderAt ? String(draft.reminderAt).slice(0, 16) : "";
 
-    window.clearPrivateUnlock?.();
+    if (activeView === "private") window.schedulePrivateLockOnLeave?.();
     activeView = "all";
     activeFolderId = null;
     window.activeFolderId = null;

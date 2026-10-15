@@ -18,7 +18,9 @@ This branch is independent of the preserved Cloudflare R2 branch (`feature/cloud
 
 Firebase Auth is the only user login. Each Vercel API request verifies the Firebase ID token, then uses the Supabase secret key **only on the server**. Files are stored in a private bucket under `users/{firebaseUid}/attachments/{noteId}/{randomId}` and `users/{firebaseUid}/profile/avatar-{randomId}.{ext}`. Upload URLs and attachment download URLs expire. No Supabase login is required. The browser uploads directly to Supabase via a signed URL to avoid Vercel function upload size limits.
 
-The backend checks the user namespace and file metadata. Attachment files are first stored in IndexedDB, so a failed upload remains on the device and can retry. The note metadata contains a Supabase object path, **not** an expiring download URL. Profile pictures are intentionally viewable by anyone who has their profile photo URL; note attachments are not public.
+The backend checks the user namespace and file metadata. Regular attachment files are first stored in IndexedDB, so a failed upload remains on the device and can retry. For Private Notes, the browser encrypts attachment bytes with the passphrase-derived AES-GCM key before storing or uploading them; decryption happens only after the private note is unlocked. Moving a note back to the regular library decrypts its files into regular attachment copies.
+
+Existing private attachments are migrated when Private Notes is unlocked if their file bytes can be safely retrieved. Supported older Supabase objects are queued for deletion after migration. Legacy download URLs that cannot be safely replaced are surfaced in the note detail and need to be removed/re-attached before relying on private attachment protection. Failed deletion of an older cloud copy is reported and queued for retry. The note metadata contains a Supabase object path, **not** an expiring download URL. Profile pictures are intentionally viewable by anyone who has their profile photo URL; note attachments are not public.
 
 ## Scheduled account deletion
 
@@ -34,6 +36,8 @@ The paged cloud library also requires owner-only Firestore access to `users/{uid
 - Sign in with an email account, upload a JPEG profile photo under 2 MB, refresh, and confirm it still loads.
 - Create a note with a small PNG/PDF attachment; confirm `Synced across devices`, then open it from a second device.
 - Turn off connectivity, attach a file, and confirm local retention and automatic retry when connectivity returns.
+- Move a note with an attachment into Private, confirm its IndexedDB/cloud bytes are ciphertext, unlock it, and verify the file opens; then move it back and confirm the restored file opens.
+- Test all four Private Notes lock choices and confirm unsupported legacy attachment URLs are clearly flagged.
 - Remove a synced attachment and verify it disappears from the note and Supabase bucket.
 - Verify a different Firebase user cannot sign or delete another user's object.
 - Test wrong bucket name, missing key, oversized file, and missing network to confirm useful errors.

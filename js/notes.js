@@ -601,21 +601,30 @@ async function openNoteDetail(id) {
     const note = window.getReadablePrivateNote?.(rawNote) || rawNote;
     const modal = document.getElementById("noteDetailModal");
     if (!note || !modal) return false;
+    window.clearPrivateAttachmentObjectUrls?.();
 
     const bodyHtml = note.html && typeof window.sanitizeNoteHtml === "function"
         ? getNoteBodyHtml(note)
         : (window.renderSubtitleMarkdownText?.(String(note.text || "")) || escapeHtml(note.text || "").replace(/\n/g, "<br>"));
     const tags = (note.tags || []).map(tag => `<span class="note-tag">#${escapeHtml(tag)}</span>`).join("");
+    const privateIndicator = note.isPrivate
+        ? '<div class="note-detail-private-indicator" title="You are viewing a private note"><i class="fa-solid fa-lock" aria-hidden="true"></i><span>Private note</span></div>'
+        : "";
+    const privateAttachmentWarning = note.isPrivate && (note.attachments || []).some(attachment => attachment?.encrypted !== true)
+        ? '<p class="private-attachment-warning" role="status"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> An older attachment could not be encrypted on this device. Its file may still exist at its original storage location; reattach it or remove it before relying on attachment protection.</p>'
+        : "";
     modal.innerHTML = `
         <div class="note-detail-sheet" role="dialog" aria-modal="true" aria-labelledby="noteDetailTitle">
             <div class="note-detail-heading">
                 <div>
                     <h2 id="noteDetailTitle">${escapeHtml(note.title || "Untitled note")}</h2>
+                    ${privateIndicator}
                     <div class="note-detail-meta"><span>${escapeHtml(formatCategory(note.category))}</span><span>${escapeHtml(note.time || formatDate(note.createdAt))}</span></div>
                 </div>
                 <button type="button" class="icon-button" data-detail-close aria-label="Close note"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="note-tags">${tags}</div>
+            ${privateAttachmentWarning}
             ${note.reminderAt ? `<div class="note-reminder"><i class="fa-regular fa-bell"></i>${escapeHtml(formatReminder(note.reminderAt))}</div>` : ""}
             <div class="note-detail-attachments" data-note-attachments></div>
             <div class="note-detail-body">${bodyHtml || "<em>No note body.</em>"}</div>
@@ -642,6 +651,7 @@ async function openNoteDetail(id) {
 function closeNoteDetail() {
     const modal = document.getElementById("noteDetailModal");
     if (!modal) return;
+    window.clearPrivateAttachmentObjectUrls?.();
     modal.classList.remove("show");
     modal.setAttribute("aria-hidden", "true");
     modal.innerHTML = "";

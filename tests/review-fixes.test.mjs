@@ -9,6 +9,7 @@ import { renderSettingsAccount } from "../js/settings-account.js";
 import { migrateLegacyDraft, readDrafts, removeDraft, upsertDraft } from "../js/drafts.js";
 import { renderSubtitleMarkdownText } from "../js/note-format.js";
 import { replaceChecklistMarker } from "../js/checklist-utils.js";
+import { decryptPrivateAttachment, encryptPrivateAttachment } from "../js/private-attachment-crypto.js";
 import { hasPrivatePasskey, registerPrivatePasskey, removePrivatePasskey, unlockPrivateKeyWithPasskey } from "../js/private-passkey.js";
 import { webcrypto } from "node:crypto";
 import { createLocalLibraryStore } from "../js/local-library.js";
@@ -136,6 +137,16 @@ test("checklist toggles update one marker while preserving text and markup", () 
   assert.equal(replaceChecklistMarker("☐ First\n☐ Second", 1, true), "☐ First\n☑ Second");
   assert.equal(replaceChecklistMarker("<div>☐ First</div><div>☑ Second</div>", 0, true), "<div>☑ First</div><div>☑ Second</div>");
   assert.equal(replaceChecklistMarker("☐ First", 4, true), "☐ First");
+});
+
+test("private attachment bytes are encrypted locally and require the matching note key", async () => {
+  const key = await webcrypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
+  const original = new Blob(["private attachment contents"], { type: "application/pdf" });
+  const encrypted = await encryptPrivateAttachment(original, key, webcrypto);
+  assert.notEqual(await encrypted.blob.text(), await original.text());
+  assert.equal(await (await decryptPrivateAttachment(encrypted.blob, key, encrypted.iv, original.type, webcrypto)).text(), await original.text());
+  const wrongKey = await webcrypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
+  await assert.rejects(decryptPrivateAttachment(encrypted.blob, wrongKey, encrypted.iv, original.type, webcrypto));
 });
 
 test("Ask My Notes filters ineligible entries before applying its eight-note limit", () => {

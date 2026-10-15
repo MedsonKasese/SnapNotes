@@ -7,6 +7,7 @@
 
 import { buildPrivatePayload, lockedPrivateNote, privateNoteMetadataNeedsMigration, stripPrivateMetadata } from "./private-note-utils.js";
 import { canUsePrivatePasskey, hasPrivatePasskey, registerPrivatePasskey, removePrivatePasskey, unlockPrivateKeyWithPasskey } from "./private-passkey.js";
+import { decryptPrivateAttachment, encryptPrivateAttachment } from "./private-attachment-crypto.js";
 
 const PRIVATE_CRYPTO_VERSION = 1;
 const PRIVATE_KDF_ITERATIONS = 600000;
@@ -14,6 +15,76 @@ const PRIVATE_MIN_PASSWORD_LENGTH = 12;
 const privateUnlockCache = new Map();
 let privateKey = null;
 let privateSalt = null;
+let privateLockTimeout = null;
+let privateSectionLeftAt = null;
+const PRIVATE_LOCK_KEY = "SnapNotesPrivateLockMode";
+const PRIVATE_LOCK_MODES = new Set(["immediate", "1m", "5m", "app-close"]);
+
+function getPrivateLockMode() {
+    try {
+        const mode = localStorage.getItem(PRIVATE_LOCK_KEY);
+        return PRIVATE_LOCK_MODES.has(mode) ? mode : "immediate";
+    } catch {
+        return "immediate";
+    }
+}
+
+function cancelScheduledPrivateLock() {
+    if (privateLockTimeout !== null) clearTimeout(privateLockTimeout);
+    privateLockTimeout = null;
+    privateSectionLeftAt = null;
+}
+
+function schedulePrivateLockOnLeave() {
+    if (privateLockTimeout !== null) clearTimeout(privateLockTimeout);
+    privateLockTimeout = null;
+    if (privateSectionLeftAt === null) privateSectionLeftAt = Date.now();
+    const mode = getPrivateLockMode();
+    if (mode === "immediate") {
+        clearPrivateUnlock();
+        window.closeNoteDetail?.();
+        return;
+    }
+    const delay = mode === "1m" ? 60_000 : mode === "5m" ? 300_000 : null;
+    if (delay === null) return;
+    const remaining = delay - (Date.now() - privateSectionLeftAt);
+    if (remaining <= 0) {
+        clearPrivateUnlock();
+        window.closeNoteDetail?.();
+        window.renderNotes?.();
+        window.updateNavigationCounts?.();
+        return;
+    }
+    privateLockTimeout = setTimeout(() => {
+        privateLockTimeout = null;
+        if (document.querySelector('.drawer-item[data-view="private"].active')) {
+            privateSectionLeftAt = null;
+            return;
+        }
+        clearPrivateUnlock();
+        window.closeNoteDetail?.();
+        window.renderNotes?.();
+        window.updateNavigationCounts?.();
+    }, remaining);
+}
+
+function setupPrivateLockSetting() {
+    const control = document.getElementById("privateLockSetting");
+    if (!control) return;
+    control.value = getPrivateLockMode();
+    control.addEventListener("change", () => {
+        const mode = PRIVATE_LOCK_MODES.has(control.value) ? control.value : "immediate";
+        localStorage.setItem(PRIVATE_LOCK_KEY, mode);
+        control.value = mode;
+        if (privateSectionLeftAt !== null) schedulePrivateLockOnLeave();
+    });
+}
+
+document.addEventListener("DOMContentLoaded", setupPrivateLockSetting);
+window.addEventListener("pagehide", () => {
+    clearPrivateUnlock();
+    window.closeNoteDetail?.();
+});
 
 function bytesToBase64(bytes) {
     let binary = "";
@@ -98,6 +169,16 @@ async function decryptPrivatePayload(note, key = privateKey) {
     return JSON.parse(new TextDecoder().decode(plaintext));
 }
 
+async function encryptPrivateAttachmentBlob(blob) {
+    if (!privateKey) throw new Error("Unlock Private Notes before protecting attachments.");
+    return encryptPrivateAttachment(blob, privateKey);
+}
+
+async function decryptPrivateAttachmentBlob(blob, iv, type) {
+    if (!privateKey) throw new Error("Unlock Private Notes to view this attachment.");
+    return decryptPrivateAttachment(blob, privateKey, iv, type);
+}
+
 function getPrivateNotes() {
     return (Array.isArray(window.notes) ? window.notes : [])
         .filter(note => note?.isPrivate);
@@ -125,9 +206,18 @@ function isPrivateNotesUnlocked() {
 }
 
 function clearPrivateUnlock() {
+    cancelScheduledPrivateLock();
+    privateSectionLeftAt = null;
     privateUnlockCache.clear();
     privateKey = null;
     privateSalt = null;
+    window.clearPrivateAttachmentObjectUrls?.();
+    window.closeNoteDetail?.();
+}
+
+function restoreObject(target, snapshot) {
+    for (const key of Object.keys(target)) delete target[key];
+    Object.assign(target, snapshot);
 }
 
 function createPrivatePasswordModal(mode) {
@@ -249,21 +339,39 @@ async function establishPrivateSessionWithKey(key, salt) {
                 : Array.isArray(note.history) ? structuredClone(note.history)
                     : Array.isArray(note.versions) ? structuredClone(note.versions) : []
         };
-        unlockedNotes.push({ note, payload, needsMigration: privateNoteMetadataNeedsMigration(note) });
-    }
-
-    for (const entry of unlockedNotes) {
-        if (entry.needsMigration) entry.encryptedData = await encryptPrivatePayload(entry.payload, key, salt);
+        unlockedNotes.push({
+            note,
+            payload,
+            needsMigration: privateNoteMetadataNeedsMigration(note),
+            noteSnapshot: structuredClone(note),
+            attachmentSnapshot: structuredClone(payload.attachments)
+        });
     }
 
     privateKey = key;
     privateSalt = salt;
     privateUnlockCache.clear();
 
-    for (const { note, payload, needsMigration, encryptedData } of unlockedNotes) {
-        if (needsMigration) {
-            note.privateData = encryptedData;
-            stripPrivateMetadata(note);
+    const legacyAttachments = [];
+    let attachmentMigrationFailed = false;
+    for (const entry of unlockedNotes) {
+        const { note, payload, needsMigration } = entry;
+        let noteChanged = needsMigration;
+        if (payload.attachments.some(attachment => attachment && attachment.encrypted !== true)) {
+            try {
+                const conversion = await window.protectPrivateAttachmentsForPrivate?.(note.id, payload.attachments);
+                if (!conversion) throw new Error("Private attachment protection is unavailable.");
+                payload.attachments = conversion.attachments;
+                legacyAttachments.push(...conversion.originals);
+                noteChanged = true;
+            } catch (error) {
+                attachmentMigrationFailed = true;
+                console.warn("Private attachment migration was incomplete:", error?.message || error);
+            }
+        }
+        if (noteChanged) {
+            note.privateData = await encryptPrivatePayload(payload, key, salt);
+            if (needsMigration) stripPrivateMetadata(note);
             migrated = true;
         }
         privateUnlockCache.set(note.id, payload);
@@ -281,7 +389,27 @@ async function establishPrivateSessionWithKey(key, salt) {
         console.warn("Could not migrate private attachment ownership:", error);
     }
 
-    if (migrated) await window.saveNotes?.();
+    if (migrated) {
+        const saveResult = await window.saveNotes?.();
+        if (saveResult?.locallySaved === false) {
+            for (const entry of unlockedNotes) {
+                restoreObject(entry.note, entry.noteSnapshot);
+                entry.payload.attachments = entry.attachmentSnapshot;
+                privateUnlockCache.set(entry.note.id, entry.payload);
+            }
+            legacyAttachments.length = 0;
+            migrated = false;
+            attachmentMigrationFailed = true;
+        }
+    }
+    if (legacyAttachments.length) {
+        const cleanup = await window.cleanupAttachmentsForNotes?.([{ attachments: legacyAttachments }]);
+        if (cleanup?.persisted === false || cleanup?.pendingCount) attachmentMigrationFailed = true;
+    }
+    if (migrated) await window.retryPendingAttachmentUploads?.({ silent: true });
+    if (attachmentMigrationFailed) {
+        window.showToast?.("Some older private attachments could not be fully protected yet. Keep the original files available and reattach them after reviewing their status.", "warning");
+    }
     window.checkDueReminders?.();
 
     return true;
@@ -347,6 +475,7 @@ async function moveNoteToPrivate(id) {
     }
 
     try {
+        const originalNote = structuredClone(note);
         if (!window.crypto?.subtle || !window.crypto?.getRandomValues) {
             throw new Error("Web Crypto is not available.");
         }
@@ -354,6 +483,9 @@ async function moveNoteToPrivate(id) {
         if (!session) return;
 
         const payload = buildPrivatePayload(note);
+        const conversion = await window.protectPrivateAttachmentsForPrivate?.(note.id, payload.attachments);
+        if (!conversion) throw new Error("Private attachment protection is unavailable. Refresh and try again.");
+        payload.attachments = conversion.attachments;
 
         note.privateData = await encryptPrivatePayload(payload, session.key, session.salt);
         note.isPrivate = true;
@@ -369,7 +501,18 @@ async function moveNoteToPrivate(id) {
 
         privateUnlockCache.set(note.id, payload);
         const result = await saveNotes();
-        if (result?.cloudEnabled && result.synced === false) {
+        if (result?.locallySaved === false) {
+            restoreObject(note, originalNote);
+            privateUnlockCache.delete(note.id);
+            throw new Error("The note could not be saved locally, so it was not moved to Private. Keep the original files and try again.");
+        }
+        const cleanup = conversion.originals.length
+            ? await window.cleanupAttachmentsForNotes?.([{ attachments: conversion.originals }])
+            : null;
+        await window.retryPendingAttachmentUploads?.({ silent: true });
+        if (cleanup?.persisted === false || cleanup?.pendingCount) {
+            window.showToast?.("Private note saved with encrypted attachments. Removal of an older unencrypted cloud copy is queued for retry.", "warning");
+        } else if (result?.cloudEnabled && result.synced === false) {
             window.showToast?.("Note moved to Private and saved locally. Cloud sync is pending.", "warning");
         } else {
             window.showToast?.("Note moved to Private", "success");
@@ -379,7 +522,7 @@ async function moveNoteToPrivate(id) {
         return true;
     } catch (error) {
         console.error("Could not protect note:", error);
-        window.showToast?.("Could not make this note private. Please try again.", "warning");
+        window.showToast?.(error?.message || "Could not make this note private. Please try again.", "warning");
         return false;
     }
 }
@@ -437,7 +580,10 @@ async function moveNoteFromPrivate(id) {
     }
 
     try {
+        const originalNote = structuredClone(note);
         const payload = privateUnlockCache.get(id) || await decryptPrivatePayload(note, privateKey);
+        const conversion = await window.unprotectPrivateAttachmentsFromPrivate?.(id, payload.attachments || []);
+        if (!conversion) throw new Error("Could not restore private attachments. Try again while online.");
         Object.assign(note, {
             title: payload.title || "",
             text: payload.text || "",
@@ -445,7 +591,7 @@ async function moveNoteFromPrivate(id) {
             category: payload.category || "general",
             tags: Array.isArray(payload.tags) ? payload.tags : [],
             folderId: payload.folderId || null,
-            attachments: Array.isArray(payload.attachments) ? structuredClone(payload.attachments) : [],
+            attachments: conversion.attachments,
             reminderAt: payload.reminderAt || null,
             reminderNotified: Boolean(payload.reminderNotified),
             time: payload.time || note.time || "",
@@ -456,14 +602,26 @@ async function moveNoteFromPrivate(id) {
         delete note.privateData;
         privateUnlockCache.delete(id);
 
-        await saveNotes();
+        const saveResult = await saveNotes();
+        if (saveResult?.locallySaved === false) {
+            restoreObject(note, originalNote);
+            privateUnlockCache.set(id, payload);
+            const originalIds = new Set((payload.attachments || []).map(attachment => attachment?.id));
+            const temporaryPlaintext = conversion.attachments.filter(attachment => attachment?.id && !originalIds.has(attachment.id));
+            if (temporaryPlaintext.length) await window.cleanupAttachmentsForNotes?.([{ attachments: temporaryPlaintext }]);
+            throw new Error("The note could not be saved locally, so it remains in Private. Try again when local storage is available.");
+        }
+        if (conversion.originals.length) {
+            await window.cleanupAttachmentsForNotes?.([{ attachments: conversion.originals }]);
+        }
+        await window.retryPendingAttachmentUploads?.({ silent: true });
         renderNotes();
         updateNavigationCounts();
         showToast("Note moved back to your regular notes", "success");
         return true;
     } catch (error) {
         console.error("Could not make note public:", error);
-        showToast("Could not unlock this private note.", "warning");
+        showToast(error?.message || "Could not unlock this private note.", "warning");
         return false;
     }
 }
@@ -540,6 +698,16 @@ async function duplicatePrivateNote(id) {
     if (!source?.isPrivate || !privateKey || !privateSalt) return false;
 
     const payload = privateUnlockCache.get(id) || await decryptPrivatePayload(source, privateKey);
+    let duplicateAttachments;
+    try {
+        duplicateAttachments = await window.duplicatePrivateAttachments?.(payload.attachments || []);
+        if (!Array.isArray(duplicateAttachments)) throw new Error("Private attachment duplication is unavailable.");
+    } catch (error) {
+        console.warn("Could not duplicate private attachments:", error?.message || error);
+        showToast(error?.message || "Could not duplicate this private note.", "warning");
+        return false;
+    }
+    const duplicatePayload = { ...structuredClone(payload), attachments: duplicateAttachments };
     const now = new Date().toISOString();
     const duplicate = {
         ...structuredClone(source),
@@ -559,12 +727,20 @@ async function duplicatePrivateNote(id) {
         deletedAt: null
     };
 
-    duplicate.privateData = await encryptPrivatePayload(payload, privateKey, privateSalt);
+    duplicate.privateData = await encryptPrivatePayload(duplicatePayload, privateKey, privateSalt);
     stripPrivateMetadata(duplicate);
     window.notes.unshift(duplicate);
-    privateUnlockCache.set(duplicate.id, payload);
+    privateUnlockCache.set(duplicate.id, duplicatePayload);
     window.recordNoteCreation?.(duplicate);
-    await saveNotes();
+    const result = await saveNotes();
+    if (result?.locallySaved === false) {
+        window.notes = window.notes.filter(note => note.id !== duplicate.id);
+        privateUnlockCache.delete(duplicate.id);
+        await window.cleanupAttachmentsForNotes?.([{ attachments: duplicateAttachments }]);
+        showToast("The duplicate could not be saved locally. The original private note is unchanged.", "warning");
+        return false;
+    }
+    await window.retryPendingAttachmentUploads?.({ silent: true });
     return true;
 }
 
@@ -627,6 +803,10 @@ window.canUsePrivatePasskey = canUsePrivatePasskey;
 window.configurePrivatePasskey = configurePrivatePasskey;
 window.disablePrivatePasskey = disablePrivatePasskey;
 window.clearPrivateUnlock = clearPrivateUnlock;
+window.schedulePrivateLockOnLeave = schedulePrivateLockOnLeave;
+window.cancelScheduledPrivateLock = cancelScheduledPrivateLock;
+window.encryptPrivateAttachmentBlob = encryptPrivateAttachmentBlob;
+window.decryptPrivateAttachmentBlob = decryptPrivateAttachmentBlob;
 window.moveNoteToPrivate = moveNoteToPrivate;
 window.moveNoteFromPrivate = moveNoteFromPrivate;
 window.updatePrivateNote = updatePrivateNote;

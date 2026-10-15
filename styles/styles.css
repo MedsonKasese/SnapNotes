@@ -1169,6 +1169,10 @@
 .note-detail-sheet{width:min(720px,100%);max-height:min(88vh,760px);overflow:auto;padding:20px;border:1px solid var(--border-color);border-radius:18px;color:var(--text-color);background:var(--surface-color);box-shadow:var(--shadow)}
 .note-detail-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .note-detail-heading h2{margin:0;font-size:24px;line-height:1.25}
+.note-detail-private-indicator{display:inline-flex;align-items:center;gap:5px;margin-top:6px;color:var(--muted-color);font-size:11px;font-weight:700}
+.note-detail-private-indicator i{color:var(--primary-color);font-size:10px}
+.private-attachment-warning{display:flex;gap:8px;align-items:flex-start;margin:12px 0;padding:10px 12px;border:1px solid color-mix(in srgb, #c77d12 42%, var(--border-color));border-radius:10px;color:var(--text-color);background:color-mix(in srgb, #c77d12 8%, var(--surface-color));font-size:12px;line-height:1.5}
+.private-attachment-warning i{flex:0 0 auto;margin-top:2px;color:#a76b08}
 .note-detail-body{margin:18px 0;color:var(--text-color);line-height:1.65;overflow-wrap:anywhere}
 .note-detail-body p:first-child{margin-top:0}.note-detail-body p:last-child{margin-bottom:0}
 .note-detail-meta{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px;color:var(--muted-color);font-size:11px}
