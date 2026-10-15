@@ -182,6 +182,7 @@ function setupEventListeners() {
             await window.configurePrivatePasskey?.();
         }
         updatePrivatePasskeyButton();
+    document.getElementById("askMyNotesLibraryBtn")?.toggleAttribute("hidden", false);
     });
 
     exportNotesBtn.addEventListener("click", exportNotes);
@@ -363,6 +364,7 @@ async function selectView(view) {
     saveDraft();
     activeView = view;
     updatePrivatePasskeyButton();
+    document.getElementById("askMyNotesLibraryBtn")?.toggleAttribute("hidden", view === "private");
     activeFolderId = null;
     window.activeFolderId = null;
     document.querySelectorAll(".drawer-item").forEach(item => {
