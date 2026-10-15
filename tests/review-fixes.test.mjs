@@ -6,6 +6,8 @@ import { mergeNotes, packLibraryPages, noteSignature, noteTimestamp } from "../j
 import { createCloudSessionGuard } from "../js/cloud-session.js";
 import { enqueueAndProcessAttachmentCleanup, ATTACHMENT_CLEANUP_KEY } from "../js/attachment-cleanup.js";
 import { renderSettingsAccount } from "../js/settings-account.js";
+import { migrateLegacyDraft, readDrafts, removeDraft, upsertDraft } from "../js/drafts.js";
+import { renderSubtitleMarkdownText } from "../js/note-format.js";
 
 function memoryStorage() {
   const values = new Map();
@@ -35,6 +37,41 @@ class FakeElement {
 }
 
 const fakeDocument = { createElement: tag => new FakeElement(tag) };
+
+test("recovery drafts migrate from the previous single-draft key and retain metadata", () => {
+  const storage = memoryStorage();
+  storage.setItem("SnapNotesDraft", JSON.stringify({
+    content: "<div>## Plan</div><div>Unfinished</div>",
+    category: "work",
+    tags: ["project"],
+    reminderAt: "2026-10-16T09:00",
+    savedAt: "2026-10-15T08:00:00.000Z"
+  }));
+
+  const drafts = migrateLegacyDraft(storage);
+  assert.equal(drafts.length, 1);
+  assert.match(drafts[0].id, /.+/);
+  assert.equal(drafts[0].category, "work");
+  assert.deepEqual(drafts[0].tags, ["project"]);
+  assert.equal(storage.getItem("SnapNotesDraft"), null);
+  assert.equal(readDrafts(storage)[0].content, "<div>## Plan</div><div>Unfinished</div>");
+});
+
+test("recovery drafts support multiple entries and update the same draft in place", () => {
+  const storage = memoryStorage();
+  upsertDraft({ id: "draft-a", content: "first", text: "first" }, storage);
+  upsertDraft({ id: "draft-b", content: "second", text: "second" }, storage);
+  upsertDraft({ id: "draft-a", content: "updated", text: "updated" }, storage);
+
+  assert.equal(readDrafts(storage).length, 2);
+  assert.equal(readDrafts(storage).find(draft => draft.id === "draft-a").text, "updated");
+  assert.equal(removeDraft("draft-b", storage).length, 1);
+});
+
+test("double-asterisk subtitle lines render as safe headings without changing ordinary text", () => {
+  const html = renderSubtitleMarkdownText("Intro\n**Highlights**\n**<script>alert(1)</script>**\n**not a subtitle** trailing");
+  assert.equal(html, "Intro<br><h3 class=\"note-subtitle\">Highlights</h3><br><h3 class=\"note-subtitle\">&lt;script&gt;alert(1)&lt;/script&gt;</h3><br>**not a subtitle** trailing");
+});
 
 test("Ask My Notes filters ineligible entries before applying its eight-note limit", () => {
   const ineligible = Array.from({ length: 10 }, (_, index) => ({ id: `private-${index}`, text: "secret", isPrivate: true }));

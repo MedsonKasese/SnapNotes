@@ -18,8 +18,8 @@ let selectedEditorCategory = "general";
 let clockTimer = null;
 let draftTimer = null;
 const DRAFT_KEY = "SnapNotesDraft";
+let activeDraftId = null;
 let pendingNotificationNoteId = null;
-
 document.addEventListener("DOMContentLoaded", () => {
     handleNotificationNoteFromUrl();
     loadNotes();
@@ -186,6 +186,12 @@ function setupEventListeners() {
 
     reminderInput?.addEventListener("change", () => {
         if (reminderInput.value) requestReminderPermission();
+        scheduleDraftSave();
+    });
+    document.getElementById("noteTagsInput")?.addEventListener("input", scheduleDraftSave);
+    window.addEventListener("pagehide", saveDraft);
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") saveDraft();
     });
     logoButton.addEventListener("click", openNewNoteView);
 
@@ -289,8 +295,19 @@ function setupEventListeners() {
 }
 
 function openNewNoteView() {
+    if (activeDraftId) saveDraft();
     window.clearPrivateUnlock?.();
     activeView = "all";
+    activeCategory = "all";
+    activeFolderId = null;
+    window.activeFolderId = null;
+    activeDraftId = null;
+    document.getElementById("noteEditor").innerHTML = "";
+    setEditorCategory("general");
+    const tagsInput = document.getElementById("noteTagsInput");
+    const reminderInput = document.getElementById("noteReminderInput");
+    if (tagsInput) tagsInput.value = "";
+    if (reminderInput) reminderInput.value = "";
     document.getElementById("newNoteView").hidden = false;
     document.getElementById("notesView").hidden = true;
     document.getElementById("addBtn").hidden = true;
@@ -299,9 +316,11 @@ function openNewNoteView() {
     document.getElementById("noteEditor").focus();
     closeSearchPanel();
     closeDrawer();
+    updateNavigationCounts();
 }
 
 function openNotesView(category = activeCategory) {
+    saveDraft();
     window.clearPrivateUnlock?.();
     activeView = "all";
     activeFolderId = null;
@@ -329,6 +348,7 @@ async function selectView(view) {
         window.clearPrivateUnlock?.();
     }
 
+    saveDraft();
     activeView = view;
     activeFolderId = null;
     window.activeFolderId = null;
@@ -343,6 +363,7 @@ async function selectView(view) {
 
     const titles = {
         archive: "Archived",
+        drafts: "Drafts",
         private: "Private Notes",
         trash: "Trash"
     };
@@ -369,6 +390,7 @@ function openFolderView(folderId) {
     const folder = window.getFolderById?.(folderId);
     if (!folder) return;
 
+    saveDraft();
     if (activeView === "private") {
         window.clearPrivateUnlock?.();
     }
@@ -478,6 +500,7 @@ function setEditorCategory(category) {
     dot.className = "category-dot " + category;
 
     closeCategoryMenu();
+    scheduleDraftSave();
 }
 
 
@@ -488,55 +511,155 @@ function scheduleDraftSave() {
 }
 
 function saveDraft() {
+    clearTimeout(draftTimer);
     const editor = document.getElementById("noteEditor");
     const content = editor?.innerHTML?.trim() || "";
     const text = editor?.innerText?.trim() || "";
+    const draftsApi = window.SnapNotesDrafts;
+    if (!draftsApi) return false;
 
     if (!text) {
+        if (activeDraftId) draftsApi.remove(activeDraftId);
+        activeDraftId = null;
         localStorage.removeItem(DRAFT_KEY);
         setDraftStatus("Drafts save automatically");
-        return;
+        updateNavigationCounts();
+        return false;
     }
 
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({
-        content,
-        category: selectedEditorCategory,
-        tags: parseTags(document.getElementById("noteTagsInput")?.value || ""),
-        reminderAt: document.getElementById("noteReminderInput")?.value || "",
-        savedAt: new Date().toISOString()
-    }));
-    setDraftStatus("Draft saved");
+    try {
+        const draft = draftsApi.upsert({
+            id: activeDraftId || undefined,
+            content,
+            text: editor.innerText.replace(/\r/g, "").trim(),
+            category: selectedEditorCategory,
+            tags: parseTags(document.getElementById("noteTagsInput")?.value || ""),
+            reminderAt: document.getElementById("noteReminderInput")?.value || "",
+            savedAt: new Date().toISOString()
+        });
+        activeDraftId = draft.id;
+        localStorage.removeItem(DRAFT_KEY);
+        setDraftStatus("Draft saved");
+        updateNavigationCounts();
+        return true;
+    } catch (error) {
+        console.error("Failed to save SnapNotes recovery draft:", error);
+        setDraftStatus("Draft could not be saved");
+        return false;
+    }
 }
 
 function restoreDraft() {
-    const editor = document.getElementById("noteEditor");
-    if (!editor) return;
-    const raw = localStorage.getItem(DRAFT_KEY);
-    if (!raw) return;
-
     try {
-        const draft = JSON.parse(raw);
-        if (!draft.content) return;
-        editor.innerHTML = draft.content;
-        setEditorCategory(draft.category || "general");
-        const tagsInput = document.getElementById("noteTagsInput");
-        const reminderInput = document.getElementById("noteReminderInput");
-        if (tagsInput) tagsInput.value = Array.isArray(draft.tags) ? draft.tags.join(", ") : "";
-        if (reminderInput) reminderInput.value = draft.reminderAt ? String(draft.reminderAt).slice(0, 16) : "";
-        updateCharacterCount();
-        setDraftStatus("Draft restored");
+        const drafts = window.SnapNotesDrafts?.migrateLegacy() || [];
+        if (drafts.length) setDraftStatus("Drafts saved — open Drafts in the Library");
+        updateNavigationCounts();
     } catch (error) {
         localStorage.removeItem(DRAFT_KEY);
-        console.error("Failed to restore SnapNotes draft:", error);
+        console.error("Failed to migrate SnapNotes recovery draft:", error);
     }
 }
 
 function clearDraft() {
     clearTimeout(draftTimer);
+    if (activeDraftId) window.SnapNotesDrafts?.remove(activeDraftId);
+    activeDraftId = null;
     localStorage.removeItem(DRAFT_KEY);
     updateCharacterCount();
     setDraftStatus("Drafts save automatically");
+    updateNavigationCounts();
 }
+
+function draftPlainText(draft) {
+    if (typeof draft?.text === "string" && draft.text) return draft.text;
+    const content = document.createElement("div");
+    content.innerHTML = window.sanitizeNoteHtml?.(draft?.content || "") || "";
+    return content.innerText || content.textContent || "";
+}
+
+function renderDrafts() {
+    const container = document.getElementById("notesContainer");
+    const emptyState = document.getElementById("emptyState");
+    if (!container || !emptyState) return;
+
+    const drafts = (window.SnapNotesDrafts?.read() || []).sort((a, b) =>
+        (Date.parse(b.savedAt || "") || 0) - (Date.parse(a.savedAt || "") || 0)
+    );
+    container.replaceChildren();
+    drafts.forEach(draft => {
+        const lines = draftPlainText(draft).replace(/\r/g, "").split("\n");
+        const first = lines.findIndex(line => line.trim());
+        const firstLine = first >= 0 ? lines[first].trim() : "";
+        const titleMatch = firstLine.match(/^##\s*(.*)$/);
+        const title = titleMatch?.[1]?.trim() || "Untitled draft";
+        if (titleMatch) lines.splice(first, 1);
+        const preview = lines.join(" ").replace(/\s+/g, " ").trim();
+
+        const card = document.createElement("article");
+        card.className = "note-card draft-card";
+        const openButton = document.createElement("button");
+        openButton.type = "button";
+        openButton.className = "draft-card-open";
+        openButton.setAttribute("aria-label", `Open draft: ${title}`);
+        const heading = document.createElement("h2");
+        heading.className = "note-card-title";
+        heading.textContent = title;
+        const excerpt = document.createElement("span");
+        excerpt.className = "draft-card-excerpt";
+        excerpt.textContent = preview || "No body text yet";
+        openButton.append(heading, excerpt);
+        openButton.addEventListener("click", () => openDraft(draft.id));
+
+        const savedAt = document.createElement("time");
+        savedAt.className = "draft-card-meta";
+        savedAt.textContent = `Draft${draft.savedAt ? ` · ${new Date(draft.savedAt).toLocaleString()}` : ""}`;
+        card.append(openButton, savedAt);
+        container.appendChild(card);
+    });
+
+    emptyState.textContent = drafts.length
+        ? ""
+        : "No drafts yet. Notes you leave unfinished are saved here automatically.";
+    emptyState.style.display = drafts.length ? "none" : "block";
+    updateNavigationCounts();
+}
+
+function openDraft(id) {
+    const draftsApi = window.SnapNotesDrafts;
+    const beforeSave = draftsApi?.read().find(item => item.id === id);
+    if (!beforeSave) return;
+    saveDraft();
+    const draft = draftsApi.read().find(item => item.id === id) || beforeSave;
+    const editor = document.getElementById("noteEditor");
+    if (!editor) return;
+
+    activeDraftId = draft.id;
+    editor.innerHTML = window.sanitizeNoteHtml?.(draft.content || "") || "";
+    if (!editor.innerHTML && draft.text) editor.textContent = draft.text;
+    setEditorCategory(CATEGORIES[draft.category] ? draft.category : "general");
+    const tagsInput = document.getElementById("noteTagsInput");
+    const reminderInput = document.getElementById("noteReminderInput");
+    if (tagsInput) tagsInput.value = Array.isArray(draft.tags) ? draft.tags.join(", ") : "";
+    if (reminderInput) reminderInput.value = draft.reminderAt ? String(draft.reminderAt).slice(0, 16) : "";
+
+    window.clearPrivateUnlock?.();
+    activeView = "all";
+    activeFolderId = null;
+    window.activeFolderId = null;
+    document.getElementById("newNoteView").hidden = false;
+    document.getElementById("notesView").hidden = true;
+    document.getElementById("addBtn").hidden = true;
+    window.resetPendingAttachments?.();
+    updateCharacterCount();
+    setDraftStatus("Draft opened — changes save automatically");
+    closeSearchPanel();
+    closeDrawer();
+    updateNavigationCounts();
+    editor.focus();
+}
+
+window.renderDrafts = renderDrafts;
+window.openSnapNotesDraft = openDraft;
 
 function setDraftStatus(message) {
     const status = document.getElementById("draftStatus");
@@ -673,7 +796,9 @@ async function saveEditorNote() {
 }
 
 function extractNoteBodyHtml(html, title) {
-    return window.stripMarkdownTitleFromHtml(html, title);
+    const safeHtml = sanitizeNoteHtml(html);
+    const formattedHtml = window.formatSubtitleMarkdownInHtml?.(safeHtml) || safeHtml;
+    return window.stripMarkdownTitleFromHtml(formattedHtml, title);
 }
 
 function sanitizeNoteHtml(html) {
@@ -681,7 +806,7 @@ function sanitizeNoteHtml(html) {
     template.innerHTML = html || "";
 
     template.querySelectorAll("*").forEach(element => {
-        const allowed = ["B", "STRONG", "I", "EM", "U", "UL", "OL", "LI", "BR", "A", "DIV", "P"];
+        const allowed = ["B", "STRONG", "I", "EM", "U", "UL", "OL", "LI", "BR", "A", "DIV", "P", "H3"];
         if (!allowed.includes(element.tagName)) {
             element.replaceWith(...Array.from(element.childNodes));
             return;
@@ -695,6 +820,8 @@ function sanitizeNoteHtml(html) {
                 } catch {
                     element.removeAttribute("href");
                 }
+            } else if (element.tagName === "H3" && attribute.name === "class" && element.classList.contains("note-subtitle")) {
+                element.className = "note-subtitle";
             } else {
                 element.removeAttribute(attribute.name);
             }
@@ -948,9 +1075,12 @@ function updateEditorTimestamp() {
 function updateNavigationCounts() {
     const notes = Array.isArray(window.notes) ? window.notes : [];
     const activeNotes = notes.filter(note => !note.deletedAt);
+    const drafts = window.SnapNotesDrafts?.read() || [];
 
     let currentNotes;
-    if (activeView === "trash") {
+    if (activeView === "drafts") {
+        currentNotes = drafts;
+    } else if (activeView === "trash") {
         currentNotes = notes.filter(note => note.deletedAt);
     } else if (activeView === "archive") {
         currentNotes = activeNotes.filter(note => note.archived && !note.isPrivate);
@@ -966,8 +1096,8 @@ function updateNavigationCounts() {
     const currentCount = currentNotes.length;
     const countEl = document.getElementById("notesCount");
     if (countEl) {
-        countEl.textContent =
-            `${currentCount} ${currentCount === 1 ? "note" : "notes"}`;
+        const noun = activeView === "drafts" ? "draft" : "note";
+        countEl.textContent = `${currentCount} ${currentCount === 1 ? noun : `${noun}s`}`;
     }
 
     document.querySelectorAll("[data-count-for]").forEach(element => {
@@ -976,6 +1106,7 @@ function updateNavigationCounts() {
 
         if (key === "all") count = activeNotes.filter(note => !note.archived && !note.isPrivate).length;
         else if (key === "archive") count = activeNotes.filter(note => note.archived && !note.isPrivate).length;
+        else if (key === "drafts") count = drafts.length;
         else if (key === "private") count = activeNotes.filter(note => note.isPrivate && !note.archived).length;
         else if (key === "trash") count = notes.filter(note => note.deletedAt).length;
         else if (key === "folder") count = activeNotes.filter(note => note.folderId && !note.archived && !note.isPrivate).length;

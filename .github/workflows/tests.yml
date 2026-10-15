@@ -15,6 +15,8 @@ jobs:
         run: |
           node --check js/app.js
           node --check js/notes.js
+          node --check js/drafts.js
+          node --check js/note-format.js
           node --check js/storage.js
           node --check js/auth.js
           node --check lib/supabase-storage.js

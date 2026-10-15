@@ -246,6 +246,11 @@ Then write your notes below..."
                 <span>Archived</span>
                 <span class="drawer-count" data-count-for="archive">0</span>
             </button>
+            <button class="drawer-item" type="button" data-view="drafts">
+                <i class="fa-regular fa-file-lines"></i>
+                <span>Drafts</span>
+                <span class="drawer-count" data-count-for="drafts">0</span>
+            </button>
             <button class="drawer-item" type="button" data-view="private" aria-label="Open private notes">
                 <i class="fa-solid fa-lock"></i>
                 <span>Private</span>
@@ -527,6 +532,8 @@ Then write your notes below..."
     <script src="js/notes.js"></script>
     <script src="js/reminder-utils.js"></script>
     <script src="js/ai-format.js"></script>
+    <script type="module" src="js/drafts.js"></script>
+    <script type="module" src="js/note-format.js"></script>
     <script type="module" src="js/firebaseConfig.js"></script>
     <script type="module" src="js/firestore.js"></script>
     <script type="module" src="js/auth.js"></script>

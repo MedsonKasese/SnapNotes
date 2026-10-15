@@ -1241,3 +1241,58 @@
         width: calc(100vw - 20px);
     }
 }
+
+
+/* Markdown subtitle lines and recoverable draft cards */
+.note-card-body h3.note-subtitle,
+.note-detail-body h3.note-subtitle {
+    margin: 12px 0 5px;
+    color: var(--text-color);
+    font-size: 1.08em;
+    font-weight: 800;
+    line-height: 1.35;
+    white-space: normal;
+}
+
+.note-card-body h3.note-subtitle:first-child,
+.note-detail-body h3.note-subtitle:first-child {
+    margin-top: 0;
+}
+
+.draft-card-open {
+    width: 100%;
+    display: grid;
+    gap: 7px;
+    padding: 0;
+    border: 0;
+    color: var(--text-color);
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+}
+
+.draft-card-open:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 4px;
+    border-radius: 4px;
+}
+
+.draft-card-excerpt {
+    display: -webkit-box;
+    overflow: hidden;
+    color: var(--muted-color);
+    font-size: 13px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.draft-card-meta {
+    display: block;
+    margin-top: 11px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+    color: var(--muted-color);
+    font-size: 11px;
+}
