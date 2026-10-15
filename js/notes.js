@@ -723,6 +723,12 @@ async function permanentlyDeleteNotes(notesToDelete, options = {}) {
         }
     }
 
+    const markerSaved = await window.recordPermanentNoteDeletions?.([...ids]);
+    if (!markerSaved) {
+        showToast("Could not safely save the deletion marker; the notes were not permanently deleted.", "warning");
+        return false;
+    }
+
     window.notes = (window.notes || []).filter(note => !ids.has(note.id));
     await saveNotes();
     if (options.rerender !== false) {

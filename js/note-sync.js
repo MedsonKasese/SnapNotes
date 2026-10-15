@@ -145,11 +145,12 @@ export function createConflictCopy(note) {
     };
 }
 
-export function mergeNotes(localNotes = [], cloudNotes = []) {
+export function mergeNotes(localNotes = [], cloudNotes = [], permanentlyDeletedIds = []) {
     const merged = new Map();
+    const deletedIds = new Set(permanentlyDeletedIds);
 
     [...cloudNotes, ...localNotes].forEach(note => {
-        if (!note?.id) return;
+        if (!note?.id || deletedIds.has(note.id) || deletedIds.has(note.conflictOf)) return;
         const existing = merged.get(note.id);
         if (!existing) {
             merged.set(note.id, note);
@@ -178,7 +179,9 @@ export function mergeNotes(localNotes = [], cloudNotes = []) {
     // Preserve conflict copies created by older app versions, but no new copies
     // are created now that both edits are retained in the canonical note history.
     [...cloudNotes, ...localNotes].forEach(note => {
-        if (note?.id && note.syncConflict && !merged.has(note.id)) merged.set(note.id, note);
+        if (note?.id && note.syncConflict && !deletedIds.has(note.id) && !deletedIds.has(note.conflictOf) && !merged.has(note.id)) {
+            merged.set(note.id, note);
+        }
     });
     return [...merged.values()];
 }

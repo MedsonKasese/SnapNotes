@@ -11,11 +11,13 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 import { createCloudSessionGuard } from "./cloud-session.js";
 import { mergeNotes, noteTimestamp, packLibraryPages } from "./note-sync.js";
+import { clearPermanentNoteDeletions, readPermanentNoteDeletions } from "./note-deletions.js";
 import { privateNoteMetadataNeedsMigration } from "./private-note-utils.js";
 
 const PENDING_KEY = "SnapNotesSyncPending";
 const DELETION_KEY_PREFIX = "SnapNotesAccountDeletion:";
 const DELETION_TOMBSTONE_COLLECTION = "accountDeletionTombstones";
+const NOTE_DELETION_COLLECTION = "deletedNotes";
 const PAGE_COLLECTION = "libraries";
 const sessionGuard = createCloudSessionGuard();
 const activeSyncs = new Map();
@@ -71,6 +73,60 @@ function pageCollection(uid, revision) {
     return collection(db, "users", uid, PAGE_COLLECTION, revision, "pages");
 }
 
+function noteDeletionCollection(uid) {
+    return collection(db, "users", uid, NOTE_DELETION_COLLECTION);
+}
+
+function noteDeletionRef(uid, noteId) {
+    return doc(noteDeletionCollection(uid), encodeURIComponent(noteId));
+}
+
+async function persistNoteDeletionMarkers(uid, markers) {
+    const chunks = [];
+    for (let index = 0; index < markers.length; index += 200) chunks.push(markers.slice(index, index + 200));
+    const userDocRef = doc(db, "users", uid);
+    for (const chunk of chunks) {
+        await runTransaction(db, async transaction => {
+            const userSnapshot = await transaction.get(userDocRef);
+            const userData = userSnapshot.exists() ? userSnapshot.data() || {} : {};
+            if (userData.accountDeletion?.status === "processing") {
+                const deleting = new Error("Account deletion is already being processed.");
+                deleting.code = "snapnotes/account-deletion-processing";
+                throw deleting;
+            }
+            if (!belongsToCurrentAccount(uid)) {
+                const stale = new Error("The active account changed during deletion-marker sync.");
+                stale.code = "snapnotes/stale-account";
+                throw stale;
+            }
+            const refs = chunk.map(marker => noteDeletionRef(uid, marker.id));
+            const snapshots = await Promise.all(refs.map(reference => transaction.get(reference)));
+            const missing = chunk.filter((_, index) => !snapshots[index].exists());
+            if (!missing.length) return;
+
+            const nextVersion = (Number(userData.deletedNotesVersion) || 0) + 1;
+            transaction.set(userDocRef, { deletedNotesVersion: nextVersion }, { merge: true });
+            missing.forEach(marker => {
+                transaction.set(noteDeletionRef(uid, marker.id), {
+                    noteId: marker.id,
+                    deletedAt: marker.deletedAt || new Date().toISOString()
+                }, { merge: true });
+            });
+        });
+        if (!belongsToCurrentAccount(uid)) return false;
+    }
+    return true;
+}
+
+async function readCloudNoteDeletionIds(uid) {
+    const snapshot = await getDocs(noteDeletionCollection(uid));
+    return snapshot.docs.map(item => {
+        const noteId = item.data()?.noteId;
+        if (typeof noteId === "string" && noteId) return noteId;
+        try { return decodeURIComponent(item.id); } catch { return item.id; }
+    }).filter(Boolean);
+}
+
 function deletionTombstoneRef(uid) {
     return doc(db, DELETION_TOMBSTONE_COLLECTION, uid);
 }
@@ -112,12 +168,35 @@ async function readLibraryRevision(uid, revision) {
 }
 
 async function removeLibraryRevision(uid, revision) {
-    if (!revision) return;
+    if (!revision) return true;
     try {
         const snapshot = await getDocs(pageCollection(uid, revision));
         await Promise.all(snapshot.docs.map(page => deleteDoc(page.ref)));
+        return true;
     } catch (error) {
         console.warn("Could not remove an inactive cloud library revision:", error?.message || error);
+        return false;
+    }
+}
+
+async function forgetInactiveLibraryRevision(uid, revision) {
+    if (!revision || !belongsToCurrentAccount(uid)) return;
+    const userDocRef = doc(db, "users", uid);
+    try {
+        await runTransaction(db, async transaction => {
+            const snapshot = await transaction.get(userDocRef);
+            if (!snapshot.exists() || !belongsToCurrentAccount(uid)) return;
+            const data = snapshot.data() || {};
+            if (data.activeLibraryRevision === revision) return;
+            const inactive = Array.isArray(data.inactiveLibraryRevisions) ? data.inactiveLibraryRevisions : [];
+            if (inactive.includes(revision)) {
+                transaction.set(userDocRef, {
+                    inactiveLibraryRevisions: inactive.filter(item => item !== revision)
+                }, { merge: true });
+            }
+        });
+    } catch (error) {
+        console.warn("Could not clear an inactive library cleanup marker:", error?.message || error);
     }
 }
 
@@ -127,31 +206,18 @@ async function performSync(uid) {
         markSyncPending(uid);
         return false;
     }
-
-    const notes = structuredClone(Array.isArray(window.notes) ? window.notes : []);
-    const folders = structuredClone(Array.isArray(window.getFolders?.()) ? window.getFolders() : []);
-    if (notes.some(note => privateNoteMetadataNeedsMigration(note))) {
-        markSyncPending(uid);
-        window.showToast?.("Cloud sync is paused. Unlock Private Notes once to encrypt legacy private metadata.", "warning");
-        return false;
-    }
-    let pages;
-    try {
-        pages = packLibraryPages(notes, folders);
-    } catch (error) {
-        console.error("Cloud library contains a record larger than a safe Firestore page:", error);
-        markSyncPending(uid);
-        window.showToast?.("Cloud sync is pending: one note or attachment record is too large to sync safely.", "warning");
-        return false;
-    }
-
-    const userDocRef = doc(db, "users", uid);
-    const deviceId = getDeviceId();
-    const syncedAt = new Date().toISOString();
     let stagedRevision = null;
     let baseRevision = null;
+    let cloudDeletedIds = [];
 
     try {
+        const localDeletionMarkers = await readPermanentNoteDeletions(uid);
+        if (!belongsToCurrentAccount(uid)) return false;
+        if (localDeletionMarkers.length) {
+            await persistNoteDeletionMarkers(uid, localDeletionMarkers);
+            if (!belongsToCurrentAccount(uid)) return false;
+        }
+        const userDocRef = doc(db, "users", uid);
         const tombstone = await getDoc(deletionTombstoneRef(uid));
         if (!belongsToCurrentAccount(uid)) return false;
         if (tombstone.exists()) {
@@ -166,6 +232,42 @@ async function performSync(uid) {
             return false;
         }
         baseRevision = existingData.activeLibraryRevision || null;
+        const baseDeletionVersion = Number(existingData.deletedNotesVersion) || 0;
+
+        cloudDeletedIds = await readCloudNoteDeletionIds(uid);
+        if (!belongsToCurrentAccount(uid)) return false;
+        const deletedIds = new Set([...localDeletionMarkers.map(marker => marker.id), ...cloudDeletedIds]);
+
+        if (deletedIds.size && Array.isArray(window.notes)) {
+            const filteredLiveNotes = window.notes.filter(note => !deletedIds.has(note?.id) && !deletedIds.has(note?.conflictOf));
+            if (filteredLiveNotes.length !== window.notes.length) {
+                window.notes = filteredLiveNotes;
+                await window.persistLocalLibrary?.(uid, filteredLiveNotes, window.getFolders?.() || [], Date.now());
+                window.renderNotes?.();
+                window.updateNavigationCounts?.();
+            }
+        }
+
+        const notes = structuredClone(Array.isArray(window.notes) ? window.notes : [])
+            .filter(note => !deletedIds.has(note?.id) && !deletedIds.has(note?.conflictOf));
+        const folders = structuredClone(Array.isArray(window.getFolders?.()) ? window.getFolders() : []);
+        if (notes.some(note => privateNoteMetadataNeedsMigration(note))) {
+            markSyncPending(uid);
+            window.showToast?.("Cloud sync is paused. Unlock Private Notes once to encrypt legacy private metadata.", "warning");
+            return false;
+        }
+        let pages;
+        try {
+            pages = packLibraryPages(notes, folders);
+        } catch (error) {
+            console.error("Cloud library contains a record larger than a safe Firestore page:", error);
+            markSyncPending(uid);
+            window.showToast?.("Cloud sync is pending: one note or attachment record is too large to sync safely.", "warning");
+            return false;
+        }
+
+        const deviceId = getDeviceId();
+        const syncedAt = new Date().toISOString();
         stagedRevision = crypto.randomUUID();
 
         for (let index = 0; index < pages.length; index++) {
@@ -196,6 +298,7 @@ async function performSync(uid) {
                 throw stale;
             }
             const currentRevision = latest.exists() ? latest.data()?.activeLibraryRevision || null : null;
+            const currentDeletionVersion = latest.exists() ? Number(latest.data()?.deletedNotesVersion) || 0 : 0;
             if (latest.exists() && latest.data()?.accountDeletion?.status === "processing") {
                 const deleting = new Error("Account deletion is already being processed.");
                 deleting.code = "snapnotes/account-deletion-processing";
@@ -206,6 +309,16 @@ async function performSync(uid) {
                 concurrent.code = "snapnotes/concurrent-library-update";
                 throw concurrent;
             }
+            if (currentDeletionVersion !== baseDeletionVersion) {
+                const concurrent = new Error("Another device permanently deleted a note during sync.");
+                concurrent.code = "snapnotes/concurrent-library-update";
+                throw concurrent;
+            }
+
+            const inactiveLibraryRevisions = new Set(Array.isArray(latest.data()?.inactiveLibraryRevisions)
+                ? latest.data().inactiveLibraryRevisions
+                : []);
+            if (currentRevision && currentRevision !== stagedRevision) inactiveLibraryRevisions.add(currentRevision);
 
             transaction.set(userDocRef, {
                 activeLibraryRevision: stagedRevision,
@@ -213,6 +326,7 @@ async function performSync(uid) {
                 lastSynced: syncedAt,
                 syncVersion: 2,
                 lastSyncedBy: deviceId,
+                inactiveLibraryRevisions: [...inactiveLibraryRevisions],
                 devices: {
                     [deviceId]: { name: getDeviceName(), lastSeen: syncedAt }
                 },
@@ -221,9 +335,14 @@ async function performSync(uid) {
             }, { merge: true });
         });
 
-        if (baseRevision && baseRevision !== stagedRevision) {
-            await removeLibraryRevision(uid, baseRevision);
+        const inactiveRevisions = new Set([
+            ...(Array.isArray(existingData.inactiveLibraryRevisions) ? existingData.inactiveLibraryRevisions : []),
+            ...(baseRevision && baseRevision !== stagedRevision ? [baseRevision] : [])
+        ]);
+        for (const revision of inactiveRevisions) {
+            if (await removeLibraryRevision(uid, revision)) await forgetInactiveLibraryRevision(uid, revision);
         }
+        await clearPermanentNoteDeletions(uid, [...deletedIds]);
         if (belongsToCurrentAccount(uid)) clearSyncPending(uid);
         return true;
     } catch (error) {
@@ -293,7 +412,11 @@ export async function loadFromCloud(uid) {
 
         const localNotes = Array.isArray(window.notes) ? window.notes : [];
         const localFolders = Array.isArray(window.getFolders?.()) ? window.getFolders() : [];
-        const merged = mergeNotes(localNotes, cloudNotes);
+        const localDeletionMarkers = await readPermanentNoteDeletions(uid);
+        const cloudDeletedIds = await readCloudNoteDeletionIds(uid);
+        if (!isCurrentLoad(session)) return;
+        const deletedIds = new Set([...localDeletionMarkers.map(marker => marker.id), ...cloudDeletedIds]);
+        const merged = mergeNotes(localNotes, cloudNotes, [...deletedIds]);
         const folderMap = new Map();
         [...cloudFolders, ...localFolders].forEach(folder => {
             if (!folder?.id) return;

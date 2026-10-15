@@ -1,6 +1,7 @@
 const DATABASE_NAME = "SnapNotesLocal";
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 const LIBRARY_STORE = "libraries";
+const DELETION_STORE = "deletions";
 
 function waitForTransaction(transaction) {
     return new Promise((resolve, reject) => {
@@ -22,6 +23,9 @@ export function createLocalLibraryStore(indexedDB = globalThis.indexedDB) {
                 const database = request.result;
                 if (!database.objectStoreNames.contains(LIBRARY_STORE)) {
                     database.createObjectStore(LIBRARY_STORE, { keyPath: "id" });
+                }
+                if (!database.objectStoreNames.contains(DELETION_STORE)) {
+                    database.createObjectStore(DELETION_STORE, { keyPath: "key" });
                 }
             };
             request.onsuccess = () => resolve(request.result);
@@ -55,24 +59,84 @@ export function createLocalLibraryStore(indexedDB = globalThis.indexedDB) {
         },
         async remove(id) {
             const database = await openDatabase();
-            const transaction = database.transaction(LIBRARY_STORE, "readwrite");
+            const transaction = database.transaction([LIBRARY_STORE, DELETION_STORE], "readwrite");
             transaction.objectStore(LIBRARY_STORE).delete(String(id || "local"));
+            const deletionStore = transaction.objectStore(DELETION_STORE);
+            const request = deletionStore.getAll();
+            request.onsuccess = () => {
+                request.result.forEach(marker => {
+                    if (marker.uid === String(id || "local")) deletionStore.delete(marker.key);
+                });
+            };
+            await waitForTransaction(transaction);
+            return true;
+        },
+        async writeDeletionMarkers(markers) {
+            if (!markers.length) return true;
+            const database = await openDatabase();
+            const transaction = database.transaction(DELETION_STORE, "readwrite");
+            const store = transaction.objectStore(DELETION_STORE);
+            markers.forEach(marker => {
+                store.put({ ...marker, key: `${marker.uid || "local"}:${marker.id}` });
+            });
+            await waitForTransaction(transaction);
+            return true;
+        },
+        async readDeletionMarkers() {
+            const database = await openDatabase();
+            const transaction = database.transaction(DELETION_STORE, "readonly");
+            const request = transaction.objectStore(DELETION_STORE).getAll();
+            return new Promise((resolve, reject) => {
+                request.onsuccess = () => resolve(request.result || []);
+                request.onerror = () => reject(request.error || new Error("Could not read local deletion markers."));
+            });
+        },
+        async removeDeletionMarkers(uid, ids, includeLocal = false) {
+            const idSet = new Set(ids || []);
+            if (!idSet.size) return true;
+            const database = await openDatabase();
+            const transaction = database.transaction(DELETION_STORE, "readwrite");
+            const store = transaction.objectStore(DELETION_STORE);
+            const request = store.getAll();
+            request.onsuccess = () => {
+                request.result.forEach(marker => {
+                    const ownerMatches = marker.uid === uid || (includeLocal && marker.uid == null);
+                    if (ownerMatches && idSet.has(marker.id)) store.delete(marker.key);
+                });
+            };
             await waitForTransaction(transaction);
             return true;
         }
     };
 }
 
-const defaultStore = createLocalLibraryStore();
+let defaultStore;
+
+function getDefaultStore() {
+    if (!defaultStore) defaultStore = createLocalLibraryStore(globalThis.indexedDB);
+    return defaultStore;
+}
 
 export async function persistLocalLibrary(id, notes, folders, savedAt = Date.now()) {
-    return defaultStore.write(id, notes, folders, savedAt);
+    return getDefaultStore().write(id, notes, folders, savedAt);
 }
 
 export async function readLocalLibrary(id) {
-    return defaultStore.read(id);
+    return getDefaultStore().read(id);
 }
 
 export async function deleteLocalLibrary(id) {
-    return defaultStore.remove(id);
+    return getDefaultStore().remove(id);
+}
+
+export async function writeLocalDeletionMarkers(markers) {
+    return getDefaultStore().writeDeletionMarkers(markers);
+}
+
+export async function readLocalDeletionMarkers() {
+    return getDefaultStore().readDeletionMarkers();
+}
+
+export async function removeLocalDeletionMarkers(uid, ids, includeLocal = false) {
+    return getDefaultStore().removeDeletionMarkers(uid, ids, includeLocal);
 }

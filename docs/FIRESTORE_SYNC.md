@@ -32,6 +32,16 @@ service cloud.firestore {
         allow read, write: if isOwner(uid) &&
           !isDeletionProcessing(uid) && !hasDeletionTombstone(uid);
       }
+
+      match /deletedNotes/{noteId} {
+        allow read: if isOwner(uid) &&
+          !isDeletionProcessing(uid) && !hasDeletionTombstone(uid);
+        allow create: if isOwner(uid) &&
+          !isDeletionProcessing(uid) && !hasDeletionTombstone(uid) &&
+          request.resource.data.keys().hasOnly(['noteId', 'deletedAt']) &&
+          request.resource.data.noteId is string;
+        allow update, delete: if false;
+      }
     }
 
     match /accountDeletionTombstones/{uid} {
@@ -44,4 +54,6 @@ service cloud.firestore {
 
 The scheduled deletion worker uses Firebase Admin, so it bypasses client rules. Once it has removed the user's storage objects, it writes an Admin-only tombstone, deletes the Firebase Auth user, and recursively deletes the user's Firestore data. The tombstone blocks a still-valid ID token from recreating data after deletion; it contains only deletion timestamps, expires after 24 hours, and is purged on a subsequent daily worker run (so it may remain longer than 24 hours). This exceeds a Firebase ID token's lifetime. The user document's `processing` status also blocks client writes during the cleanup phase. Ensure no existing, more-permissive overlapping `allow` rule overrides these restrictions; merge into the project's active rules rather than replacing project rules blindly.
 
-Each page targets at most 450 KiB of serialized JSON, safely below Firestore's 1 MiB document ceiling. A single oversized note is left local and reported as pending instead of being split or silently truncated. Sync stages immutable revision pages and changes the active pointer in a transaction; if another device commits first, the client reloads and merges divergent note versions into deterministic conflict copies before retrying. If a legacy private note still has plaintext metadata outside its encrypted payload, cloud sync pauses until the user unlocks Private Notes and the legacy fields are migrated; this avoids republishing those fields in the new page format.
+Each page targets at most 450 KiB of serialized JSON, safely below Firestore's 1 MiB document ceiling. A single oversized note is left local and reported as pending instead of being split or silently truncated. Sync stages immutable revision pages and changes the active pointer in a transaction. Note versions merge into the canonical note history: a longer shared edit-history lineage takes precedence over skewed device timestamps, and the alternate content is retained as a history entry instead of a duplicate conflict note. If another device commits first, the client reloads and retries from the new library revision.
+
+Permanent note deletion uses immutable ID-only markers at `users/{uid}/deletedNotes/{encodedNoteId}`. The marker contains only `noteId` and `deletedAt`—not note content—and is retained so a device that reconnects after a long offline period cannot recreate the deleted note. The user's `deletedNotesVersion` increments transactionally with marker creation; library sync compares that version before switching the active page revision, preventing a concurrent sync from winning a race against a permanent delete. After committing the filtered revision, the old page documents are deleted. Failed page cleanup remains listed in `inactiveLibraryRevisions` and is retried by later syncs. Configure rules to allow owner reads and creates for these markers, while denying updates and deletes.

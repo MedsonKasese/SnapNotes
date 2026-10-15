@@ -11,6 +11,7 @@ import { renderSubtitleMarkdownText } from "../js/note-format.js";
 import { hasPrivatePasskey, registerPrivatePasskey, removePrivatePasskey, unlockPrivateKeyWithPasskey } from "../js/private-passkey.js";
 import { webcrypto } from "node:crypto";
 import { createLocalLibraryStore } from "../js/local-library.js";
+import { clearPermanentNoteDeletions, readPermanentNoteDeletions, recordPermanentNoteDeletions } from "../js/note-deletions.js";
 
 function memoryStorage() {
   const values = new Map();
@@ -23,30 +24,43 @@ function memoryStorage() {
 
 function fakeIndexedDB() {
   const records = new Map();
-  let hasStore = false;
+  const stores = new Set();
   const database = {
-    objectStoreNames: { contains: () => hasStore },
-    createObjectStore() { hasStore = true; },
+    objectStoreNames: { contains: name => stores.has(name) },
+    createObjectStore(name) { stores.add(name); records.set(name, new Map()); },
     transaction() {
       const transaction = { error: null };
-      transaction.objectStore = () => ({
-        put(value) {
-          records.set(value.id, structuredClone(value));
-          queueMicrotask(() => transaction.oncomplete?.());
-        },
-        get(id) {
-          const request = {};
-          queueMicrotask(() => {
-            request.result = records.has(id) ? structuredClone(records.get(id)) : undefined;
-            request.onsuccess?.();
-          });
-          return request;
-        },
-        delete(id) {
-          records.delete(id);
-          queueMicrotask(() => transaction.oncomplete?.());
-        }
-      });
+      transaction.objectStore = name => {
+        const store = records.get(name);
+        return {
+          put(value) {
+            const key = value.key ?? value.id;
+            store.set(key, structuredClone(value));
+            queueMicrotask(() => transaction.oncomplete?.());
+          },
+          get(id) {
+            const request = {};
+            queueMicrotask(() => {
+              request.result = store.has(id) ? structuredClone(store.get(id)) : undefined;
+              request.onsuccess?.();
+            });
+            return request;
+          },
+          getAll() {
+            const request = {};
+            queueMicrotask(() => {
+              request.result = [...store.values()].map(value => structuredClone(value));
+              request.onsuccess?.();
+              queueMicrotask(() => transaction.oncomplete?.());
+            });
+            return request;
+          },
+          delete(key) {
+            store.delete(key);
+            queueMicrotask(() => transaction.oncomplete?.());
+          }
+        };
+      };
       return transaction;
     }
   };
@@ -215,11 +229,14 @@ test("durable local library stores independent account snapshots and deletes the
   const notes = [{ id: "n1", text: "saved offline" }];
   const folders = [{ id: "f1", name: "Local" }];
   await store.write("account-a", notes, folders, 1234);
+  await store.writeDeletionMarkers([{ id: "n2", uid: "account-a", deletedAt: "2026-10-15T00:00:00Z" }]);
   notes[0].text = "changed after snapshot";
   assert.equal((await store.read("account-a")).notes[0].text, "saved offline");
   assert.equal(await store.read("account-b"), null);
+  assert.equal((await store.readDeletionMarkers()).length, 1);
   await store.remove("account-a");
   assert.equal(await store.read("account-a"), null);
+  assert.equal((await store.readDeletionMarkers()).length, 0);
 });
 
 test("cloud load generation rejects stale A-to-B and A-to-B-to-A responses", () => {
@@ -288,6 +305,24 @@ test("soft deletion beats stale active copies, but an explicit later restore win
   assert.ok(mergeNotes([active], [deleted])[0].deletedAt);
   const restored = { ...active, restoredAt: "2026-01-02T00:00:00Z" };
   assert.equal(mergeNotes([restored], [deleted])[0].deletedAt, undefined);
+});
+
+test("permanent deletion markers are account-scoped and prevent stale note resurrection", async () => {
+  const storage = memoryStorage();
+  const previousIndexedDB = Object.getOwnPropertyDescriptor(globalThis, "indexedDB");
+  Object.defineProperty(globalThis, "indexedDB", { configurable: true, writable: true, value: fakeIndexedDB() });
+  try {
+    assert.equal(await recordPermanentNoteDeletions(["n1"], "account-a", storage), true);
+    assert.deepEqual((await readPermanentNoteDeletions("account-a", storage)).map(marker => marker.id), ["n1"]);
+    assert.deepEqual(await readPermanentNoteDeletions("account-b", storage), []);
+    assert.deepEqual(mergeNotes([{ id: "n1", text: "stale local copy" }], [{ id: "n1", text: "old cloud copy" }], ["n1"]), []);
+    assert.deepEqual(mergeNotes([{ id: "legacy-copy", conflictOf: "n1", syncConflict: true }], [], ["n1"]), []);
+    assert.equal(await clearPermanentNoteDeletions("account-a", ["n1"], storage), true);
+    assert.deepEqual(await readPermanentNoteDeletions("account-a", storage), []);
+  } finally {
+    if (previousIndexedDB) Object.defineProperty(globalThis, "indexedDB", previousIndexedDB);
+    else delete globalThis.indexedDB;
+  }
 });
 
 test("Firestore library pages remain below the byte limit and reject oversized records", () => {

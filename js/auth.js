@@ -314,6 +314,7 @@ async function clearLocalAccountDataForDeletion(user) {
         if (typeof window.deleteLocalLibrarySnapshot === "function") {
             await window.deleteLocalLibrarySnapshot(uid);
         }
+        await window.clearAccountPermanentNoteDeletions?.(uid);
         localLibraryCleanupComplete = true;
     } catch (error) {
         console.warn("Could not remove the durable local library for the deleted account:", error);
