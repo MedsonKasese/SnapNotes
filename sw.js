@@ -92,6 +92,9 @@ self.addEventListener("fetch", event => {
 
   const url = new URL(event.request.url);
 
+  // Never cache API responses, signed URLs, or private user-specific content.
+  if (url.origin === self.location.origin && url.pathname.startsWith("/api/")) return;
+
   if (url.origin !== self.location.origin) {
     event.respondWith(
       fetch(event.request).catch(() => caches.match(event.request))
