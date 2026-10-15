@@ -675,7 +675,8 @@ function restoreNote(id) {
     recordHistory(id);
     note.archived = false;
     note.deletedAt = null;
-    note.updatedAt = new Date().toISOString();
+    note.restoredAt = new Date().toISOString();
+    note.updatedAt = note.restoredAt;
     saveNotes();
     renderNotes();
     updateNavigationCounts();
@@ -763,6 +764,7 @@ function togglePin(id) {
 
     recordHistory(id);
     note.pinned = !note.pinned;
+    note.updatedAt = new Date().toISOString();
     saveNotes();
     renderNotes();
     showToast(note.pinned ? "Note pinned" : "Note unpinned", note.pinned ? "update" : "warning");

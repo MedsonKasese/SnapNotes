@@ -184,33 +184,56 @@ test("cloud load generation rejects stale A-to-B and A-to-B-to-A responses", () 
   assert.equal(guard.isCurrent(currentA, "A"), true);
 });
 
-test("merge preserves divergent versions with different timestamps and is idempotent", () => {
+test("merge preserves divergent edits in canonical edit history and is idempotent", () => {
   const cloud = { id: "n1", title: "Plan", text: "Cloud", createdAt: "2026-01-01", updatedAt: "2026-01-02" };
   const local = { ...cloud, text: "Local", updatedAt: "2026-01-03" };
   assert.notEqual(noteSignature(cloud), noteSignature(local));
   const merged = mergeNotes([local], [cloud]);
-  assert.equal(merged.find(note => note.id === "n1").text, "Local");
-  const conflict = merged.find(note => note.syncConflict);
-  assert.equal(conflict.text, "Cloud");
-  assert.equal(conflict.conflictOf, "n1");
+  const canonical = merged.find(note => note.id === "n1");
+  assert.equal(canonical.text, "Local");
+  assert.equal(merged.filter(note => note.id === "n1").length, 1);
+  assert.equal(merged.filter(note => note.syncConflict).length, 0);
+  assert.ok(canonical.versions.some(version => version.text === "Cloud"));
   const secondMerge = mergeNotes(merged, merged);
-  assert.equal(secondMerge.filter(note => note.syncConflict).length, 1);
-  assert.equal(secondMerge.find(note => note.syncConflict).id, conflict.id);
+  assert.equal(secondMerge.filter(note => note.syncConflict).length, 0);
+  assert.deepEqual(secondMerge.find(note => note.id === "n1").versions, canonical.versions);
 });
 
 test("merge detects reminder-only, attachment-metadata, and version-history divergence", () => {
   const base = { id: "n1", text: "same", reminderAt: null, versions: [], attachments: [{ id: "a1", name: "one.pdf" }] };
   const changed = { ...base, reminderAt: "2026-10-15T09:00:00Z", versions: [{ text: "prior" }], attachments: [{ id: "a1", name: "renamed.pdf" }] };
-  assert.equal(mergeNotes([base], [changed]).filter(note => note.syncConflict).length, 1);
+  const merged = mergeNotes([base], [changed]);
+  assert.equal(merged.filter(note => note.syncConflict).length, 0);
+  assert.equal(merged[0].reminderAt, changed.reminderAt);
+  assert.equal(merged[0].attachments[0].name, "renamed.pdf");
+  assert.ok(merged[0].versions.some(version => version.text === "same"));
 });
 
-test("merge treats invalid timestamps as oldest and preserves the divergent cloud version", () => {
+test("merge treats invalid timestamps as oldest and preserves the losing version in history", () => {
   const cloud = { id: "n1", title: "Plan", text: "Cloud", updatedAt: "not-a-date" };
   const local = { ...cloud, text: "Local", updatedAt: "2026-01-03T00:00:00Z" };
   assert.equal(noteTimestamp(cloud), 0);
   const merged = mergeNotes([local], [cloud]);
   assert.equal(merged.find(note => note.id === "n1").text, "Local");
-  assert.equal(merged.find(note => note.syncConflict).text, "Cloud");
+  assert.ok(merged.find(note => note.id === "n1").versions.some(version => version.text === "Cloud"));
+});
+
+test("longer shared edit history beats skewed device timestamps and carries both edits", () => {
+  const baseVersion = { title: "Plan", text: "Initial", savedAt: "2026-01-01T00:00:00Z" };
+  const intermediateVersion = { title: "Plan", text: "First edit", savedAt: "2026-01-02T00:00:00Z" };
+  const latest = { id: "n1", title: "Plan", text: "Latest cloud edit", updatedAt: "2026-01-03T00:00:00Z", versions: [baseVersion, intermediateVersion] };
+  const skewed = { id: "n1", title: "Plan", text: "Clock-skewed local edit", updatedAt: "2030-01-03T00:00:00Z", versions: [baseVersion] };
+  const merged = mergeNotes([skewed], [latest]);
+  assert.equal(merged[0].text, "Latest cloud edit");
+  assert.ok(merged[0].versions.some(version => version.text === "Clock-skewed local edit"));
+});
+
+test("soft deletion beats stale active copies, but an explicit later restore wins", () => {
+  const active = { id: "n1", text: "Edited copy", updatedAt: "2030-01-01T00:00:00Z" };
+  const deleted = { id: "n1", text: "Deleted copy", deletedAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" };
+  assert.ok(mergeNotes([active], [deleted])[0].deletedAt);
+  const restored = { ...active, restoredAt: "2026-01-02T00:00:00Z" };
+  assert.equal(mergeNotes([restored], [deleted])[0].deletedAt, undefined);
 });
 
 test("Firestore library pages remain below the byte limit and reject oversized records", () => {
