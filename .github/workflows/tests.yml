@@ -18,6 +18,8 @@ jobs:
           node --check js/drafts.js
           node --check js/note-format.js
           node --check js/storage.js
+          node --check js/local-library.js
+          node --check js/note-deletions.js
           node --check js/auth.js
           node --check lib/supabase-storage.js
           node --check api/storage/sign-upload.js
@@ -27,6 +29,7 @@ jobs:
           node --check api/storage/avatar.js
           node --check js/firestore.js
           node --check js/private-notes.js
+          node --check js/private-passkey.js
           node --check js/attachments.js
           node --check js/folders.js
           node --check js/version-history.js
@@ -112,6 +115,8 @@ jobs:
           grep -q 'isPrivate' js/notes.js
           grep -q 'AES-GCM' js/private-notes.js
           grep -q 'PBKDF2-SHA-256' js/private-notes.js
+          grep -q 'extensions: { prf:' js/private-passkey.js
+          grep -q 'deletedNotesVersion' js/firestore.js
           grep -q 'privateNoteMetadataNeedsMigration' js/firestore.js
           grep -q 'accountDeletionTombstones' js/firestore.js
           grep -q 'accountDeletionTombstones' api/cron/delete-scheduled-accounts.js

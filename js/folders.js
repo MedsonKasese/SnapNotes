@@ -33,6 +33,15 @@ function loadFolders() {
 
 function saveFolders() {
     localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders));
+    const libraryId = window.snapNotesDataUid !== undefined
+        ? window.snapNotesDataUid || "local"
+        : window.firebaseAuth?.currentUser?.uid || "local";
+    void window.persistLocalLibrary?.(
+        libraryId,
+        Array.isArray(window.notes) ? window.notes : [],
+        folders,
+        Date.now()
+    );
     window.dispatchEvent(new CustomEvent("snapnotes:folders-changed", {
         detail: { folders: structuredClone(folders) }
     }));

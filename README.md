@@ -13,12 +13,12 @@ SnapNotes is a vanilla HTML, CSS, and JavaScript note-taking app for capturing a
 | Notes and formatting | Create and edit notes with formatted text; each note is limited to **1,500 characters**. |
 | Search and organization | Search notes, filter by category, tags, pinned state, archive, Trash, and folders. |
 | Reminders | Set one-time reminders, with browser/service-worker notifications where supported. |
-| Private Notes | Protect private note content and metadata with a passphrase-derived AES-GCM key. The passphrase stays in the browser and cannot be recovered. |
+| Private Notes | Protect private note content and metadata with a passphrase-derived AES-GCM key. On supported devices, an optional platform passkey or biometric can unlock the key locally; the password remains available as a fallback. |
 | Attachments | Store supported images, PDFs, and text files locally first; signed-in users can sync them through private Supabase Storage. |
 | Cloud sync | Sync notes and folders across signed-in devices. The library is written in bounded Firestore pages rather than one unbounded account document. |
 | Ask My Notes | Search eligible regular notes with the configured Gemini API; private, archived, trashed, and conflict-copy notes are excluded. |
 | Account security | Edit account profile details, schedule account deletion with a 10-day cancellation window, and manage sign-in security. |
-| Local-first use | Notes are saved in browser storage when signed out or offline. |
+| Local-first use | Notes are saved locally first, mirrored to IndexedDB and localStorage, and queued for cloud sync when offline. The app requests persistent browser storage where supported, while keeping a localStorage fallback. |
 
 ## Local development
 

@@ -13,6 +13,7 @@ import {
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
 import { getAccountDeletionStatus, loadFromCloud } from "./firestore.js";
+import { mergeNotes } from "./note-sync.js";
 
 const signupFullName = document.getElementById("signupFullName");
 const emailInput = document.getElementById("emailInput");
@@ -162,42 +163,76 @@ function accountCacheKey(uid) {
     return `SnapNotesAccount:${uid}`;
 }
 
-function restoreAccountCache(user) {
+async function restoreAccountCache(user, includeLocalCache = false) {
     if (!user?.uid) return;
     if (localStorage.getItem(`SnapNotesAccountCleanupPending:${user.uid}`) === "true") {
         void clearLocalAccountDataForDeletion(user);
         return;
     }
     const raw = localStorage.getItem(accountCacheKey(user.uid));
-    if (!raw) return;
-
+    let cached = null;
     try {
-        const cached = JSON.parse(raw);
-        if (Array.isArray(cached.notes)) {
-            localStorage.setItem("SnapNotes", JSON.stringify(cached.notes));
-        }
-        if (Array.isArray(cached.folders)) {
-            localStorage.setItem("SnapNotesFolders", JSON.stringify(cached.folders));
-        }
-        window.loadNotes?.();
-        window.loadFolders?.();
-        const attachmentIds = attachmentIdsForAccount(user.uid);
-        void window.tagLegacyAttachmentFilesForUser?.(user.uid, attachmentIds).catch(error => {
-            console.warn("Could not migrate account-cache attachment ownership:", error);
-        });
+        cached = raw ? JSON.parse(raw) : null;
     } catch (error) {
         localStorage.removeItem(accountCacheKey(user.uid));
         console.warn("Could not restore the local account cache:", error);
     }
+
+    let localCache = null;
+    if (includeLocalCache) {
+        try { localCache = JSON.parse(localStorage.getItem("SnapNotesLocalCache") || "null"); } catch {}
+        try {
+            const durableLocal = await window.readLocalLibrary?.("local");
+            if (Array.isArray(durableLocal?.notes) && Number(durableLocal.savedAt) > (Date.parse(localCache?.savedAt || "") || 0)) {
+                localCache = { notes: durableLocal.notes, folders: durableLocal.folders || [], savedAt: new Date(durableLocal.savedAt).toISOString() };
+            }
+        } catch (error) {
+            console.warn("Could not recover the signed-out local library:", error);
+        }
+    }
+
+    const localNotes = includeLocalCache && Array.isArray(localCache?.notes) ? localCache.notes : [];
+    const accountNotes = Array.isArray(cached?.notes) ? cached.notes : [];
+    const notes = mergeNotes(localNotes, accountNotes);
+    const folderMap = new Map();
+    [...(includeLocalCache && Array.isArray(localCache?.folders) ? localCache.folders : []),
+        ...(Array.isArray(cached?.folders) ? cached.folders : [])].forEach(folder => {
+        if (!folder?.id) return;
+        const existing = folderMap.get(folder.id);
+        const existingTime = Date.parse(existing?.updatedAt || existing?.createdAt || "") || 0;
+        const incomingTime = Date.parse(folder.updatedAt || folder.createdAt || "") || 0;
+        if (!existing || incomingTime > existingTime) folderMap.set(folder.id, folder);
+    });
+    const folders = [...folderMap.values()].slice(0, 20);
+    if (!notes.length && !folders.length) {
+        const localReady = window.loadNotes?.();
+        if (localReady) await localReady;
+        return;
+    }
+
+    const savedAt = Date.now();
+    window.notes = notes;
+    await window.persistLocalLibrary?.(user.uid, notes, folders, savedAt);
+    window.loadFolders?.();
+    const localReady = window.loadNotes?.();
+    if (localReady) await localReady;
+    const attachmentIds = attachmentIdsForAccount(user.uid);
+    void window.tagLegacyAttachmentFilesForUser?.(user.uid, attachmentIds).catch(error => {
+        console.warn("Could not migrate account-cache attachment ownership:", error);
+    });
 }
 
 function cacheAccountBeforeSignOut(user) {
     if (!user?.uid) return;
-    localStorage.setItem(accountCacheKey(user.uid), JSON.stringify({
-        notes: Array.isArray(window.notes) ? window.notes : [],
-        folders: Array.isArray(window.getFolders?.()) ? window.getFolders() : [],
-        savedAt: new Date().toISOString()
-    }));
+    const notes = Array.isArray(window.notes) ? window.notes : [];
+    const folders = Array.isArray(window.getFolders?.()) ? window.getFolders() : [];
+    const savedAt = Date.now();
+    try {
+        localStorage.setItem(accountCacheKey(user.uid), JSON.stringify({ notes, folders, savedAt: new Date(savedAt).toISOString() }));
+    } catch (error) {
+        console.warn("Could not cache the account library in localStorage:", error);
+    }
+    void window.persistLocalLibrary?.(user.uid, notes, folders, savedAt);
 }
 
 function attachmentIdsForAccount(uid) {
@@ -249,6 +284,7 @@ async function clearLocalAccountDataForDeletion(user) {
         ...queuedAttachmentIdsForAccount(uid)
     ])];
     let attachmentCleanupComplete = false;
+    let localLibraryCleanupComplete = false;
     let attachmentIdsPersisted = false;
     try {
         localStorage.setItem(idsKey, JSON.stringify(attachmentIds));
@@ -274,7 +310,17 @@ async function clearLocalAccountDataForDeletion(user) {
         console.warn("Could not remove all local attachment blobs for the deleted account:", error);
     }
 
-    if (attachmentCleanupComplete || attachmentIdsPersisted) {
+    try {
+        if (typeof window.deleteLocalLibrarySnapshot === "function") {
+            await window.deleteLocalLibrarySnapshot(uid);
+        }
+        await window.clearAccountPermanentNoteDeletions?.(uid);
+        localLibraryCleanupComplete = true;
+    } catch (error) {
+        console.warn("Could not remove the durable local library for the deleted account:", error);
+    }
+
+    if ((attachmentCleanupComplete || attachmentIdsPersisted) && localLibraryCleanupComplete) {
         localStorage.removeItem(accountCacheKey(uid));
     } else {
         try { localStorage.setItem(`SnapNotesAccountCleanupPending:${uid}`, "true"); } catch {}
@@ -288,11 +334,12 @@ async function clearLocalAccountDataForDeletion(user) {
         window.snapNotesDataUid = null;
         localStorage.removeItem("SnapNotes");
         localStorage.removeItem("SnapNotesFolders");
+        localStorage.removeItem("SnapNotesSavedAt");
         window.loadFolders?.();
         window.renderNotes?.("", "all");
         window.updateNavigationCounts?.();
     }
-    if (attachmentCleanupComplete) {
+    if (attachmentCleanupComplete && localLibraryCleanupComplete) {
         localStorage.setItem(`SnapNotesAccountCleanupDone:${uid}`, "true");
     }
 }
@@ -576,11 +623,22 @@ function resetNoteStateForAuthTransition(nextUid, user) {
         return;
     }
 
-    if (previousUid === null && nextUid) {
+    if ((previousUid === null || previousUid === undefined) && nextUid) {
+        let localNotes = Array.isArray(window.notes) ? window.notes : [];
+        let localFolders = Array.isArray(window.getFolders?.()) ? window.getFolders() : [];
+        try {
+            const storedNotes = JSON.parse(localStorage.getItem("SnapNotes") || "null");
+            if (Array.isArray(storedNotes) && (!localNotes.length || Number(localStorage.getItem("SnapNotesSavedAt")) > 0)) localNotes = storedNotes;
+            const storedFolders = JSON.parse(localStorage.getItem("SnapNotesFolders") || "null");
+            if (Array.isArray(storedFolders)) localFolders = storedFolders;
+        } catch {}
+        const savedAt = Number(localStorage.getItem("SnapNotesSavedAt")) || Date.now();
         localStorage.setItem("SnapNotesLocalCache", JSON.stringify({
-            notes: Array.isArray(window.notes) ? window.notes : [],
-            folders: Array.isArray(window.getFolders?.()) ? window.getFolders() : []
+            notes: localNotes,
+            folders: localFolders,
+            savedAt: new Date(savedAt).toISOString()
         }));
+        void window.persistLocalLibrary?.("local", localNotes, localFolders, savedAt);
     }
 
     if (previousUid && localStorage.getItem(`SnapNotesAccountCleanupDone:${previousUid}`) !== "true") {
@@ -592,26 +650,28 @@ function resetNoteStateForAuthTransition(nextUid, user) {
     window.notes = [];
     localStorage.removeItem("SnapNotes");
     localStorage.removeItem("SnapNotesFolders");
+    localStorage.removeItem("SnapNotesSavedAt");
     window.snapNotesDataUid = nextUid || null;
     observedAuthUid = nextUid;
 
     if (user) {
-        restoreAccountCache(user);
+        window.localNotesReady = restoreAccountCache(user, previousUid === null || previousUid === undefined);
     } else {
         try {
             const localCache = JSON.parse(localStorage.getItem("SnapNotesLocalCache") || "null");
             if (Array.isArray(localCache?.notes)) localStorage.setItem("SnapNotes", JSON.stringify(localCache.notes));
             if (Array.isArray(localCache?.folders)) localStorage.setItem("SnapNotesFolders", JSON.stringify(localCache.folders));
+            if (localCache?.savedAt) localStorage.setItem("SnapNotesSavedAt", String(Date.parse(localCache.savedAt) || Date.now()));
         } catch (error) {
             console.warn("Could not restore signed-out local notes:", error);
         }
-        window.loadNotes?.();
+        window.localNotesReady = window.loadNotes?.();
         window.loadFolders?.();
         window.updateNavigationCounts?.();
     }
 }
 
-onAuthStateChanged(auth, user => {
+onAuthStateChanged(auth, async user => {
     resetNoteStateForAuthTransition(user?.uid || null, user);
     window.dispatchEvent(new CustomEvent("snapnotes:auth-changed", { detail: { user } }));
     resetGoogleButton();
@@ -651,7 +711,8 @@ onAuthStateChanged(auth, user => {
             clearVerificationState();
         }
 
-        loadFromCloud(user.uid);
+        await window.localNotesReady;
+        if (auth.currentUser?.uid === user.uid) await loadFromCloud(user.uid);
     } else {
         userAvatar.hidden = true;
         if (userAvatarImage) {

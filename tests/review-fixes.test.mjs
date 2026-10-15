@@ -8,6 +8,10 @@ import { enqueueAndProcessAttachmentCleanup, ATTACHMENT_CLEANUP_KEY } from "../j
 import { renderSettingsAccount } from "../js/settings-account.js";
 import { migrateLegacyDraft, readDrafts, removeDraft, upsertDraft } from "../js/drafts.js";
 import { renderSubtitleMarkdownText } from "../js/note-format.js";
+import { hasPrivatePasskey, registerPrivatePasskey, removePrivatePasskey, unlockPrivateKeyWithPasskey } from "../js/private-passkey.js";
+import { webcrypto } from "node:crypto";
+import { createLocalLibraryStore } from "../js/local-library.js";
+import { clearPermanentNoteDeletions, readPermanentNoteDeletions, recordPermanentNoteDeletions } from "../js/note-deletions.js";
 
 function memoryStorage() {
   const values = new Map();
@@ -15,6 +19,60 @@ function memoryStorage() {
     getItem(key) { return values.get(key) ?? null; },
     setItem(key, value) { values.set(key, String(value)); },
     removeItem(key) { values.delete(key); }
+  };
+}
+
+function fakeIndexedDB() {
+  const records = new Map();
+  const stores = new Set();
+  const database = {
+    objectStoreNames: { contains: name => stores.has(name) },
+    createObjectStore(name) { stores.add(name); records.set(name, new Map()); },
+    transaction() {
+      const transaction = { error: null };
+      transaction.objectStore = name => {
+        const store = records.get(name);
+        return {
+          put(value) {
+            const key = value.key ?? value.id;
+            store.set(key, structuredClone(value));
+            queueMicrotask(() => transaction.oncomplete?.());
+          },
+          get(id) {
+            const request = {};
+            queueMicrotask(() => {
+              request.result = store.has(id) ? structuredClone(store.get(id)) : undefined;
+              request.onsuccess?.();
+            });
+            return request;
+          },
+          getAll() {
+            const request = {};
+            queueMicrotask(() => {
+              request.result = [...store.values()].map(value => structuredClone(value));
+              request.onsuccess?.();
+              queueMicrotask(() => transaction.oncomplete?.());
+            });
+            return request;
+          },
+          delete(key) {
+            store.delete(key);
+            queueMicrotask(() => transaction.oncomplete?.());
+          }
+        };
+      };
+      return transaction;
+    }
+  };
+  return {
+    open() {
+      const request = { result: database };
+      queueMicrotask(() => {
+        request.onupgradeneeded?.();
+        request.onsuccess?.();
+      });
+      return request;
+    }
   };
 }
 
@@ -119,6 +177,68 @@ test("private payload preserves metadata for encryption while locked projection 
   assert.equal(source.reminderAt, null);
 });
 
+test("passkey PRF wraps and restores the private-note key without removing password fallback", async () => {
+  const descriptors = new Map();
+  const define = (name, value) => {
+    descriptors.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+    Object.defineProperty(globalThis, name, { configurable: true, writable: true, value });
+  };
+  const storage = memoryStorage();
+  const credentialId = Uint8Array.from([1, 2, 3, 4]).buffer;
+  const prfOutput = Uint8Array.from({ length: 32 }, (_, index) => index + 7);
+  define("crypto", webcrypto);
+  define("isSecureContext", true);
+  define("location", { hostname: "localhost" });
+  define("PublicKeyCredential", class {});
+  define("navigator", {
+    credentials: {
+      async create({ publicKey }) {
+        assert.equal(publicKey.rp.id, "localhost");
+        assert.deepEqual(publicKey.extensions, { prf: {} });
+        return { rawId: credentialId, getClientExtensionResults: () => ({ prf: { enabled: true } }) };
+      },
+      async get({ publicKey }) {
+        assert.equal(publicKey.userVerification, "required");
+        assert.ok(publicKey.extensions.prf.eval.first instanceof Uint8Array);
+        return { getClientExtensionResults: () => ({ prf: { results: { first: prfOutput.slice().buffer } } }) };
+      }
+    }
+  });
+
+  try {
+    const original = await webcrypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
+    assert.equal(await registerPrivatePasskey(original, storage), true);
+    assert.equal(hasPrivatePasskey(storage), true);
+    const unlocked = await unlockPrivateKeyWithPasskey(storage);
+    assert.deepEqual(
+      new Uint8Array(await webcrypto.subtle.exportKey("raw", unlocked)),
+      new Uint8Array(await webcrypto.subtle.exportKey("raw", original))
+    );
+    removePrivatePasskey(storage);
+    assert.equal(hasPrivatePasskey(storage), false);
+  } finally {
+    for (const [name, descriptor] of descriptors) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else delete globalThis[name];
+    }
+  }
+});
+
+test("durable local library stores independent account snapshots and deletes them for account cleanup", async () => {
+  const store = createLocalLibraryStore(fakeIndexedDB());
+  const notes = [{ id: "n1", text: "saved offline" }];
+  const folders = [{ id: "f1", name: "Local" }];
+  await store.write("account-a", notes, folders, 1234);
+  await store.writeDeletionMarkers([{ id: "n2", uid: "account-a", deletedAt: "2026-10-15T00:00:00Z" }]);
+  notes[0].text = "changed after snapshot";
+  assert.equal((await store.read("account-a")).notes[0].text, "saved offline");
+  assert.equal(await store.read("account-b"), null);
+  assert.equal((await store.readDeletionMarkers()).length, 1);
+  await store.remove("account-a");
+  assert.equal(await store.read("account-a"), null);
+  assert.equal((await store.readDeletionMarkers()).length, 0);
+});
+
 test("cloud load generation rejects stale A-to-B and A-to-B-to-A responses", () => {
   const guard = createCloudSessionGuard();
   guard.advance("A");
@@ -135,33 +255,74 @@ test("cloud load generation rejects stale A-to-B and A-to-B-to-A responses", () 
   assert.equal(guard.isCurrent(currentA, "A"), true);
 });
 
-test("merge preserves divergent versions with different timestamps and is idempotent", () => {
+test("merge preserves divergent edits in canonical edit history and is idempotent", () => {
   const cloud = { id: "n1", title: "Plan", text: "Cloud", createdAt: "2026-01-01", updatedAt: "2026-01-02" };
   const local = { ...cloud, text: "Local", updatedAt: "2026-01-03" };
   assert.notEqual(noteSignature(cloud), noteSignature(local));
   const merged = mergeNotes([local], [cloud]);
-  assert.equal(merged.find(note => note.id === "n1").text, "Local");
-  const conflict = merged.find(note => note.syncConflict);
-  assert.equal(conflict.text, "Cloud");
-  assert.equal(conflict.conflictOf, "n1");
+  const canonical = merged.find(note => note.id === "n1");
+  assert.equal(canonical.text, "Local");
+  assert.equal(merged.filter(note => note.id === "n1").length, 1);
+  assert.equal(merged.filter(note => note.syncConflict).length, 0);
+  assert.ok(canonical.versions.some(version => version.text === "Cloud"));
   const secondMerge = mergeNotes(merged, merged);
-  assert.equal(secondMerge.filter(note => note.syncConflict).length, 1);
-  assert.equal(secondMerge.find(note => note.syncConflict).id, conflict.id);
+  assert.equal(secondMerge.filter(note => note.syncConflict).length, 0);
+  assert.deepEqual(secondMerge.find(note => note.id === "n1").versions, canonical.versions);
 });
 
 test("merge detects reminder-only, attachment-metadata, and version-history divergence", () => {
   const base = { id: "n1", text: "same", reminderAt: null, versions: [], attachments: [{ id: "a1", name: "one.pdf" }] };
   const changed = { ...base, reminderAt: "2026-10-15T09:00:00Z", versions: [{ text: "prior" }], attachments: [{ id: "a1", name: "renamed.pdf" }] };
-  assert.equal(mergeNotes([base], [changed]).filter(note => note.syncConflict).length, 1);
+  const merged = mergeNotes([base], [changed]);
+  assert.equal(merged.filter(note => note.syncConflict).length, 0);
+  assert.equal(merged[0].reminderAt, changed.reminderAt);
+  assert.equal(merged[0].attachments[0].name, "renamed.pdf");
+  assert.ok(merged[0].versions.some(version => version.text === "same"));
 });
 
-test("merge treats invalid timestamps as oldest and preserves the divergent cloud version", () => {
+test("merge treats invalid timestamps as oldest and preserves the losing version in history", () => {
   const cloud = { id: "n1", title: "Plan", text: "Cloud", updatedAt: "not-a-date" };
   const local = { ...cloud, text: "Local", updatedAt: "2026-01-03T00:00:00Z" };
   assert.equal(noteTimestamp(cloud), 0);
   const merged = mergeNotes([local], [cloud]);
   assert.equal(merged.find(note => note.id === "n1").text, "Local");
-  assert.equal(merged.find(note => note.syncConflict).text, "Cloud");
+  assert.ok(merged.find(note => note.id === "n1").versions.some(version => version.text === "Cloud"));
+});
+
+test("longer shared edit history beats skewed device timestamps and carries both edits", () => {
+  const baseVersion = { title: "Plan", text: "Initial", savedAt: "2026-01-01T00:00:00Z" };
+  const intermediateVersion = { title: "Plan", text: "First edit", savedAt: "2026-01-02T00:00:00Z" };
+  const latest = { id: "n1", title: "Plan", text: "Latest cloud edit", updatedAt: "2026-01-03T00:00:00Z", versions: [baseVersion, intermediateVersion] };
+  const skewed = { id: "n1", title: "Plan", text: "Clock-skewed local edit", updatedAt: "2030-01-03T00:00:00Z", versions: [baseVersion] };
+  const merged = mergeNotes([skewed], [latest]);
+  assert.equal(merged[0].text, "Latest cloud edit");
+  assert.ok(merged[0].versions.some(version => version.text === "Clock-skewed local edit"));
+});
+
+test("soft deletion beats stale active copies, but an explicit later restore wins", () => {
+  const active = { id: "n1", text: "Edited copy", updatedAt: "2030-01-01T00:00:00Z" };
+  const deleted = { id: "n1", text: "Deleted copy", deletedAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" };
+  assert.ok(mergeNotes([active], [deleted])[0].deletedAt);
+  const restored = { ...active, restoredAt: "2026-01-02T00:00:00Z" };
+  assert.equal(mergeNotes([restored], [deleted])[0].deletedAt, undefined);
+});
+
+test("permanent deletion markers are account-scoped and prevent stale note resurrection", async () => {
+  const storage = memoryStorage();
+  const previousIndexedDB = Object.getOwnPropertyDescriptor(globalThis, "indexedDB");
+  Object.defineProperty(globalThis, "indexedDB", { configurable: true, writable: true, value: fakeIndexedDB() });
+  try {
+    assert.equal(await recordPermanentNoteDeletions(["n1"], "account-a", storage), true);
+    assert.deepEqual((await readPermanentNoteDeletions("account-a", storage)).map(marker => marker.id), ["n1"]);
+    assert.deepEqual(await readPermanentNoteDeletions("account-b", storage), []);
+    assert.deepEqual(mergeNotes([{ id: "n1", text: "stale local copy" }], [{ id: "n1", text: "old cloud copy" }], ["n1"]), []);
+    assert.deepEqual(mergeNotes([{ id: "legacy-copy", conflictOf: "n1", syncConflict: true }], [], ["n1"]), []);
+    assert.equal(await clearPermanentNoteDeletions("account-a", ["n1"], storage), true);
+    assert.deepEqual(await readPermanentNoteDeletions("account-a", storage), []);
+  } finally {
+    if (previousIndexedDB) Object.defineProperty(globalThis, "indexedDB", previousIndexedDB);
+    else delete globalThis.indexedDB;
+  }
 });
 
 test("Firestore library pages remain below the byte limit and reject oversized records", () => {
