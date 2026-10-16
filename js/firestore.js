@@ -10,7 +10,7 @@ import {
     setDoc
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 import { createCloudSessionGuard } from "./cloud-session.js";
-import { mergeNotes, noteTimestamp, packLibraryPages } from "./note-sync.js";
+import { isLibraryRevisionComplete, mergeNotes, noteSignature, noteTimestamp, packLibraryPages } from "./note-sync.js";
 import { clearPermanentNoteDeletions, readPermanentNoteDeletions } from "./note-deletions.js";
 import { privateNoteMetadataNeedsMigration } from "./private-note-utils.js";
 
@@ -21,9 +21,13 @@ const NOTE_DELETION_COLLECTION = "deletedNotes";
 const PAGE_COLLECTION = "libraries";
 const sessionGuard = createCloudSessionGuard();
 const activeSyncs = new Map();
+const cloudReadyUids = new Set();
+const recoveryBackupByUid = new Map();
 
 window.addEventListener("snapnotes:auth-changed", event => {
     sessionGuard.advance(event.detail?.user?.uid || null);
+    cloudReadyUids.clear();
+    recoveryBackupByUid.clear();
 });
 
 function getDeviceId() {
@@ -156,9 +160,9 @@ async function clearLocalDataIfDeletionProcessing(uid) {
 }
 
 async function readLibraryRevision(uid, revision) {
-    if (!revision) return { notes: [], folders: [] };
+    if (!revision) return { notes: [], folders: [], pageCount: 0 };
     const snapshot = await getDocs(pageCollection(uid, revision));
-    const result = { notes: [], folders: [] };
+    const result = { notes: [], folders: [], pageCount: snapshot.size };
     snapshot.docs.sort((a, b) => a.id.localeCompare(b.id)).forEach(page => {
         const data = page.data() || {};
         if (Array.isArray(data.notes)) result.notes.push(...data.notes);
@@ -202,6 +206,10 @@ async function forgetInactiveLibraryRevision(uid, revision) {
 
 async function performSync(uid) {
     if (!belongsToCurrentAccount(uid)) return false;
+    if (!cloudReadyUids.has(uid)) {
+        markSyncPending(uid);
+        return false;
+    }
     if (!navigator.onLine) {
         markSyncPending(uid);
         return false;
@@ -339,9 +347,12 @@ async function performSync(uid) {
             ...(Array.isArray(existingData.inactiveLibraryRevisions) ? existingData.inactiveLibraryRevisions : []),
             ...(baseRevision && baseRevision !== stagedRevision ? [baseRevision] : [])
         ]);
+        const keepRevision = recoveryBackupByUid.get(uid) || baseRevision;
         for (const revision of inactiveRevisions) {
+            if (revision === keepRevision) continue;
             if (await removeLibraryRevision(uid, revision)) await forgetInactiveLibraryRevision(uid, revision);
         }
+        recoveryBackupByUid.delete(uid);
         await clearPermanentNoteDeletions(uid, [...deletedIds]);
         if (belongsToCurrentAccount(uid)) clearSyncPending(uid);
         return true;
@@ -380,6 +391,8 @@ export function syncToCloud(expectedUid = auth?.currentUser?.uid) {
 
 export async function loadFromCloud(uid) {
     if (!uid || !belongsToCurrentAccount(uid)) return;
+    cloudReadyUids.delete(uid);
+    recoveryBackupByUid.delete(uid);
     const session = sessionGuard.capture(uid);
     if (!isCurrentLoad(session)) return;
 
@@ -403,18 +416,70 @@ export async function loadFromCloud(uid) {
         }
         let cloudNotes = Array.isArray(cloudData.notes) ? cloudData.notes : [];
         let cloudFolders = Array.isArray(cloudData.folders) ? cloudData.folders : [];
-        if (cloudData.activeLibraryRevision) {
-            const library = await readLibraryRevision(uid, cloudData.activeLibraryRevision);
+        const activeRevision = cloudData.activeLibraryRevision || null;
+        const inactiveRevisions = (Array.isArray(cloudData.inactiveLibraryRevisions)
+            ? cloudData.inactiveLibraryRevisions
+            : []).filter(revision => typeof revision === "string" && revision && revision !== activeRevision);
+        if (activeRevision) {
+            const library = await readLibraryRevision(uid, activeRevision);
             if (!isCurrentLoad(session)) return;
-            cloudNotes = [...cloudNotes, ...library.notes];
-            cloudFolders = [...cloudFolders, ...library.folders];
+            if (!isLibraryRevisionComplete(cloudData.libraryPageCount, library.pageCount)) {
+                let recovery = null;
+                for (const revision of [...inactiveRevisions].reverse()) {
+                    try {
+                        const backup = await readLibraryRevision(uid, revision);
+                        if (!isCurrentLoad(session)) return;
+                        if (backup.pageCount > 0 && (backup.notes.length || backup.folders.length)) {
+                            recovery = { revision, library: backup };
+                            break;
+                        }
+                    } catch (error) {
+                        console.warn("Could not read a retained cloud library revision:", error?.message || error);
+                    }
+                }
+                if (!recovery) {
+                    markSyncPending(uid);
+                    window.showToast?.("The cloud library appears incomplete. Your local notes are preserved and cloud sync is paused.", "warning");
+                    return;
+                }
+                cloudNotes = mergeNotes([...cloudNotes, ...library.notes], recovery.library.notes);
+                cloudFolders = [...cloudFolders, ...library.folders, ...recovery.library.folders];
+                recoveryBackupByUid.set(uid, recovery.revision);
+                window.showToast?.("Recovered notes from the last safe cloud snapshot.", "success");
+            } else {
+                cloudNotes = [...cloudNotes, ...library.notes];
+                cloudFolders = [...cloudFolders, ...library.folders];
+            }
         }
 
-        const localNotes = Array.isArray(window.notes) ? window.notes : [];
-        const localFolders = Array.isArray(window.getFolders?.()) ? window.getFolders() : [];
+        if (!recoveryBackupByUid.has(uid)) {
+            const backupRevision = inactiveRevisions.at(-1);
+            if (backupRevision) {
+                try {
+                    const backup = await readLibraryRevision(uid, backupRevision);
+                    if (!isCurrentLoad(session)) return;
+                    const currentById = new Map(cloudNotes.filter(note => note?.id).map(note => [note.id, note]));
+                    const mergedBackupNotes = mergeNotes(cloudNotes, backup.notes);
+                    const backupContributed = mergedBackupNotes.some(note => {
+                        const current = currentById.get(note.id);
+                        return !current || noteSignature(current) !== noteSignature(note);
+                    });
+                    if (backupContributed) {
+                        cloudNotes = mergedBackupNotes;
+                        recoveryBackupByUid.set(uid, backupRevision);
+                        window.showToast?.("Recovered notes from a recent cloud backup.", "success");
+                    }
+                } catch (error) {
+                    console.warn("Could not check the retained cloud backup:", error?.message || error);
+                }
+            }
+        }
+
         const localDeletionMarkers = await readPermanentNoteDeletions(uid);
         const cloudDeletedIds = await readCloudNoteDeletionIds(uid);
         if (!isCurrentLoad(session)) return;
+        const localNotes = Array.isArray(window.notes) ? window.notes : [];
+        const localFolders = Array.isArray(window.getFolders?.()) ? window.getFolders() : [];
         const deletedIds = new Set([...localDeletionMarkers.map(marker => marker.id), ...cloudDeletedIds]);
         const merged = mergeNotes(localNotes, cloudNotes, [...deletedIds]);
         const folderMap = new Map();
@@ -455,6 +520,7 @@ export async function loadFromCloud(uid) {
         }
         if (!isCurrentLoad(session)) return;
 
+        cloudReadyUids.add(uid);
         const synced = await syncToCloud(uid);
         if (!isCurrentLoad(session)) return;
         await window.retryPendingAttachmentCleanup?.();

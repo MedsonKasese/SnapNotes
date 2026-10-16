@@ -31,6 +31,14 @@ export function noteTimestamp(note) {
     return Number.isFinite(parsed) ? parsed : 0;
 }
 
+export function isLibraryRevisionComplete(expectedPageCount, actualPageCount) {
+    if (expectedPageCount === null || expectedPageCount === undefined || expectedPageCount === "") return false;
+    const expected = Number(expectedPageCount);
+    const actual = Number(actualPageCount);
+    return Number.isInteger(expected) && expected >= 0 &&
+        Number.isInteger(actual) && actual >= 0 && expected === actual;
+}
+
 function noteVersions(note) {
     return Array.isArray(note?.versions) ? note.versions : [];
 }

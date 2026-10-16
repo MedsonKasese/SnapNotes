@@ -480,13 +480,16 @@
     z-index: 2200;
     width: min(320px, 88vw);
     height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
     padding: 20px 15px;
     background: var(--surface-color);
     border-right: 1px solid var(--border-color);
     box-shadow: 15px 0 35px rgba(0, 0, 0, 0.12);
     transform: translateX(-105%);
     transition: transform 0.25s ease;
-    overflow-y: auto;
+    overflow: hidden;
 }
 
 .notes-drawer.open {
@@ -494,6 +497,7 @@
 }
 
 .drawer-header {
+    flex: 0 0 auto;
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -504,7 +508,13 @@
 
 .drawer-nav {
     display: grid;
+    flex: 1 1 auto;
+    align-content: start;
     gap: 5px;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     padding-top: 14px;
 }
 
@@ -876,10 +886,13 @@
 
 .drawer-tools {
     display: grid;
+    flex: 0 0 auto;
     gap: 6px;
-    margin-top: 18px;
+    margin-top: 12px;
     padding-top: 14px;
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
     border-top: 1px solid var(--border-color);
+    background: var(--surface-color);
 }
 
 .drawer-tools button {
@@ -989,6 +1002,34 @@
     font-size: 11px;
 }
 
+.folder-nav-row[hidden] {
+    display: none;
+}
+
+.folder-view-all {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 36px;
+    justify-content: center;
+    padding: 8px;
+    border: 0;
+    border-radius: 8px;
+    color: var(--primary-color);
+    background: transparent;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.folder-view-all:hover {
+    background: var(--surface-soft);
+}
+
+.folder-view-all[hidden] {
+    display: none;
+}
+
 
 /* Ask My Notes and Save note share a row above the draft guidance. */
 .editor-footer {
@@ -1045,27 +1086,4 @@
 
 .folder-nav-item.active > i {
     color: var(--folder-accent, var(--primary-color));
-}
-
-@media (max-width: 520px) {
-    .notes-view-actions #askMyNotesLibraryBtn {
-        min-width: 44px;
-        width: 44px;
-        min-height: 42px;
-        justify-content: center;
-        gap: 0;
-        padding: 9px;
-        font-size: 0;
-    }
-
-    .notes-view-actions #askMyNotesLibraryBtn span {
-        display: none;
-    }
-
-    .notes-view-actions #askMyNotesLibraryBtn::after {
-        content: "Ask";
-        margin-left: 5px;
-        font-size: 12px;
-        font-weight: 700;
-    }
 }

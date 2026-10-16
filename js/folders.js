@@ -26,6 +26,7 @@ const FOLDER_COLORS = {
 };
 
 let folders = [];
+let foldersExpanded = false;
 
 function normaliseFolder(folder) {
     if (!folder || typeof folder !== "object" || !folder.id) return null;
@@ -42,6 +43,7 @@ function normaliseFolder(folder) {
 }
 
 function loadFolders() {
+    foldersExpanded = false;
     try {
         const saved = JSON.parse(localStorage.getItem(FOLDERS_KEY) || "[]");
         folders = Array.isArray(saved) ? saved.map(normaliseFolder).filter(Boolean).slice(0, MAX_FOLDERS) : [];
@@ -86,22 +88,25 @@ function renderFolderNavigation() {
     const list = document.getElementById("folderNavList");
     const empty = document.getElementById("folderNavEmpty");
     const divider = document.getElementById("folderNavDivider");
+    const viewAll = document.getElementById("folderNavViewAll");
     if (!list) return;
 
     list.innerHTML = "";
     if (!folders.length) {
         if (empty) empty.hidden = false;
         if (divider) divider.hidden = true;
+        if (viewAll) viewAll.hidden = true;
         return;
     }
 
     if (empty) empty.hidden = true;
     if (divider) divider.hidden = false;
 
-    folders.forEach(folder => {
+    folders.forEach((folder, index) => {
         const item = document.createElement("div");
         item.className = "folder-nav-row";
         item.dataset.folderId = folder.id;
+        item.hidden = !foldersExpanded && index >= 3;
 
         const button = document.createElement("button");
         button.type = "button";
@@ -131,7 +136,20 @@ function renderFolderNavigation() {
         list.appendChild(item);
     });
 
+    if (viewAll) {
+        viewAll.hidden = folders.length <= 3;
+        viewAll.textContent = foldersExpanded ? "Show fewer" : `View all folders (${folders.length})`;
+        viewAll.setAttribute("aria-expanded", String(foldersExpanded));
+        viewAll.onclick = toggleFolderNavigation;
+    }
+
     updateFolderActiveState();
+}
+
+function toggleFolderNavigation() {
+    if (folders.length <= 3) return;
+    foldersExpanded = !foldersExpanded;
+    renderFolderNavigation();
 }
 
 function updateFolderActiveState() {
@@ -322,5 +340,6 @@ window.deleteFolder = deleteFolder;
 window.manageFolder = manageFolder;
 window.moveNoteToFolder = moveNoteToFolder;
 window.renderFolderNavigation = renderFolderNavigation;
+window.toggleFolderNavigation = toggleFolderNavigation;
 window.updateFolderActiveState = updateFolderActiveState;
 window.clearFolderAssignments = clearFolderAssignments;

@@ -636,7 +636,11 @@ async function resolveAttachmentUrl(attachment) {
     }
     if (attachment?.id) {
         const blob = await getAttachmentFile(attachment.id).catch(() => null);
-        if (blob) return URL.createObjectURL(blob);
+        if (blob) {
+            const url = URL.createObjectURL(blob);
+            privateAttachmentObjectUrls.add(url);
+            return url;
+        }
     }
     if (attachment?.storageProvider === "supabase" && attachment.storagePath) {
         try {
@@ -731,18 +735,44 @@ async function openAttachmentViewer(attachment, url) {
         URL.revokeObjectURL(activeAttachmentPreview.url);
         privateAttachmentObjectUrls.delete(activeAttachmentPreview.url);
     }
-    activeAttachmentPreview = { attachment, url };
-    title.textContent = attachment.name || "Attachment preview";
+    const previewState = { attachment, url };
+    activeAttachmentPreview = previewState;
+    if (title) title.textContent = attachment.name || "Attachment preview";
     content.replaceChildren();
     viewer.hidden = false;
     viewer.setAttribute("aria-hidden", "false");
     document.body.classList.add("attachment-viewer-open");
 
     if (attachment.type === "application/pdf") {
+        let previewUrl = url;
+        if (/^https?:/i.test(url)) {
+            const loading = document.createElement("p");
+            loading.className = "attachment-viewer-message";
+            loading.textContent = "Preparing document preview…";
+            content.appendChild(loading);
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("The PDF could not be downloaded for preview.");
+                const blob = await response.blob();
+                previewUrl = URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
+                privateAttachmentObjectUrls.add(previewUrl);
+            } catch (error) {
+                console.warn("Could not prepare an inline PDF preview; trying the signed URL directly:", error?.message || error);
+                previewUrl = url;
+            }
+        }
+        if (activeAttachmentPreview !== previewState || viewer.hidden) {
+            if (previewUrl !== url && previewUrl.startsWith("blob:")) {
+                URL.revokeObjectURL(previewUrl);
+                privateAttachmentObjectUrls.delete(previewUrl);
+            }
+            return;
+        }
+        previewState.url = previewUrl;
         const frame = document.createElement("iframe");
         frame.title = `Preview of ${attachment.name || "PDF document"}`;
-        frame.src = url;
         content.appendChild(frame);
+        frame.src = previewUrl;
         return;
     }
     if (attachment.type?.startsWith("image/")) {
@@ -941,15 +971,11 @@ async function renderNoteAttachments(container, attachments = [], options = {}) 
         const open = document.createElement("button");
         open.type = "button";
         open.className = "attachment-open";
-        if (url) {
-            open.addEventListener("click", async () => {
-                const previewUrl = await resolveAttachmentUrl(attachment);
-                await openAttachmentViewer(attachment, previewUrl);
-            });
-        } else {
-            open.disabled = true;
-            open.title = "This attachment is waiting to upload from the device where it was added.";
-        }
+        open.addEventListener("click", async () => {
+            const previewUrl = await resolveAttachmentUrl(attachment);
+            await openAttachmentViewer(attachment, previewUrl);
+        });
+        if (!url) open.title = "Try again to load this attachment, or open it on the device where it was added.";
         open.textContent = "Preview";
 
         item.append(preview, copy, open);
@@ -1006,6 +1032,7 @@ window.tagLegacyAttachmentFilesForUser = tagLegacyAttachmentFilesForUser;
 window.clearAttachmentCleanupQueueForUser = clearAttachmentCleanupQueueForUser;
 window.renderNoteAttachments = renderNoteAttachments;
 window.removeNoteAttachment = removeNoteAttachment;
+window.openAttachmentViewer = openAttachmentViewer;
 window.closeAttachmentViewer = closeAttachmentViewer;
 window.downloadActiveAttachment = downloadActiveAttachment;
 window.shareActiveAttachment = shareActiveAttachment;
