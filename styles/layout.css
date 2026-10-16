@@ -911,6 +911,10 @@
     text-transform: uppercase;
 }
 
+.folder-section-heading {
+    margin-top: 0;
+}
+
 .folder-add-button,
 .folder-manage-button {
     width: 30px;
@@ -1039,12 +1043,20 @@
 }
 
 
-/* Refined mobile listing actions and user-created folder separation. */
+/* Drawer section separators and user-created folder separation. */
+.drawer-divider,
 .folder-nav-divider {
     height: 1px;
-    margin: 9px 8px 7px;
     background: var(--border-color);
     opacity: 0.75;
+}
+
+.drawer-divider {
+    margin: 6px 8px;
+}
+
+.folder-nav-divider {
+    margin: 9px 8px 7px;
 }
 
 .folder-nav-item > i {
