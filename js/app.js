@@ -190,6 +190,12 @@ function setupEventListeners() {
     importNotesInput.addEventListener("change", importNotes);
     createFolderBtn?.addEventListener("click", () => window.createFolder?.());
     addAttachmentBtn?.addEventListener("click", () => window.openAttachmentPicker?.(attachmentInput));
+    document.getElementById("attachmentViewerClose")?.addEventListener("click", () => window.closeAttachmentViewer?.());
+    document.getElementById("attachmentViewerDownload")?.addEventListener("click", () => window.downloadActiveAttachment?.());
+    document.getElementById("attachmentViewerShare")?.addEventListener("click", () => window.shareActiveAttachment?.());
+    document.getElementById("attachmentViewer")?.addEventListener("click", event => {
+        if (event.target.id === "attachmentViewer") window.closeAttachmentViewer?.();
+    });
     attachmentInput?.addEventListener("change", event => {
         window.addPendingAttachments?.(event.target.files);
         event.target.value = "";
@@ -277,6 +283,7 @@ function setupEventListeners() {
             return;
         }
         if (event.key === "Escape") {
+            window.closeAttachmentViewer?.();
             closeNoteDetail?.();
             closeDrawer();
             closeCategoryMenu();
