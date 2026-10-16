@@ -1028,3 +1028,44 @@
         font-size: 12px;
     }
 }
+
+
+/* Refined mobile listing actions and user-created folder separation. */
+.folder-nav-divider {
+    height: 1px;
+    margin: 9px 8px 7px;
+    background: var(--border-color);
+    opacity: 0.75;
+}
+
+.folder-nav-item > i {
+    color: var(--folder-accent, var(--muted-color));
+    transition: color 0.15s ease;
+}
+
+.folder-nav-item.active > i {
+    color: var(--folder-accent, var(--primary-color));
+}
+
+@media (max-width: 520px) {
+    .notes-view-actions #askMyNotesLibraryBtn {
+        min-width: 44px;
+        width: 44px;
+        min-height: 42px;
+        justify-content: center;
+        gap: 0;
+        padding: 9px;
+        font-size: 0;
+    }
+
+    .notes-view-actions #askMyNotesLibraryBtn span {
+        display: none;
+    }
+
+    .notes-view-actions #askMyNotesLibraryBtn::after {
+        content: "Ask";
+        margin-left: 5px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+}

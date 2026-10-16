@@ -172,7 +172,7 @@ function setupEventListeners() {
 
     saveNoteBtn.addEventListener("click", saveEditorNote);
     addBtn.addEventListener("click", openNewNoteView);
-    newNoteBtn.addEventListener("click", openNewNoteView);
+    newNoteBtn?.addEventListener("click", openNewNoteView);
     emptyTrashBtn.addEventListener("click", () => window.emptyTrash?.());
     privatePasskeyBtn?.addEventListener("click", async () => {
         if (window.hasPrivatePasskey?.()) {

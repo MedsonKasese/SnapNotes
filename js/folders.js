@@ -5,6 +5,25 @@
 const FOLDERS_KEY = "SnapNotesFolders";
 const MAX_FOLDERS = 20;
 const MAX_FOLDER_NAME = 32;
+const FOLDER_ICONS = {
+    folder: "fa-regular fa-folder",
+    book: "fa-solid fa-book",
+    flask: "fa-solid fa-flask",
+    code: "fa-solid fa-code",
+    lightbulb: "fa-regular fa-lightbulb",
+    briefcase: "fa-solid fa-briefcase",
+    heart: "fa-solid fa-heart",
+    star: "fa-solid fa-star",
+    cloud: "fa-solid fa-cloud"
+};
+const FOLDER_COLORS = {
+    green: "#5b8c43",
+    blue: "#4b78b5",
+    purple: "#8561ad",
+    orange: "#c77a32",
+    rose: "#bb5e73",
+    teal: "#3b8983"
+};
 
 let folders = [];
 
@@ -15,6 +34,8 @@ function normaliseFolder(folder) {
     return {
         id: String(folder.id),
         name,
+        icon: Object.hasOwn(FOLDER_ICONS, folder.icon) ? folder.icon : "folder",
+        color: Object.hasOwn(FOLDER_COLORS, folder.color) ? folder.color : "",
         createdAt: folder.createdAt || new Date().toISOString(),
         updatedAt: folder.updatedAt || folder.createdAt || new Date().toISOString()
     };
@@ -64,15 +85,18 @@ function getFolderNoteCount(id) {
 function renderFolderNavigation() {
     const list = document.getElementById("folderNavList");
     const empty = document.getElementById("folderNavEmpty");
+    const divider = document.getElementById("folderNavDivider");
     if (!list) return;
 
     list.innerHTML = "";
     if (!folders.length) {
         if (empty) empty.hidden = false;
+        if (divider) divider.hidden = true;
         return;
     }
 
     if (empty) empty.hidden = true;
+    if (divider) divider.hidden = false;
 
     folders.forEach(folder => {
         const item = document.createElement("div");
@@ -84,7 +108,9 @@ function renderFolderNavigation() {
         button.className = "drawer-item folder-nav-item";
         button.dataset.folderId = folder.id;
         button.setAttribute("aria-label", `Open folder ${folder.name}`);
-        button.innerHTML = '<i class="fa-regular fa-folder"></i><span class="folder-nav-name"></span><span class="drawer-count folder-nav-count"></span>';
+        button.innerHTML = '<i aria-hidden="true"></i><span class="folder-nav-name"></span><span class="drawer-count folder-nav-count"></span>';
+        button.querySelector("i").className = FOLDER_ICONS[folder.icon] || FOLDER_ICONS.folder;
+        if (FOLDER_COLORS[folder.color]) button.style.setProperty("--folder-accent", FOLDER_COLORS[folder.color]);
         button.querySelector(".folder-nav-name").textContent = folder.name;
         button.querySelector(".folder-nav-count").textContent = getFolderNoteCount(folder.id);
 
@@ -138,6 +164,8 @@ function createFolder() {
     folders.push({
         id: crypto.randomUUID(),
         name,
+        icon: "folder",
+        color: "",
         createdAt: now,
         updatedAt: now
     });
@@ -174,6 +202,37 @@ function renameFolder(id) {
     window.showToast?.("Folder renamed", "success");
 }
 
+function customizeFolder(id) {
+    const folder = getFolderById(id);
+    if (!folder) return;
+
+    const iconChoices = Object.keys(FOLDER_ICONS).join(", ");
+    const iconValue = prompt(`Choose an icon (${iconChoices}):`, folder.icon || "folder");
+    if (iconValue === null) return;
+    const icon = iconValue.trim().toLowerCase();
+    if (!Object.hasOwn(FOLDER_ICONS, icon)) {
+        window.showToast?.(`Choose one of these icons: ${iconChoices}.`, "warning");
+        return;
+    }
+
+    const colorChoices = `none, ${Object.keys(FOLDER_COLORS).join(", ")}`;
+    const colorValue = prompt(`Choose a color (${colorChoices}):`, folder.color || "none");
+    if (colorValue === null) return;
+    const color = colorValue.trim().toLowerCase();
+    if (color !== "none" && !Object.hasOwn(FOLDER_COLORS, color)) {
+        window.showToast?.(`Choose one of these colors: ${colorChoices}.`, "warning");
+        return;
+    }
+
+    folder.icon = icon;
+    folder.color = color === "none" ? "" : color;
+    folder.updatedAt = new Date().toISOString();
+    saveFolders();
+    renderFolderNavigation();
+    window.syncToCloud?.();
+    window.showToast?.("Folder appearance updated", "success");
+}
+
 async function deleteFolder(id) {
     const folder = getFolderById(id);
     if (!folder) return;
@@ -205,13 +264,14 @@ function manageFolder(id) {
     const folder = getFolderById(id);
     if (!folder) return;
 
-    const action = prompt(`Folder: ${folder.name}\n\nType "rename" or "delete".`, "rename");
+    const action = prompt(`Folder: ${folder.name}\n\nType "rename", "customize" or "delete".`, "rename");
     if (!action) return;
 
     const choice = action.trim().toLowerCase();
     if (choice === "rename") renameFolder(id);
+    else if (choice === "customize") customizeFolder(id);
     else if (choice === "delete") deleteFolder(id);
-    else window.showToast?.("Choose rename or delete.", "warning");
+    else window.showToast?.("Choose rename, customize or delete.", "warning");
 }
 
 async function moveNoteToFolder(noteId) {
@@ -257,6 +317,7 @@ window.getFolders = getFolders;
 window.getFolderById = getFolderById;
 window.createFolder = createFolder;
 window.renameFolder = renameFolder;
+window.customizeFolder = customizeFolder;
 window.deleteFolder = deleteFolder;
 window.manageFolder = manageFolder;
 window.moveNoteToFolder = moveNoteToFolder;

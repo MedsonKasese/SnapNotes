@@ -85,12 +85,30 @@ test("folder module exposes folder management APIs", () => {
   assert(typeof window.createFolder === "function", "createFolder API is missing");
   assert(typeof window.moveNoteToFolder === "function", "moveNoteToFolder API is missing");
   assert(typeof window.getFolderById === "function", "getFolderById API is missing");
+  assert(typeof window.customizeFolder === "function", "customizeFolder API is missing");
 });
 
 test("folder limits and names are bounded", () => {
   const name = "A".repeat(32);
   assert(name.length === 32, "folder name limit fixture is invalid");
   assert(localStorage.getItem("SnapNotesFolders") === null || Array.isArray(JSON.parse(localStorage.getItem("SnapNotesFolders"))), "folder storage shape is invalid");
+});
+
+test("custom folder icon and color choices are preserved and invalid values are reset", () => {
+  const previous = localStorage.getItem("SnapNotesFolders");
+  try {
+    localStorage.setItem("SnapNotesFolders", JSON.stringify([
+      { id: "folder-themed", name: "Research", icon: "book", color: "blue" },
+      { id: "folder-legacy", name: "Legacy", icon: "<script>", color: "url(javascript:alert(1))" }
+    ]));
+    const folders = window.loadFolders();
+    assert(folders[0].icon === "book" && folders[0].color === "blue", "folder appearance was not preserved");
+    assert(folders[1].icon === "folder" && folders[1].color === "", "unrecognized appearance values were not rejected");
+  } finally {
+    if (previous === null) localStorage.removeItem("SnapNotesFolders");
+    else localStorage.setItem("SnapNotesFolders", previous);
+    window.loadFolders();
+  }
 });
 
 test("notes can carry a folder id without changing categories", () => {
