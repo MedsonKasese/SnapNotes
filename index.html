@@ -330,6 +330,24 @@ Then write your notes below..."
                 </div>
             </section>
 
+            <section class="settings-section settings-storage-section" aria-labelledby="storageTitle">
+                <div class="settings-section-heading">
+                    <div>
+                        <p class="settings-section-title" id="storageTitle">Cloud storage</p>
+                    </div>
+                    <button id="refreshStorageUsageBtn" class="storage-refresh-button" type="button" aria-label="Refresh cloud storage usage" title="Refresh usage">
+                        <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <div class="settings-storage-meter">
+                    <span class="settings-storage-icon" aria-hidden="true"><i class="fa-solid fa-cloud-arrow-up"></i></span>
+                    <div>
+                        <strong>Cloud storage</strong>
+                        <small id="cloudStorageUsage" role="status" aria-live="polite">Sign in to check usage</small>
+                    </div>
+                </div>
+            </section>
+
             <section class="settings-section" aria-labelledby="notesSettingsTitle">
                 <div class="settings-section-heading">
                     <div>
