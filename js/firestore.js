@@ -498,6 +498,23 @@ export async function loadFromCloud(uid) {
         const localNotes = Array.isArray(window.notes) ? window.notes : [];
         const localFolders = Array.isArray(window.getFolders?.()) ? window.getFolders() : [];
         const deletedIds = new Set([...localDeletionMarkers.map(marker => marker.id), ...cloudDeletedIds]);
+        // An empty cloud response on a fresh preview origin is not proof that
+        // the user's library is empty. Production may still hold local-only notes.
+        // Never publish an empty revision until a cloud library has been verified.
+        if (!cloudNotes.length && !localNotes.length && !cloudFolders.length && !localFolders.length) {
+            console.warn("SnapNotes cloud hydration returned an empty library", {
+                userDocumentExists: docSnap.exists(),
+                activeRevisionPresent: Boolean(activeRevision),
+                expectedPageCount: cloudData.libraryPageCount ?? null,
+                inactiveRevisionCount: inactiveRevisions.length,
+                cloudNoteCount: cloudNotes.length,
+                localNoteCount: localNotes.length,
+                deletionMarkerCount: deletedIds.size
+            });
+            markSyncPending(uid);
+            window.showToast?.("No notes were returned from cloud storage. Sync is paused to protect your existing notes. Check production before making changes.", "warning");
+            return;
+        }
         const merged = mergeNotes(localNotes, cloudNotes, [...deletedIds]);
         const folderMap = new Map();
         [...cloudFolders, ...localFolders].forEach(folder => {
