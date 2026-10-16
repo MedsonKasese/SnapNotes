@@ -423,7 +423,14 @@ export async function loadFromCloud(uid) {
         if (activeRevision) {
             const library = await readLibraryRevision(uid, activeRevision);
             if (!isCurrentLoad(session)) return;
-            if (!isLibraryRevisionComplete(cloudData.libraryPageCount, library.pageCount)) {
+            // Libraries created before page-count metadata was introduced are valid.
+            // Do not mistake a missing count for a corrupt revision and hide existing notes.
+            const hasRecordedPageCount = cloudData.libraryPageCount !== undefined &&
+                cloudData.libraryPageCount !== null && cloudData.libraryPageCount !== "";
+            const revisionComplete = hasRecordedPageCount
+                ? isLibraryRevisionComplete(cloudData.libraryPageCount, library.pageCount)
+                : library.pageCount > 0;
+            if (!revisionComplete) {
                 let recovery = null;
                 for (const revision of [...inactiveRevisions].reverse()) {
                     try {
@@ -450,6 +457,16 @@ export async function loadFromCloud(uid) {
                 cloudNotes = [...cloudNotes, ...library.notes];
                 cloudFolders = [...cloudFolders, ...library.folders];
             }
+        }
+
+        // A previously populated cloud library must never be replaced by an empty
+        // snapshot from a new browser or preview deployment. Preserve its revision
+        // and require explicit recovery rather than publishing an empty library.
+        if (activeRevision && !cloudNotes.length && !cloudFolders.length &&
+            !Array.isArray(cloudData.notes) && !Array.isArray(cloudData.folders)) {
+            markSyncPending(uid);
+            window.showToast?.("Cloud notes could not be verified. Sync paused to protect your existing notes.", "warning");
+            return;
         }
 
         if (!recoveryBackupByUid.has(uid)) {
