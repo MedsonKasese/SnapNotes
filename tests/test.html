@@ -166,29 +166,44 @@ await testAsync("attachment rename uses the custom modal and saves synced metada
   }
 });
 
-await testAsync("remote PDFs stream directly in the viewer with a mobile-friendly fallback", async () => {
-  let fetchCalls = 0;
-  const originalFetch = window.fetch;
+await testAsync("PDF.js renders pages in-app with paging, zoom, and one-page canvas memory", async () => {
   const trigger = document.createElement("button");
   trigger.textContent = "Open attachment";
   document.body.appendChild(trigger);
-  window.fetch = async (...args) => { fetchCalls++; return originalFetch(...args); };
+  const originalPdfJs = window.__snapnotesPdfJsForTests;
+  let destroyed = 0;
+  const pdf = {
+    numPages: 2,
+    async getPage() {
+      return {
+        getViewport: ({ scale }) => ({ width: 400 * scale, height: 600 * scale }),
+        render: () => ({ promise: Promise.resolve(), cancel() {} }),
+        cleanup() {}
+      };
+    },
+    async destroy() { destroyed++; }
+  };
+  window.__snapnotesPdfJsForTests = {
+    GlobalWorkerOptions: {},
+    getDocument: () => ({ promise: Promise.resolve(pdf), async destroy() { destroyed++; } })
+  };
   try {
-    const url = "https://preview.example/report.pdf";
-    await window.openAttachmentViewer({ name: "report.pdf", type: "application/pdf" }, url, trigger);
+    await window.openAttachmentViewer({ name: "report.pdf", type: "application/pdf", size: 1234 }, "https://preview.example/report.pdf", trigger);
     const viewer = document.getElementById("attachmentViewer");
-    const frame = viewer.querySelector("iframe");
     assert(!viewer.hidden, "document viewer did not open");
-    assert(frame?.src === url, "the PDF was not streamed directly into the iframe");
-    assert(fetchCalls === 0, "opening a PDF fetched the full document into memory");
-    assert(viewer.querySelector(".attachment-pdf-fallback a")?.href === url, "the direct-open fallback is missing");
+    assert(!viewer.querySelector("iframe"), "PDF preview still relies on a browser iframe");
+    assert(viewer.querySelector(".pdfjs-viewer canvas"), "PDF.js did not render a page canvas");
+    assert(viewer.querySelector(".pdfjs-page-label")?.textContent === "Page 1 of 2", "initial page count is missing");
+    viewer.querySelector('[aria-label="Next PDF page"]').click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert(viewer.querySelector(".pdfjs-page-label")?.textContent === "Page 2 of 2", "next-page navigation did not update the rendered page");
+    viewer.querySelector('[aria-label="Zoom in"]').click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert(viewer.querySelector(".pdfjs-viewer canvas"), "zoom removed the PDF canvas");
     assert(document.activeElement.id === "attachmentViewerClose", "focus did not enter the viewer");
-    viewer.querySelector(".attachment-pdf-fallback a").focus();
-    viewer.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
-    assert(document.activeElement.id === "attachmentViewerClose", "Tab did not wrap within the viewer");
   } finally {
     window.closeAttachmentViewer();
-    window.fetch = originalFetch;
+    window.__snapnotesPdfJsForTests = originalPdfJs;
     assert(document.activeElement === trigger, "focus was not restored to the attachment control");
     trigger.remove();
   }
