@@ -572,6 +572,11 @@ export async function loadFromCloud(uid) {
         if (!isCurrentLoad(session)) return;
         console.error("Failed to sync notes:", error);
         markSyncPending(uid);
+        if (error?.code === "permission-denied") {
+            window.showToast?.("Cloud notes could not load: Firestore permissions denied. Your cloud data has not been deleted.", "error");
+        } else {
+            window.showToast?.("Could not load cloud notes. Your existing cloud data is unchanged; please retry later.", "warning");
+        }
     }
 }
 
