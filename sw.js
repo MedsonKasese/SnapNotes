@@ -51,6 +51,7 @@ const APP_SHELL = [
   "./js/notes.js",
   "./js/checklist-utils.js",
   "./js/app.js",
+  "./js/sync-center.js",
   "./js/ai.js",
   "./js/version-history.js",
   "./js/private-notes.js",
