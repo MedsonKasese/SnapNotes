@@ -2,7 +2,7 @@
 // NOTE ATTACHMENTS
 // =========================
 
-import { enqueueAndProcessAttachmentCleanup, processAttachmentCleanupQueue } from "./attachment-cleanup.js";
+import { enqueueAndProcessAttachmentCleanup, processAttachmentCleanupQueue, enqueueAttachmentCleanup, cancelQueuedAttachmentCleanup } from "./attachment-cleanup.js";
 import { renderPdfPreview, disposePdfPreview } from "./pdf-preview.js";
 
 const ATTACHMENT_DB = "SnapNotesAttachments";
@@ -738,13 +738,14 @@ async function removeNoteAttachment(noteId, attachmentId) {
     if (!attachment) return false;
 
     if (!attachmentIsReferencedElsewhere(note, attachment)) {
-        const result = await runAttachmentCleanup([attachment]);
+        const user = window.firebaseAuth?.currentUser;
+        const result = enqueueAttachmentCleanup([attachment], {
+            storage: localStorage,
+            currentUid: user?.uid || null
+        });
         if (!result.persisted) {
             window.showToast?.("Could not safely queue attachment cleanup. The attachment is still on the note.", "warning");
             return false;
-        }
-        if (result.pendingCount) {
-            window.showToast?.("Removed from the note. Cloud cleanup is queued and will retry when available.", "warning");
         }
     }
     if (note?.attachments) note.attachments = note.attachments.filter(item => item !== attachment);
@@ -1225,13 +1226,52 @@ async function renderNoteAttachments(container, attachments = [], options = {}) 
             remove.setAttribute("aria-label", "Remove " + (attachment.name || "attachment"));
             remove.innerHTML = '<i class="fa-solid fa-trash-can" aria-hidden="true"></i><span>Remove</span>';
             remove.addEventListener("click", async () => {
+                if (remove.disabled) return;
                 if (options.editable && localStorage.getItem("SnapNotesConfirmDelete") !== "false" &&
                     !confirm(`Remove "${attachment.name || "this attachment"}" from the note?`)) return;
+
+                const note = (window.notes || []).find(candidate => String(candidate.id) === String(options.noteId));
+                const previousAttachments = Array.isArray(note?.attachments) ? [...note.attachments] : null;
+                remove.disabled = true;
                 const removed = await removeNoteAttachment(options.noteId, attachment.id);
-                if (!removed) return;
+                if (!removed) {
+                    remove.disabled = false;
+                    return;
+                }
                 item.remove();
                 if (!container.children.length) container.hidden = true;
-                await options.onChange?.();
+
+                try {
+                    const saveResult = await options.onChange?.();
+                    if (saveResult === false || saveResult?.locallySaved === false) {
+                        throw new Error("The note removal could not be saved.");
+                    }
+                } catch (error) {
+                    if (note && previousAttachments) note.attachments = previousAttachments;
+                    const user = window.firebaseAuth?.currentUser;
+                    const cancelled = cancelQueuedAttachmentCleanup([attachment], {
+                        storage: localStorage,
+                        currentUid: user?.uid || null
+                    });
+                    await renderNoteAttachments(container, note?.attachments || attachments, options);
+                    window.showToast?.(
+                        cancelled.persisted
+                            ? "The removal could not be saved, so the attachment was restored."
+                            : "The removal could not be saved. Attachment cleanup is paused; reconnect and review the note.",
+                        "warning"
+                    );
+                    return;
+                }
+
+                // Only delete local/cloud bytes after the note change is durable.
+                try {
+                    const cleanup = await retryPendingAttachmentCleanup();
+                    if (cleanup?.pendingCount) {
+                        window.showToast?.("Removed from the note. File cleanup is queued and will retry when available.", "warning");
+                    }
+                } catch (error) {
+                    window.showToast?.("Removed from the note. File cleanup will retry when available.", "warning");
+                }
             });
             actions.appendChild(remove);
             item.appendChild(actions);
