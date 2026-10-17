@@ -53,8 +53,14 @@ The browser Firebase configuration is in `js/firebaseConfig.js`. Server credenti
 | `GEMINI_API_KEY` | Enables Ask My Notes. |
 | `GEMINI_MODEL` | Optional Gemini model override. |
 | `CRON_SECRET` | Random Vercel Cron bearer secret; required to authorize scheduled account deletion. Use at least 16 random characters and enable it for Production. |
+| `RESEND_API_KEY` | Server-only Resend key for account verification and password-reset emails. |
+| `RESEND_FROM_EMAIL` | Sender address on a Resend-verified domain, optionally `SnapNotes <auth@example.com>`. |
+| `SNAPNOTES_APP_URL` | Exact HTTPS app origin for authentication email requests and Firebase return links. |
+| `AUTH_EMAIL_HOURLY_LIMIT` | Optional deployment-wide authentication email request budget; defaults to `100`. |
 
 See [Supabase Storage setup](docs/SUPABASE_STORAGE.md) for bucket, authorization, and deployment details, and [Firestore sync setup](docs/FIRESTORE_SYNC.md) for the owner-only rules needed by paged cloud libraries. Vercel Cron invokes the account-deletion worker daily at 00:00 UTC to remain compatible with Hobby. Hobby timing may drift by up to 59 minutes, so processing can begin about 25 hours after the 10-day grace-period deadline in the worst case. Failed or large storage cleanups continue in retryable daily batches; each run handles one eligible account.
+
+**Authentication emails:** verification and password-reset delivery use Resend, while Firebase continues to handle sign-in and secure action links. Configure the required variables and verified sender **before merging/deploying this change**; there is no Firebase-delivery fallback. See [Resend authentication email setup](docs/RESEND_AUTH_EMAIL.md) for rollout, rate limits, Firestore TTL cleanup, and live checks.
 
 **Local-device limitation:** the server cannot erase browser storage on devices that are offline or never open the app again. When a signed-in device observes that deletion processing has started, SnapNotes clears its matching account cache and UID-tagged IndexedDB attachment blobs; referenced legacy blobs are migrated or removed by attachment ID. Unreferenced legacy attachment orphans and caches on other offline devices may remain locally until those devices are used and cleaned manually.
 
