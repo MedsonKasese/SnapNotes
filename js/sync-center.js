@@ -37,7 +37,10 @@
   window.addEventListener("snapnotes:sync-status", event => {
     const uid = userId();
     if (!uid || event.detail?.uid !== uid) return;
-    if (event.detail.status === "synced") localStorage.setItem(key(uid), new Date().toISOString());
+    if (event.detail.status === "synced") {
+      syncError = "";
+      localStorage.setItem(key(uid), new Date().toISOString());
+    }
     render();
   });
   retry.addEventListener("click", async () => {
