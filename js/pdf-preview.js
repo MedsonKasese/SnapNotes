@@ -211,11 +211,13 @@ export function disposePdfPreview(state) {
         try { state.pdfRenderTask.cancel(); } catch {}
         state.pdfRenderTask = null;
     }
-    if (state.pdfLoadingTask?.destroy) {
-        try { Promise.resolve(state.pdfLoadingTask.destroy()).catch(() => {}); } catch {}
-        state.pdfLoadingTask = null;
-    }
-    if (state.pdfDocument?.destroy) {
+    const loadingTask = state.pdfLoadingTask;
+    state.pdfLoadingTask = null;
+    if (loadingTask?.destroy) {
+        // PDFDocumentLoadingTask.destroy() also tears down its worker/document.
+        try { Promise.resolve(loadingTask.destroy()).catch(() => {}); } catch {}
+        state.pdfDocument = null;
+    } else if (state.pdfDocument?.destroy) {
         try { Promise.resolve(state.pdfDocument.destroy()).catch(() => {}); } catch {}
         state.pdfDocument = null;
     }
