@@ -104,3 +104,40 @@ export async function processAttachmentCleanupQueue(options) {
     }
     return { persisted: true, pendingCount: remaining.length };
 }
+
+
+/**
+ * Persist cleanup intent without deleting bytes yet. Note-removal callers use
+ * this before saving the updated note, then process the queue only after the
+ * note save succeeds. This prevents deleting a cloud object still referenced
+ * by a note whose save failed.
+ */
+export function enqueueAttachmentCleanup(attachments, { storage, currentUid }) {
+    const entries = cleanupEntriesForAttachments(attachments, currentUid);
+    if (!entries.length) return { persisted: true, pendingCount: 0 };
+    const queue = parseQueue(storage);
+    const byKey = new Map(queue.map(item => [item.key, item]));
+    for (const entry of entries) {
+        const existing = byKey.get(entry.key);
+        byKey.set(entry.key, existing ? { ...entry, ...existing } : entry);
+    }
+    try {
+        const next = [...byKey.values()];
+        storage.setItem(ATTACHMENT_CLEANUP_KEY, JSON.stringify(next));
+        return { persisted: true, pendingCount: next.length };
+    } catch (error) {
+        return { persisted: false, pendingCount: entries.length, error };
+    }
+}
+
+export function cancelQueuedAttachmentCleanup(attachments, { storage, currentUid }) {
+    const keys = new Set(cleanupEntriesForAttachments(attachments, currentUid).map(entry => entry.key));
+    if (!keys.size) return { persisted: true };
+    try {
+        const queue = parseQueue(storage).filter(entry => !keys.has(entry.key));
+        storage.setItem(ATTACHMENT_CLEANUP_KEY, JSON.stringify(queue));
+        return { persisted: true };
+    } catch (error) {
+        return { persisted: false, error };
+    }
+}
