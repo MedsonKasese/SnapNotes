@@ -28,7 +28,7 @@ self.addEventListener("notificationclick", event => {
   );
 });
 
-const CACHE_NAME = "snapnotes-v78";
+const CACHE_NAME = "snapnotes-v79";
 const APP_SHELL = [
   "./",
   "./index.html",
