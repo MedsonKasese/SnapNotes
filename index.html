@@ -297,6 +297,19 @@ Then write your notes below..."
                 <div class="settings-account" id="settingsAccount"></div>
             </section>
 
+            <section class="settings-section" aria-labelledby="syncCenterTitle">
+                <div class="settings-section-heading">
+                    <div>
+                        <p class="settings-section-title" id="syncCenterTitle">Sync Center</p>
+                        <p class="settings-section-description">See whether cloud note synchronization has been confirmed.</p>
+                    </div>
+                </div>
+                <p id="syncCenterStatus" role="status" aria-live="polite">Checking sync status…</p>
+                <p id="syncCenterLast" class="settings-section-description"></p>
+                <button id="syncCenterRetry" class="secondary-action" type="button">Sync now</button>
+                <p class="settings-section-description">Attachment uploads retry separately. A note sync confirmation does not guarantee every attachment is uploaded.</p>
+            </section>
+
             <section class="settings-section settings-security-section" aria-labelledby="securityCenterTitle">
                 <div class="settings-section-heading">
                     <div>
@@ -612,6 +625,7 @@ Then write your notes below..."
     <script type="module" src="js/settings-account.js"></script>
     <script src="js/app.js"></script>
     <script src="js/ai.js"></script>
+    <script src="js/sync-center.js"></script>
     <script>
         window.addEventListener("offline", () => window.showToast?.("You're offline. Local changes are still available.", "warning"));
         window.addEventListener("online", () => window.showToast?.("You're back online. Syncing changes...", "success"));
