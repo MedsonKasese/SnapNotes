@@ -8,6 +8,7 @@
   const pending = uid => localStorage.getItem("SnapNotesSyncPending:" + uid) === "true" ||
     localStorage.getItem("SnapNotesSyncPending") === "true";
   let running = false;
+  let syncError = "";
   const userId = () => window.firebaseAuth?.currentUser?.uid || null;
   function render() {
     const uid = userId();
@@ -18,6 +19,8 @@
       status.textContent = "Offline — changes are stored locally until synchronization succeeds.";
     } else if (running) {
       status.textContent = "Synchronizing notes and pending attachments…";
+    } else if (syncError) {
+      status.textContent = syncError;
     } else if (pending(uid)) {
       status.textContent = "Pending cloud changes — not everything is synced yet.";
     } else if (localStorage.getItem(key(uid))) {
@@ -41,15 +44,16 @@
     const uid = userId();
     if (!uid || running || !navigator.onLine) return;
     running = true;
+    syncError = "";
     render();
     try {
       const result = await window.syncToCloud?.(uid);
-      if (result === false) status.textContent = "Cloud note sync did not complete. Please retry.";
+      if (result === false) syncError = "Cloud note sync did not complete. Please retry.";
       await window.retryPendingAttachmentUploads?.();
       await window.retryPendingAttachmentCleanup?.();
     } catch (error) {
       console.warn("Manual sync failed:", error);
-      status.textContent = "Sync failed. Your local changes remain available.";
+      syncError = "Sync failed. Your local changes remain available.";
     } finally {
       running = false;
       render();
@@ -57,7 +61,7 @@
   });
   window.addEventListener("online", render);
   window.addEventListener("offline", render);
-  window.addEventListener("snapnotes:auth-changed", render);
+  window.addEventListener("snapnotes:auth-changed", () => { syncError = ""; render(); });
   window.addEventListener("snapnotes:auth-ready", render);
   document.getElementById("settingsBtn")?.addEventListener("click", render);
   render();
