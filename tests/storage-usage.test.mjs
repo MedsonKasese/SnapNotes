@@ -99,3 +99,33 @@ test("simultaneous storage usage requests share one folder scan", async () => {
     { bytes: 0, fileCount: 0, unknownSizeCount: 0 }
   ]);
 });
+
+
+test("forced refresh starts a newer scan instead of reusing an older pending request", async () => {
+  const completions = [];
+  let scans = 0;
+  const bucket = {
+    list() {
+      scans++;
+      return new Promise(resolve => completions.push(() => resolve({
+        data: [{ id: `object-${scans}`, name: "file.bin", metadata: { size: scans * 10 } }],
+        error: null
+      })));
+    }
+  };
+  const root = "users/forced-pending-race";
+  const older = calculateCachedStorageUsage(bucket, root, { force: false });
+  await new Promise(resolve => setImmediate(resolve));
+  const newer = calculateCachedStorageUsage(bucket, root, { force: true });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(scans, 2, "forced refresh incorrectly reused the older pending scan");
+
+  completions[1]();
+  assert.deepEqual(await newer, { bytes: 20, fileCount: 1, unknownSizeCount: 0 });
+  completions[0]();
+  assert.deepEqual(await older, { bytes: 20, fileCount: 1, unknownSizeCount: 0 });
+  assert.deepEqual(await calculateCachedStorageUsage(bucket, root), {
+    bytes: 20, fileCount: 1, unknownSizeCount: 0
+  }, "the older response overwrote the newer cached usage");
+  assert.equal(scans, 2, "a valid result should be served from cache");
+});
