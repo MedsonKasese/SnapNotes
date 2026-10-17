@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+    function isDeletionProcessing(uid) {
+      let userPath = /databases/$(database)/documents/users/$(uid);
+      return exists(userPath)
+        && (get(userPath).data.get('accountDeletion', {}) is map)
+        && get(userPath).data.get('accountDeletion', {}).get('status', '') == 'processing';
+    }
+    function hasDeletionTombstone(uid) {
+      return exists(/databases/$(database)/documents/accountDeletionTombstones/$(uid));
+    }
+    match /users/{uid} {
+      allow read: if isOwner(uid) && !hasDeletionTombstone(uid);
+      allow create, update, delete: if isOwner(uid)
+        && !isDeletionProcessing(uid)
+        && !hasDeletionTombstone(uid);
+      match /libraries/{revision}/pages/{pageId} {
+        allow read, write: if isOwner(uid)
+          && !isDeletionProcessing(uid)
+          && !hasDeletionTombstone(uid);
+      }
+      // Required by readCloudNoteDeletionIds() and persistNoteDeletionMarkers().
+      // Only the account owner may access their own deletion tombstones.
+      match /deletedNotes/{noteId} {
+        allow read, write: if isOwner(uid)
+          && !isDeletionProcessing(uid)
+          && !hasDeletionTombstone(uid);
+      }
+    }
+    match /accountDeletionTombstones/{uid} {
+      allow get: if isOwner(uid);
+      allow list, create, update, delete: if false;
+    }
+  }
+}
