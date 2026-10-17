@@ -3,6 +3,7 @@
 // =========================
 
 import { enqueueAndProcessAttachmentCleanup, processAttachmentCleanupQueue } from "./attachment-cleanup.js";
+import { renderPdfPreview, disposePdfPreview } from "./pdf-preview.js";
 
 const ATTACHMENT_DB = "SnapNotesAttachments";
 const ATTACHMENT_STORE = "files";
@@ -857,6 +858,7 @@ async function saveAttachmentRename(event) {
 
 function releaseAttachmentPreview(preview) {
     preview?.textAbortController?.abort();
+    disposePdfPreview(preview);
     if (preview?.url?.startsWith("blob:")) {
         URL.revokeObjectURL(preview.url);
         privateAttachmentObjectUrls.delete(preview.url);
@@ -875,8 +877,8 @@ function beginAttachmentPreview(attachment, url = "", trigger = null) {
     if (!viewer || !content) return null;
 
     if (viewer.hidden) attachmentViewerReturnFocus = trigger || (document.activeElement !== document.body ? document.activeElement : null);
-    clearAttachmentViewerContent(content);
     releaseAttachmentPreview(activeAttachmentPreview);
+    clearAttachmentViewerContent(content);
     const state = { attachment, url, trigger, requestId: ++attachmentPreviewRequestId, textAbortController: null };
     activeAttachmentPreview = state;
     if (title) title.textContent = attachment.name || "Attachment preview";
@@ -931,8 +933,8 @@ function closeAttachmentViewer() {
     const content = document.getElementById("attachmentViewerContent");
     if (!viewer || viewer.hidden) return;
     attachmentPreviewRequestId++;
-    clearAttachmentViewerContent(content);
     releaseAttachmentPreview(activeAttachmentPreview);
+    clearAttachmentViewerContent(content);
     activeAttachmentPreview = null;
     viewer.hidden = true;
     viewer.setAttribute("aria-hidden", "true");
@@ -989,52 +991,14 @@ async function renderAttachmentPreview(state) {
     content.replaceChildren();
 
     if (attachment.type === "application/pdf") {
-        const wrapper = document.createElement("div");
-        wrapper.className = "attachment-pdf-preview";
-        const frame = document.createElement("iframe");
-        frame.title = `Preview of ${attachment.name || "PDF document"}`;
-        frame.loading = "eager";
-        frame.referrerPolicy = "no-referrer";
-        const loading = document.createElement("div");
-        loading.className = "attachment-pdf-loading";
-        loading.setAttribute("role", "status");
-        loading.setAttribute("aria-live", "polite");
-        const spinner = document.createElement("span");
-        spinner.className = "attachment-viewer-spinner";
-        spinner.setAttribute("aria-hidden", "true");
-        const loadingLabel = document.createElement("span");
-        loadingLabel.textContent = "Loading PDF preview…";
-        loading.append(spinner, loadingLabel);
-        frame.addEventListener("load", () => { loading.hidden = true; });
-        frame.addEventListener("error", () => {
-            if (!isCurrentAttachmentPreview(state)) return;
-            loading.hidden = true;
-            const message = wrapper.querySelector(".attachment-pdf-fallback-message");
-            if (message) message.textContent = "The embedded preview could not load. Open the PDF in a new tab or download it instead.";
+        showViewerLoading("Loading PDF viewer…");
+        await renderPdfPreview({
+            state,
+            url,
+            container: content,
+            isCurrent: isCurrentAttachmentPreview,
+            onError: message => showViewerFailure(state, message)
         });
-        const fallback = document.createElement("div");
-        fallback.className = "attachment-pdf-fallback";
-        const fallbackMessage = document.createElement("span");
-        fallbackMessage.className = "attachment-pdf-fallback-message";
-        fallbackMessage.textContent = "If this preview stays blank, open the PDF in a new tab or download it.";
-        const openLink = document.createElement("a");
-        openLink.href = url;
-        openLink.target = "_blank";
-        openLink.rel = "noopener noreferrer";
-        openLink.textContent = "Open PDF in a new tab";
-        fallback.append(fallbackMessage, openLink);
-        wrapper.append(frame, loading, fallback);
-        content.appendChild(wrapper);
-        // Let the browser stream and render the signed PDF URL itself. Fetching a
-        // remote PDF into a Blob first stalls some mobile PDF viewers and doubles
-        // the file's memory footprint on lower-memory devices.
-        frame.src = url;
-        setTimeout(() => {
-            if (loading.isConnected && !loading.hidden && isCurrentAttachmentPreview(state)) {
-                loading.hidden = true;
-                fallbackMessage.textContent = "The preview is taking longer than expected. Open the PDF in a new tab or download it instead.";
-            }
-        }, 10_000);
         return;
     }
     if (attachment.type?.startsWith("image/")) {
