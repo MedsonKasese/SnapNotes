@@ -21,6 +21,7 @@ let pendingAttachmentFiles = [];
 let attachmentUploadPromise = null;
 let attachmentRetryQueued = false;
 const privateAttachmentObjectUrls = new Set();
+let activeAttachmentPreview = null;
 
 function isAttachmentUserSignedIn() {
     return Boolean(window.firebaseAuth?.currentUser);
@@ -635,7 +636,11 @@ async function resolveAttachmentUrl(attachment) {
     }
     if (attachment?.id) {
         const blob = await getAttachmentFile(attachment.id).catch(() => null);
-        if (blob) return URL.createObjectURL(blob);
+        if (blob) {
+            const url = URL.createObjectURL(blob);
+            privateAttachmentObjectUrls.add(url);
+            return url;
+        }
     }
     if (attachment?.storageProvider === "supabase" && attachment.storagePath) {
         try {
@@ -672,6 +677,181 @@ async function removeNoteAttachment(noteId, attachmentId) {
     return true;
 }
 
+function formatAttachmentDate(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return "";
+    return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
+}
+
+async function renameNoteAttachment(noteId, attachmentId) {
+    const note = (window.notes || []).find(item => String(item.id) === String(noteId));
+    const attachment = note?.attachments?.find(item => item.id === attachmentId);
+    if (!note || note.isPrivate || !attachment) return false;
+
+    const value = prompt("Rename attachment:", attachment.name || "Attachment");
+    if (value === null) return false;
+    const name = value.replace(/[\\/\u0000-\u001f\u007f]/g, "").trim().slice(0, 120);
+    if (!name) {
+        window.showToast?.("Enter a file name.", "warning");
+        return false;
+    }
+
+    attachment.name = name;
+    attachment.updatedAt = new Date().toISOString();
+    note.updatedAt = attachment.updatedAt;
+    await window.saveNotes?.();
+    window.renderNotes?.();
+    window.openNoteDetail?.(note.id);
+    window.showToast?.("Attachment renamed", "success");
+    return true;
+}
+
+function closeAttachmentViewer() {
+    const viewer = document.getElementById("attachmentViewer");
+    if (viewer) {
+        viewer.hidden = true;
+        viewer.setAttribute("aria-hidden", "true");
+    }
+    document.body.classList.remove("attachment-viewer-open");
+    if (activeAttachmentPreview?.url?.startsWith("blob:")) {
+        URL.revokeObjectURL(activeAttachmentPreview.url);
+        privateAttachmentObjectUrls.delete(activeAttachmentPreview.url);
+    }
+    activeAttachmentPreview = null;
+}
+
+async function openAttachmentViewer(attachment, url) {
+    const viewer = document.getElementById("attachmentViewer");
+    const title = document.getElementById("attachmentViewerTitle");
+    const content = document.getElementById("attachmentViewerContent");
+    if (!viewer || !content) return;
+    if (!url) {
+        window.showToast?.("This attachment is not available on this device yet.", "warning");
+        return;
+    }
+
+    if (activeAttachmentPreview?.url?.startsWith("blob:")) {
+        URL.revokeObjectURL(activeAttachmentPreview.url);
+        privateAttachmentObjectUrls.delete(activeAttachmentPreview.url);
+    }
+    const previewState = { attachment, url };
+    activeAttachmentPreview = previewState;
+    if (title) title.textContent = attachment.name || "Attachment preview";
+    content.replaceChildren();
+    viewer.hidden = false;
+    viewer.setAttribute("aria-hidden", "false");
+    document.body.classList.add("attachment-viewer-open");
+
+    if (attachment.type === "application/pdf") {
+        let previewUrl = url;
+        if (/^https?:/i.test(url)) {
+            const loading = document.createElement("p");
+            loading.className = "attachment-viewer-message";
+            loading.textContent = "Preparing document preview…";
+            content.appendChild(loading);
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("The PDF could not be downloaded for preview.");
+                const blob = await response.blob();
+                previewUrl = URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
+                privateAttachmentObjectUrls.add(previewUrl);
+            } catch (error) {
+                console.warn("Could not prepare an inline PDF preview; trying the signed URL directly:", error?.message || error);
+                previewUrl = url;
+            }
+        }
+        if (activeAttachmentPreview !== previewState || viewer.hidden) {
+            if (previewUrl !== url && previewUrl.startsWith("blob:")) {
+                URL.revokeObjectURL(previewUrl);
+                privateAttachmentObjectUrls.delete(previewUrl);
+            }
+            return;
+        }
+        previewState.url = previewUrl;
+        const frame = document.createElement("iframe");
+        frame.title = `Preview of ${attachment.name || "PDF document"}`;
+        content.appendChild(frame);
+        frame.src = previewUrl;
+        return;
+    }
+    if (attachment.type?.startsWith("image/")) {
+        const image = document.createElement("img");
+        image.className = "attachment-viewer-image";
+        image.src = url;
+        image.alt = attachment.name || "Attachment preview";
+        content.appendChild(image);
+        return;
+    }
+    if (attachment.type === "text/plain") {
+        const pre = document.createElement("pre");
+        pre.className = "attachment-viewer-text";
+        pre.textContent = "Loading preview…";
+        content.appendChild(pre);
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error("The text file could not be loaded.");
+            pre.textContent = await response.text();
+        } catch {
+            pre.textContent = "Could not load this preview. Use Download to save the file.";
+        }
+        return;
+    }
+    const message = document.createElement("p");
+    message.className = "attachment-viewer-message";
+    message.textContent = "Preview is not available for this file type. You can still download or share it.";
+    content.appendChild(message);
+}
+
+async function downloadActiveAttachment() {
+    const active = activeAttachmentPreview;
+    if (!active?.url) return;
+    const filename = String(active.attachment.name || "attachment").replace(/[\\/\u0000-\u001f\u007f]/g, "_");
+    try {
+        const response = await fetch(active.url);
+        if (!response.ok) throw new Error("Download could not be prepared.");
+        const blob = await response.blob();
+        const downloadUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+    } catch (error) {
+        window.showToast?.(error?.message || "Could not download this attachment.", "warning");
+    }
+}
+
+async function shareActiveAttachment() {
+    const active = activeAttachmentPreview;
+    if (!active?.url) return;
+    const attachment = active.attachment;
+    try {
+        const response = await fetch(active.url);
+        if (!response.ok) throw new Error("Sharing could not be prepared.");
+        const blob = await response.blob();
+        const file = new File([blob], attachment.name || "attachment", { type: attachment.type || blob.type });
+        if (navigator.share && navigator.canShare?.({ files: [file] })) {
+            await navigator.share({ title: attachment.name || "SnapNotes attachment", files: [file] });
+            return;
+        }
+        if (navigator.share && /^https?:/i.test(active.url)) {
+            await navigator.share({ title: attachment.name || "SnapNotes attachment", url: active.url });
+            return;
+        }
+        if (/^https?:/i.test(active.url) && navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(active.url);
+            window.showToast?.("Temporary attachment link copied", "success");
+            return;
+        }
+        window.showToast?.("Sharing is not available here. Use Download to save the file.", "warning");
+    } catch (error) {
+        if (error?.name !== "AbortError") window.showToast?.(error?.message || "Could not share this attachment.", "warning");
+    }
+}
+
 async function renderNoteAttachments(container, attachments = [], options = {}) {
     if (!container) return;
     container.innerHTML = "";
@@ -692,6 +872,13 @@ async function renderNoteAttachments(container, attachments = [], options = {}) 
         name.textContent = attachment.name || "Attachment";
         const size = document.createElement("small");
         size.textContent = formatAttachmentSize(Number(attachment.size) || 0);
+        const date = document.createElement("small");
+        date.className = "attachment-upload-date";
+        const timestamp = attachment.uploadedAt || attachment.createdAt;
+        const formattedDate = formatAttachmentDate(timestamp);
+        date.textContent = formattedDate
+            ? `${attachment.uploadedAt ? "Uploaded" : "Added"} ${formattedDate}`
+            : "Upload date unavailable";
         const status = document.createElement("small");
         status.className = "attachment-sync-status";
         if (attachment.uploadStatus === "pending" && !attachment.downloadUrl) {
@@ -703,7 +890,7 @@ async function renderNoteAttachments(container, attachments = [], options = {}) 
             status.textContent = "Synced across devices";
             status.classList.add("is-synced");
         }
-        copy.append(name, size, status);
+        copy.append(name, size, date, status);
 
         const url = await resolveAttachmentUrl(attachment);
         if (attachment.uploadStatus === "pending" && url) {
@@ -781,32 +968,45 @@ async function renderNoteAttachments(container, attachments = [], options = {}) 
             preview.appendChild(icon);
         }
 
-        const open = document.createElement("a");
+        const open = document.createElement("button");
+        open.type = "button";
         open.className = "attachment-open";
-        if (url) {
-            open.href = url;
-            open.target = "_blank";
-            open.rel = "noopener noreferrer";
-        } else {
-            open.setAttribute("aria-disabled", "true");
-            open.title = "This attachment is waiting to upload from the device where it was added.";
-        }
-        open.textContent = attachment.type?.startsWith("image/") ? "Open" : "Download";
+        open.addEventListener("click", async () => {
+            const previewUrl = await resolveAttachmentUrl(attachment);
+            await openAttachmentViewer(attachment, previewUrl);
+        });
+        if (!url) open.title = "Try again to load this attachment, or open it on the device where it was added.";
+        open.textContent = "Preview";
 
         item.append(preview, copy, open);
-        if (options.removable) {
+        if (options.removable || options.editable) {
+            const actions = document.createElement("div");
+            actions.className = "attachment-management-actions";
+            if (options.editable) {
+                const rename = document.createElement("button");
+                rename.type = "button";
+                rename.className = "attachment-manage-button";
+                rename.innerHTML = '<i class="fa-solid fa-pen" aria-hidden="true"></i><span>Rename</span>';
+                rename.setAttribute("aria-label", `Rename ${attachment.name || "attachment"}`);
+                rename.addEventListener("click", () => renameNoteAttachment(options.noteId, attachment.id));
+                actions.appendChild(rename);
+            }
             const remove = document.createElement("button");
             remove.type = "button";
-            remove.className = "attachment-remove";
+            remove.className = "attachment-manage-button is-danger";
             remove.setAttribute("aria-label", "Remove " + (attachment.name || "attachment"));
-            remove.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+            remove.innerHTML = '<i class="fa-solid fa-trash-can" aria-hidden="true"></i><span>Remove</span>';
             remove.addEventListener("click", async () => {
-                await removeNoteAttachment(options.noteId, attachment.id);
+                if (options.editable && localStorage.getItem("SnapNotesConfirmDelete") !== "false" &&
+                    !confirm(`Remove "${attachment.name || "this attachment"}" from the note?`)) return;
+                const removed = await removeNoteAttachment(options.noteId, attachment.id);
+                if (!removed) return;
                 item.remove();
                 if (!container.children.length) container.hidden = true;
-                options.onChange?.();
+                await options.onChange?.();
             });
-            item.appendChild(remove);
+            actions.appendChild(remove);
+            item.appendChild(actions);
         }
         container.appendChild(item);
     }
@@ -832,3 +1032,7 @@ window.tagLegacyAttachmentFilesForUser = tagLegacyAttachmentFilesForUser;
 window.clearAttachmentCleanupQueueForUser = clearAttachmentCleanupQueueForUser;
 window.renderNoteAttachments = renderNoteAttachments;
 window.removeNoteAttachment = removeNoteAttachment;
+window.openAttachmentViewer = openAttachmentViewer;
+window.closeAttachmentViewer = closeAttachmentViewer;
+window.downloadActiveAttachment = downloadActiveAttachment;
+window.shareActiveAttachment = shareActiveAttachment;

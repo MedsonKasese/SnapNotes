@@ -81,6 +81,7 @@ function setupEventListeners() {
     const settingsModal = document.getElementById("settingsModal");
     const closeSettingsBtn = document.getElementById("closeSettingsBtn");
     const signOutSettingsBtn = document.getElementById("signOutSettingsBtn");
+    const refreshStorageUsageBtn = document.getElementById("refreshStorageUsageBtn");
     const deleteAccountBtn = document.getElementById("deleteAccountBtn");
     const cancelAccountDeletionBtn = document.getElementById("cancelAccountDeletionBtn");
     const settingsTheme = document.getElementById("settingsTheme");
@@ -126,6 +127,7 @@ function setupEventListeners() {
 
     settingsBtn.addEventListener("click", openSettings);
     closeSettingsBtn.addEventListener("click", closeSettings);
+    refreshStorageUsageBtn?.addEventListener("click", refreshCloudStorageUsage);
     signOutSettingsBtn.addEventListener("click", () => document.getElementById("userAvatar").click());
     deleteAccountBtn.addEventListener("click", requestAccountDeletion);
     cancelAccountDeletionBtn.addEventListener("click", cancelScheduledAccountDeletion);
@@ -172,7 +174,7 @@ function setupEventListeners() {
 
     saveNoteBtn.addEventListener("click", saveEditorNote);
     addBtn.addEventListener("click", openNewNoteView);
-    newNoteBtn.addEventListener("click", openNewNoteView);
+    newNoteBtn?.addEventListener("click", openNewNoteView);
     emptyTrashBtn.addEventListener("click", () => window.emptyTrash?.());
     privatePasskeyBtn?.addEventListener("click", async () => {
         if (window.hasPrivatePasskey?.()) {
@@ -190,6 +192,12 @@ function setupEventListeners() {
     importNotesInput.addEventListener("change", importNotes);
     createFolderBtn?.addEventListener("click", () => window.createFolder?.());
     addAttachmentBtn?.addEventListener("click", () => window.openAttachmentPicker?.(attachmentInput));
+    document.getElementById("attachmentViewerClose")?.addEventListener("click", () => window.closeAttachmentViewer?.());
+    document.getElementById("attachmentViewerDownload")?.addEventListener("click", () => window.downloadActiveAttachment?.());
+    document.getElementById("attachmentViewerShare")?.addEventListener("click", () => window.shareActiveAttachment?.());
+    document.getElementById("attachmentViewer")?.addEventListener("click", event => {
+        if (event.target.id === "attachmentViewer") window.closeAttachmentViewer?.();
+    });
     attachmentInput?.addEventListener("change", event => {
         window.addPendingAttachments?.(event.target.files);
         event.target.value = "";
@@ -277,6 +285,7 @@ function setupEventListeners() {
             return;
         }
         if (event.key === "Escape") {
+            window.closeAttachmentViewer?.();
             closeNoteDetail?.();
             closeDrawer();
             closeCategoryMenu();
@@ -290,6 +299,9 @@ function setupEventListeners() {
         } else if (event.detail?.status === "synced") {
             setDraftStatus("Saved and synced");
         }
+    });
+    window.addEventListener("snapnotes:auth-changed", () => {
+        if (document.getElementById("settingsModal")?.classList.contains("show")) refreshCloudStorageUsage();
     });
 
     document.getElementById("noteEditor").addEventListener("input", () => {
@@ -1198,6 +1210,48 @@ function openSettings() {
 
     settingsModal.classList.add("show");
     settingsModal.setAttribute("aria-hidden", "false");
+    refreshCloudStorageUsage();
+}
+
+function formatCloudStorageSize(bytes) {
+    const size = Math.max(0, Number(bytes) || 0);
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function refreshCloudStorageUsage() {
+    const value = document.getElementById("cloudStorageUsage");
+    const refreshButton = document.getElementById("refreshStorageUsageBtn");
+    if (!value) return;
+    const user = window.firebaseAuth?.currentUser;
+    if (!user) {
+        value.textContent = "Sign in to check usage";
+        return;
+    }
+
+    value.textContent = "Checking cloud storage…";
+    if (refreshButton) refreshButton.disabled = true;
+    try {
+        const response = await fetch("/api/storage/usage", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${await user.getIdToken()}` }
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !Number.isFinite(Number(result.bytes))) {
+            throw new Error(result.error || "Storage usage could not be loaded.");
+        }
+        const unknownSizeCount = Number(result.unknownSizeCount) || 0;
+        value.textContent = `${unknownSizeCount ? "At least " : ""}${formatCloudStorageSize(result.bytes)} used`;
+        value.title = unknownSizeCount
+            ? `${Number(result.fileCount) || 0} cloud files; ${unknownSizeCount} file size(s) unavailable`
+            : `${Number(result.fileCount) || 0} cloud files`;
+    } catch (error) {
+        value.textContent = "Usage unavailable · Try again";
+        value.title = error?.message || "Could not load cloud storage usage.";
+    } finally {
+        if (refreshButton) refreshButton.disabled = false;
+    }
 }
 
 async function refreshAccountDeletionStatus(user = window.firebaseAuth?.currentUser) {

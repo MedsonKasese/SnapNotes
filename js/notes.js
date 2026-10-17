@@ -637,7 +637,15 @@ async function openNoteDetail(id) {
     modal.classList.add("show");
     modal.setAttribute("aria-hidden", "false");
     window.renderInteractiveChecklist?.(modal.querySelector(".note-detail-body"), note.id);
-    window.renderNoteAttachments?.(modal.querySelector("[data-note-attachments]"), note.attachments || []);
+    window.renderNoteAttachments?.(modal.querySelector("[data-note-attachments]"), note.attachments || [], {
+        editable: !note.isPrivate,
+        noteId: id,
+        onChange: async () => {
+            await saveNotes();
+            window.renderNotes?.();
+            window.openNoteDetail?.(id);
+        }
+    });
     modal.querySelectorAll("[data-detail-close]").forEach(button => button.addEventListener("click", closeNoteDetail));
     modal.querySelector("[data-detail-edit]").addEventListener("click", () => {
         closeNoteDetail();

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { safeNotes } from "../api/ai-notes.js";
 import { buildPrivatePayload, lockedPrivateNote, privateNoteMetadataNeedsMigration, stripPrivateMetadata } from "../js/private-note-utils.js";
-import { mergeNotes, packLibraryPages, noteSignature, noteTimestamp } from "../js/note-sync.js";
+import { mergeNotes, packLibraryPages, noteSignature, noteTimestamp, isLibraryRevisionComplete } from "../js/note-sync.js";
 import { createCloudSessionGuard } from "../js/cloud-session.js";
 import { enqueueAndProcessAttachmentCleanup, ATTACHMENT_CLEANUP_KEY } from "../js/attachment-cleanup.js";
 import { renderSettingsAccount } from "../js/settings-account.js";
@@ -305,6 +305,26 @@ test("merge treats invalid timestamps as oldest and preserves the losing version
   const merged = mergeNotes([local], [cloud]);
   assert.equal(merged.find(note => note.id === "n1").text, "Local");
   assert.ok(merged.find(note => note.id === "n1").versions.some(version => version.text === "Cloud"));
+});
+
+test("cloud library hydration rejects incomplete page revisions", () => {
+  assert.equal(isLibraryRevisionComplete(0, 0), true);
+  assert.equal(isLibraryRevisionComplete("2", 2), true);
+  assert.equal(isLibraryRevisionComplete(3, 2), false);
+  assert.equal(isLibraryRevisionComplete(0, 1), false);
+  assert.equal(isLibraryRevisionComplete(undefined, 0), false);
+});
+
+test("a prior cloud snapshot can restore missing notes without resurrecting permanently deleted notes", () => {
+  const current = [{ id: "kept", text: "current", updatedAt: "2026-10-16T10:00:00Z" }];
+  const backup = [
+    { id: "kept", text: "stale", updatedAt: "2026-10-15T10:00:00Z" },
+    { id: "recovered", text: "from prior snapshot", updatedAt: "2026-10-15T09:00:00Z" },
+    { id: "deleted", text: "permanently removed" }
+  ];
+  const merged = mergeNotes(current, backup, ["deleted"]);
+  assert.deepEqual(merged.map(note => note.id).sort(), ["kept", "recovered"]);
+  assert.equal(merged.find(note => note.id === "kept").text, "current");
 });
 
 test("longer shared edit history beats skewed device timestamps and carries both edits", () => {

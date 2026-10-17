@@ -813,3 +813,176 @@ body.dark-mode .smart-share-preview {
 #profileEditModal label { display: block; margin: 10px 0 5px; font-size: 13px; }
 #profileEditModal input { width: 100%; }
 #profileEditFeedback { font-size: 13px; }
+
+
+/* Full-screen attachment preview. */
+.attachment-viewer[hidden] {
+    display: none;
+}
+
+.attachment-viewer {
+    position: fixed;
+    inset: 0;
+    z-index: 2400;
+    display: flex;
+    background: var(--surface-color);
+    color: var(--text-color);
+}
+
+.attachment-viewer-dialog {
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.attachment-viewer-header {
+    min-height: 62px;
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--surface-color);
+}
+
+.attachment-viewer-header h2 {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    font-size: 15px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.attachment-viewer-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.attachment-viewer-content {
+    min-height: 0;
+    flex: 1;
+    display: grid;
+    place-items: center;
+    overflow: auto;
+    background: var(--surface-soft, #f2f4f2);
+}
+
+.attachment-viewer-content iframe {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    border: 0;
+    background: white;
+}
+
+.attachment-viewer-image {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.attachment-viewer-text {
+    width: min(900px, 100%);
+    min-height: 100%;
+    margin: 0;
+    padding: clamp(18px, 4vw, 48px);
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    background: var(--surface-color);
+    color: var(--text-color);
+    font: 14px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.attachment-viewer-message {
+    padding: 24px;
+    color: var(--muted-color);
+    text-align: center;
+}
+
+body.attachment-viewer-open {
+    overflow: hidden;
+}
+
+@media (max-width: 520px) {
+    .attachment-viewer-header {
+        grid-template-columns: 36px minmax(0, 1fr) auto;
+        gap: 7px;
+        padding-inline: 8px;
+    }
+
+    .attachment-viewer-header .icon-button {
+        width: 36px;
+        height: 36px;
+    }
+}
+
+
+/* Attachment dates and per-file management controls. */
+.attachment-upload-date {
+    color: var(--muted-color, #718071);
+    font-size: 0.72rem;
+}
+
+.attachment-open {
+    min-height: 34px;
+    padding: 6px 9px;
+    border: 1px solid var(--border-color);
+    border-radius: 9px;
+    color: var(--primary-dark, #367d0c);
+    background: var(--surface-soft);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.attachment-open:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.attachment-management-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 7px;
+    border-top: 1px solid var(--border-color);
+}
+
+.attachment-manage-button {
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 5px 9px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-color);
+    background: var(--surface-soft);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 650;
+}
+
+.attachment-manage-button.is-danger {
+    color: var(--danger-color, #b42318);
+}
+
+.attachment-manage-button:hover,
+.attachment-open:hover:not(:disabled) {
+    filter: brightness(0.97);
+}
+
+body.dark-mode .attachment-upload-date {
+    color: var(--muted-color);
+}

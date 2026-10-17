@@ -166,10 +166,6 @@ Then write your notes below..."
                     </button>
                     <button id="askMyNotesLibraryBtn" class="ai-editor-button" type="button" aria-label="Ask My Notes AI"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Ask My Notes</span></button>
                     <button id="privatePasskeyBtn" class="secondary-action" type="button" hidden>Set up passkey</button>
-                    <button id="newNoteBtn" class="secondary-action" type="button">
-                        <i class="fa-solid fa-plus"></i>
-                        New note
-                    </button>
                 </div>
             </div>
             <p id="emptyState" class="empty-state">No notes yet. Create your first one.</p>
@@ -234,6 +230,7 @@ Then write your notes below..."
                 <span>Important</span>
                 <span class="drawer-count" data-count-for="important">0</span>
             </button>
+            <div class="drawer-divider" aria-hidden="true"></div>
             <div class="drawer-section-heading folder-section-heading">
                 <span>Folders</span>
                 <button id="createFolderBtn" class="folder-add-button" type="button" aria-label="Create folder" title="Create folder">
@@ -241,7 +238,9 @@ Then write your notes below..."
                 </button>
             </div>
             <div id="folderNavList" class="folder-nav-list"></div>
+            <button id="folderNavViewAll" class="folder-view-all" type="button" aria-controls="folderNavList" aria-expanded="false" hidden>View all folders</button>
             <p id="folderNavEmpty" class="folder-nav-empty">No folders yet.</p>
+            <div id="folderNavDivider" class="folder-nav-divider" aria-hidden="true" hidden></div>
             <button class="drawer-item" type="button" data-view="archive">
                 <i class="fa-solid fa-box-archive"></i>
                 <span>Archived</span>
@@ -262,12 +261,17 @@ Then write your notes below..."
                 <span>Trash</span>
                 <span class="drawer-count" data-count-for="trash">0</span>
             </button>
-        </nav>
-        <div class="drawer-tools">
-            <button type="button" id="exportNotesBtn"><i class="fa-solid fa-file-export"></i><span>Export notes</span></button>
-            <button type="button" id="importNotesBtn"><i class="fa-solid fa-file-import"></i><span>Import notes</span></button>
+            <div class="drawer-divider" aria-hidden="true"></div>
+            <button class="drawer-item" type="button" id="exportNotesBtn">
+                <i class="fa-solid fa-file-export"></i>
+                <span>Export notes</span>
+            </button>
+            <button class="drawer-item" type="button" id="importNotesBtn">
+                <i class="fa-solid fa-file-import"></i>
+                <span>Import notes</span>
+            </button>
             <input type="file" id="importNotesInput" accept=".json,application/json" hidden>
-        </div>
+        </nav>
     </aside>
     <div id="drawerBackdrop" class="drawer-backdrop" hidden></div>
 
@@ -330,6 +334,24 @@ Then write your notes below..."
                         <option value="light">Light</option>
                         <option value="dark">Dark</option>
                     </select>
+                </div>
+            </section>
+
+            <section class="settings-section settings-storage-section" aria-labelledby="storageTitle">
+                <div class="settings-section-heading">
+                    <div>
+                        <p class="settings-section-title" id="storageTitle">Cloud storage</p>
+                    </div>
+                    <button id="refreshStorageUsageBtn" class="storage-refresh-button" type="button" aria-label="Refresh cloud storage usage" title="Refresh usage">
+                        <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <div class="settings-storage-meter">
+                    <span class="settings-storage-icon" aria-hidden="true"><i class="fa-solid fa-cloud-arrow-up"></i></span>
+                    <div>
+                        <strong>Cloud storage</strong>
+                        <small id="cloudStorageUsage" role="status" aria-live="polite">Sign in to check usage</small>
+                    </div>
                 </div>
             </section>
 
@@ -446,6 +468,26 @@ Then write your notes below..."
     </div>
 
     <div id="noteDetailModal" class="note-detail-modal" aria-hidden="true"></div>
+
+    <div id="attachmentViewer" class="attachment-viewer" aria-hidden="true" hidden>
+        <section class="attachment-viewer-dialog" role="dialog" aria-modal="true" aria-labelledby="attachmentViewerTitle">
+            <header class="attachment-viewer-header">
+                <button id="attachmentViewerClose" class="icon-button" type="button" aria-label="Close document preview">
+                    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                </button>
+                <h2 id="attachmentViewerTitle">Attachment preview</h2>
+                <div class="attachment-viewer-actions">
+                    <button id="attachmentViewerShare" class="icon-button" type="button" aria-label="Share attachment" title="Share">
+                        <i class="fa-solid fa-share-nodes" aria-hidden="true"></i>
+                    </button>
+                    <button id="attachmentViewerDownload" class="icon-button" type="button" aria-label="Download attachment" title="Download">
+                        <i class="fa-solid fa-download" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </header>
+            <div id="attachmentViewerContent" class="attachment-viewer-content" aria-live="polite"></div>
+        </section>
+    </div>
 
     <div id="toast" role="status" aria-live="polite"></div>
            <!--AUTHENTICATION MODAL-->

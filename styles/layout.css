@@ -480,13 +480,16 @@
     z-index: 2200;
     width: min(320px, 88vw);
     height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
     padding: 20px 15px;
     background: var(--surface-color);
     border-right: 1px solid var(--border-color);
     box-shadow: 15px 0 35px rgba(0, 0, 0, 0.12);
     transform: translateX(-105%);
     transition: transform 0.25s ease;
-    overflow-y: auto;
+    overflow: hidden;
 }
 
 .notes-drawer.open {
@@ -494,6 +497,7 @@
 }
 
 .drawer-header {
+    flex: 0 0 auto;
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -504,7 +508,13 @@
 
 .drawer-nav {
     display: grid;
+    flex: 1 1 auto;
+    align-content: start;
     gap: 5px;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     padding-top: 14px;
 }
 
@@ -871,35 +881,6 @@
     gap: 5px;
     min-width: 0;
 }
-
-
-
-.drawer-tools {
-    display: grid;
-    gap: 6px;
-    margin-top: 18px;
-    padding-top: 14px;
-    border-top: 1px solid var(--border-color);
-}
-
-.drawer-tools button {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 11px;
-    border: 0;
-    border-radius: 10px;
-    color: var(--text-color);
-    background: transparent;
-    text-align: left;
-    font-size: 13px;
-    font-weight: 700;
-}
-
-.drawer-tools button:hover {
-    background: var(--surface-soft);
-}
-
 .note-card { cursor: default; }
 .note-card:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 3px; }
 .note-detail-content { padding: 22px 0; line-height: 1.7; white-space: normal; }
@@ -928,6 +909,10 @@
     font-weight: 800;
     letter-spacing: 0.08em;
     text-transform: uppercase;
+}
+
+.folder-section-heading {
+    margin-top: 0;
 }
 
 .folder-add-button,
@@ -989,6 +974,34 @@
     font-size: 11px;
 }
 
+.folder-nav-row[hidden] {
+    display: none;
+}
+
+.folder-view-all {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 36px;
+    justify-content: center;
+    padding: 8px;
+    border: 0;
+    border-radius: 8px;
+    color: var(--primary-color);
+    background: transparent;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.folder-view-all:hover {
+    background: var(--surface-soft);
+}
+
+.folder-view-all[hidden] {
+    display: none;
+}
+
 
 /* Ask My Notes and Save note share a row above the draft guidance. */
 .editor-footer {
@@ -1027,4 +1040,30 @@
         padding: 9px 7px;
         font-size: 12px;
     }
+}
+
+
+/* Drawer section separators and user-created folder separation. */
+.drawer-divider,
+.folder-nav-divider {
+    height: 1px;
+    background: var(--border-color);
+    opacity: 0.75;
+}
+
+.drawer-divider {
+    margin: 6px 8px;
+}
+
+.folder-nav-divider {
+    margin: 9px 8px 7px;
+}
+
+.folder-nav-item > i {
+    color: var(--folder-accent, var(--muted-color));
+    transition: color 0.15s ease;
+}
+
+.folder-nav-item.active > i {
+    color: var(--folder-accent, var(--primary-color));
 }

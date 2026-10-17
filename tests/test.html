@@ -4,6 +4,17 @@
 <body>
 <h1>SnapNotes automated tests</h1>
 <pre id="results">Running...</pre>
+<p id="result-summary" aria-live="polite"></p>
+<div id="folderNavList"></div>
+<button id="folderNavViewAll" type="button" aria-controls="folderNavList" aria-expanded="false" hidden></button>
+<p id="folderNavEmpty" hidden></p>
+<div id="folderNavDivider" hidden></div>
+<div id="attachmentViewer" aria-hidden="true" hidden>
+  <section role="dialog" aria-labelledby="attachmentViewerTitle">
+    <h2 id="attachmentViewerTitle"></h2>
+    <div id="attachmentViewerContent"></div>
+  </section>
+</div>
 <script type="module" src="../js/attachments.js"></script>
 <script type="module" src="../js/checklist-utils.js"></script>
 <script src="../js/folders.js"></script>
@@ -17,6 +28,10 @@ import { buildPrivatePayload, lockedPrivateNote } from "../js/private-note-utils
 const results = [];
 function test(name, fn) {
   try { fn(); results.push("PASS  " + name); }
+  catch (error) { results.push("FAIL  " + name + " — " + error.message); }
+}
+async function testAsync(name, fn) {
+  try { await fn(); results.push("PASS  " + name); }
   catch (error) { results.push("FAIL  " + name + " — " + error.message); }
 }
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
@@ -61,6 +76,37 @@ test("attachment module exposes note attachment preparation", () => {
   assert(typeof window.duplicatePrivateAttachments === "function", "private attachment duplication API is missing");
 });
 
+await testAsync("saved attachment rows expose preview, upload date, rename and remove actions", async () => {
+  const container = document.createElement("div");
+  await window.renderNoteAttachments(container, [{
+    id: "browser-preview-fixture",
+    name: "research.pdf",
+    type: "application/pdf",
+    size: 1536,
+    createdAt: "2026-10-16T08:00:00.000Z",
+    downloadUrl: "data:application/pdf;base64,JVBERi0xLjQK"
+  }], { editable: true, noteId: "fixture-note" });
+  assert(container.querySelector(".attachment-open")?.textContent === "Preview", "preview action is missing");
+  assert(container.querySelector(".attachment-upload-date")?.textContent.startsWith("Added "), "attachment date is missing");
+  assert(container.querySelector('[aria-label="Rename research.pdf"]'), "rename action is missing");
+  assert(container.querySelector('[aria-label="Remove research.pdf"]'), "remove action is missing");
+});
+
+await testAsync("remote PDFs open from a local inline preview URL", async () => {
+  const originalFetch = window.fetch;
+  window.fetch = async () => new Response(new Blob(["%PDF-1.4\nfixture"], { type: "application/pdf" }), { status: 200 });
+  try {
+    await window.openAttachmentViewer({ name: "report.pdf", type: "application/pdf" }, "https://preview.example/report.pdf");
+    const viewer = document.getElementById("attachmentViewer");
+    const frame = viewer.querySelector("iframe");
+    assert(!viewer.hidden, "document viewer did not open");
+    assert(frame?.src.startsWith("blob:"), "remote PDF was not converted to an inline local preview");
+  } finally {
+    window.closeAttachmentViewer();
+    window.fetch = originalFetch;
+  }
+});
+
 
 test("signed-out users receive a sign-in gate before choosing files", () => {
   let clicked = false;
@@ -85,12 +131,55 @@ test("folder module exposes folder management APIs", () => {
   assert(typeof window.createFolder === "function", "createFolder API is missing");
   assert(typeof window.moveNoteToFolder === "function", "moveNoteToFolder API is missing");
   assert(typeof window.getFolderById === "function", "getFolderById API is missing");
+  assert(typeof window.customizeFolder === "function", "customizeFolder API is missing");
 });
 
 test("folder limits and names are bounded", () => {
   const name = "A".repeat(32);
   assert(name.length === 32, "folder name limit fixture is invalid");
   assert(localStorage.getItem("SnapNotesFolders") === null || Array.isArray(JSON.parse(localStorage.getItem("SnapNotesFolders"))), "folder storage shape is invalid");
+});
+
+test("custom folder icon and color choices are preserved and invalid values are reset", () => {
+  const previous = localStorage.getItem("SnapNotesFolders");
+  try {
+    localStorage.setItem("SnapNotesFolders", JSON.stringify([
+      { id: "folder-themed", name: "Research", icon: "book", color: "blue" },
+      { id: "folder-legacy", name: "Legacy", icon: "<script>", color: "url(javascript:alert(1))" }
+    ]));
+    const folders = window.loadFolders();
+    assert(folders[0].icon === "book" && folders[0].color === "blue", "folder appearance was not preserved");
+    assert(folders[1].icon === "folder" && folders[1].color === "", "unrecognized appearance values were not rejected");
+  } finally {
+    if (previous === null) localStorage.removeItem("SnapNotesFolders");
+    else localStorage.setItem("SnapNotesFolders", previous);
+    window.loadFolders();
+  }
+});
+
+test("folder navigation initially shows three folders and View all reveals every folder", () => {
+  const previous = localStorage.getItem("SnapNotesFolders");
+  try {
+    localStorage.setItem("SnapNotesFolders", JSON.stringify(Array.from({ length: 5 }, (_, index) => ({
+      id: `view-all-${index + 1}`, name: `Folder ${index + 1}`
+    }))));
+    window.loadFolders();
+    let rows = [...document.querySelectorAll("#folderNavList .folder-nav-row")];
+    const viewAll = document.getElementById("folderNavViewAll");
+    assert(rows.filter(row => !row.hidden).length === 3, "more than three folders are initially visible");
+    assert(!viewAll.hidden && viewAll.textContent.includes("View all"), "View all control is missing");
+    viewAll.click();
+    rows = [...document.querySelectorAll("#folderNavList .folder-nav-row")];
+    assert(rows.filter(row => !row.hidden).length === 5, "View all did not reveal every folder");
+    assert(viewAll.getAttribute("aria-expanded") === "true", "expanded state was not exposed accessibly");
+    viewAll.click();
+    rows = [...document.querySelectorAll("#folderNavList .folder-nav-row")];
+    assert(rows.filter(row => !row.hidden).length === 3, "Show fewer did not collapse the folder list");
+  } finally {
+    if (previous === null) localStorage.removeItem("SnapNotesFolders");
+    else localStorage.setItem("SnapNotesFolders", previous);
+    window.loadFolders();
+  }
 });
 
 test("notes can carry a folder id without changing categories", () => {
@@ -345,8 +434,10 @@ test("locked private-note metadata is masked and included only in encryption pay
   assert(locked.reminderAt === null && locked.folderId === null && locked.attachments.length === 0, "locked note exposes private metadata");
 });
 
+const allPassed = results.every(line => line.startsWith("PASS"));
 document.getElementById("results").textContent = results.join("\n") + "\n\n" +
-  (results.every(line => line.startsWith("PASS")) ? "ALL TESTS PASSED" : "SOME TESTS FAILED");
+  (allPassed ? "ALL TESTS PASSED" : "SOME TESTS FAILED");
+document.getElementById("result-summary").textContent = `${allPassed ? "ALL TESTS PASSED" : "SOME TESTS FAILED"} (${results.filter(line => line.startsWith("PASS")).length}/${results.length})`;
 </script>
 </body>
 </html>
