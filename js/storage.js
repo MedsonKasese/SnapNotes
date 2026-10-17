@@ -28,6 +28,15 @@ function trySetLocalStorage(key, value) {
     }
 }
 
+function markCloudSyncPending(uid) {
+    if (!uid) return;
+    try { localStorage.setItem(`SnapNotesSyncPending:${uid}`, "true"); }
+    catch (error) { console.warn("Could not record pending cloud sync:", error); }
+    window.dispatchEvent(new CustomEvent("snapnotes:sync-status", {
+        detail: { status: "pending", uid }
+    }));
+}
+
 let persistenceRequested = false;
 function requestPersistentOriginStorage() {
     if (persistenceRequested) return;
@@ -78,6 +87,8 @@ async function saveNotes() {
         window.showToast?.("Local storage is unavailable. Keep this page open and reconnect to sync your notes.", "warning");
     }
 
+    const syncUid = window.firebaseAuth?.currentUser?.uid;
+    if (syncUid) markCloudSyncPending(syncUid);
     const cloudEnabled = Boolean(window.firebaseAuth?.currentUser);
     if (!cloudEnabled || typeof window.syncToCloud !== "function") {
         return { synced: false, cloudEnabled, locallySaved: localResult.locallySaved };

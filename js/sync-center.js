@@ -32,7 +32,9 @@
       const date = localStorage.getItem(key(uid));
       last.textContent = date ? "Last confirmed note sync: " + new Date(date).toLocaleString() : "No confirmed sync recorded yet.";
     }
-    retry.disabled = !uid || !navigator.onLine || running;
+    const confirmedSync = uid && localStorage.getItem(key(uid));
+    const needsSync = uid && (pending(uid) || Boolean(syncError) || !confirmedSync);
+    retry.disabled = !uid || !navigator.onLine || running || !needsSync;
   }
   window.addEventListener("snapnotes:sync-status", event => {
     const uid = userId();

@@ -5,7 +5,7 @@ import vm from "node:vm";
 
 const syncCenterSource = await readFile(new URL("../js/sync-center.js", import.meta.url), "utf8");
 
-function makeSyncCenter({ syncToCloud }) {
+function makeSyncCenter({ syncToCloud, initialStorage = {} }) {
   const elements = new Map();
   for (const id of ["syncCenterStatus", "syncCenterLast", "syncCenterRetry"]) {
     elements.set(id, {
@@ -17,7 +17,7 @@ function makeSyncCenter({ syncToCloud }) {
   }
 
   const windowListeners = new Map();
-  const values = new Map();
+  const values = new Map(Object.entries(initialStorage));
   const window = {
     firebaseAuth: { currentUser: { uid: "user-1" } },
     syncToCloud,
@@ -52,8 +52,10 @@ test("successful background sync clears a previous manual retry error", async ()
   const last = elements.get("syncCenterLast");
   const retry = elements.get("syncCenterRetry");
 
+  assert.equal(retry.disabled, false, "the first sync should be available until confirmed");
   await retry.listeners.get("click")();
   assert.equal(status.textContent, "Cloud note sync did not complete. Please retry.");
+  assert.equal(retry.disabled, false, "a failed sync should leave retry available");
 
   window.dispatchEvent({
     type: "snapnotes:sync-status",
@@ -62,4 +64,23 @@ test("successful background sync clears a previous manual retry error", async ()
 
   assert.equal(status.textContent, "Last cloud note synchronization succeeded.");
   assert.match(last.textContent, /^Last confirmed note sync: /);
+  assert.equal(retry.disabled, true, "a successful sync should disable retry");
+});
+
+test("Sync now re-enables when local changes become pending after a successful sync", () => {
+  const { elements, localStorage, window } = makeSyncCenter({ syncToCloud: async () => true });
+  const retry = elements.get("syncCenterRetry");
+
+  window.dispatchEvent({
+    type: "snapnotes:sync-status",
+    detail: { status: "synced", uid: "user-1" }
+  });
+  assert.equal(retry.disabled, true);
+
+  localStorage.setItem("SnapNotesSyncPending:user-1", "true");
+  window.dispatchEvent({
+    type: "snapnotes:sync-status",
+    detail: { status: "pending", uid: "user-1" }
+  });
+  assert.equal(retry.disabled, false, "pending local changes should make retry available");
 });
