@@ -106,9 +106,9 @@ test("forced refresh starts a newer scan instead of reusing an older pending req
   let scans = 0;
   const bucket = {
     list() {
-      scans++;
+      const scanNumber = ++scans;
       return new Promise(resolve => completions.push(() => resolve({
-        data: [{ id: `object-${scans}`, name: "file.bin", metadata: { size: scans * 10 } }],
+        data: [{ id: `object-${scanNumber}`, name: "file.bin", metadata: { size: scanNumber * 10 } }],
         error: null
       })));
     }
@@ -123,7 +123,7 @@ test("forced refresh starts a newer scan instead of reusing an older pending req
   completions[1]();
   assert.deepEqual(await newer, { bytes: 20, fileCount: 1, unknownSizeCount: 0 });
   completions[0]();
-  assert.deepEqual(await older, { bytes: 20, fileCount: 1, unknownSizeCount: 0 });
+  assert.deepEqual(await older, { bytes: 10, fileCount: 1, unknownSizeCount: 0 });
   assert.deepEqual(await calculateCachedStorageUsage(bucket, root), {
     bytes: 20, fileCount: 1, unknownSizeCount: 0
   }, "the older response overwrote the newer cached usage");
