@@ -6,14 +6,13 @@ import {
     GoogleAuthProvider,
     setPersistence,
     browserLocalPersistence,
-    sendEmailVerification,
-    sendPasswordResetEmail,
     signOut,
     updateProfile,
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
 import { getAccountDeletionStatus, loadFromCloud } from "./firestore.js";
 import { mergeNotes } from "./note-sync.js";
+import { requestVerificationEmail, requestPasswordResetEmail } from "./auth-email.js";
 
 const signupFullName = document.getElementById("signupFullName");
 const emailInput = document.getElementById("emailInput");
@@ -32,6 +31,7 @@ const userAvatarInitials = document.getElementById("userAvatarInitials");
 const authModal = document.getElementById("authModal");
 const closeModalBtn = document.getElementById("closeModalBtn");
 let observedAuthUid;
+let signupBusy = false;
 
 
 const profileModal = document.getElementById("profileEditModal");
@@ -399,20 +399,17 @@ resetPasswordBtn?.addEventListener("click", async () => {
 
     try {
         resetPasswordBtn.disabled = true;
-        await sendPasswordResetEmail(auth, email);
-        window.showToast("Password reset link sent. Check your email.", "success");
+        await requestPasswordResetEmail(email);
+        window.showToast("If an eligible account exists, a password reset link will arrive shortly.", "success");
     } catch (error) {
-        if (error.code === "auth/user-not-found") {
-            window.showToast("No account was found for that email address.", "warning");
-        } else {
-            handleAuthError(error);
-        }
+        window.showToast(error?.message || "Could not request a password reset. Please try again.", "warning");
     } finally {
         resetPasswordBtn.disabled = false;
     }
 });
 
 signupBtn.addEventListener("click", async () => {
+    if (signupBusy) return;
     if (signupFullName.hidden) { signupFullName.hidden = false; signupBtn.textContent = "Register with email"; signupFullName.focus(); return; }
     const email = emailInput.value.trim();
     const password = passwordInput.value;
@@ -423,15 +420,30 @@ signupBtn.addEventListener("click", async () => {
         return;
     }
 
+    signupBusy = true;
+    signupBtn.disabled = true;
     try {
         const credential = await createUserWithEmailAndPassword(auth, email, password);
-        await updateProfile(credential.user, { displayName: fullName });
+        try {
+            await updateProfile(credential.user, { displayName: fullName });
+        } catch (error) {
+            console.warn("Account was created, but the display name could not be saved:", error);
+        }
         refreshProfileUI(credential.user);
-        await sendEmailVerification(credential.user);
         showVerificationState(credential.user);
-        window.showToast("Verification email sent. Check your inbox.", "success");
+        try {
+            await requestVerificationEmail(credential.user);
+            window.showToast("Account created. Check your inbox for a verification email.", "success");
+        } catch (error) {
+            const deliveryError = error?.message ? ` ${error.message}` : "";
+            window.showToast(`Your account was created, but the verification email was not sent. Use Resend verification email to try again.${deliveryError}`, "warning");
+            console.warn("Verification email delivery failed after account creation:", error);
+        }
     } catch (error) {
         handleAuthError(error);
+    } finally {
+        signupBusy = false;
+        signupBtn.disabled = false;
     }
 });
 
@@ -495,16 +507,14 @@ resendVerificationBtn.addEventListener("click", async () => {
         return;
     }
 
+    resendVerificationBtn.disabled = true;
     try {
-        await sendEmailVerification(user);
-        window.showToast("Verification email resent. Check your inbox.", "success");
+        await requestVerificationEmail(user);
+        window.showToast("Verification email requested. Check your inbox and spam folder.", "success");
     } catch (error) {
-        if (error.code === "auth/too-many-requests") {
-            window.showToast("Please wait before requesting another email.", "warning");
-            return;
-        }
-
-        handleAuthError(error);
+        window.showToast(error?.message || "Could not request a verification email. Please try again.", "warning");
+    } finally {
+        resendVerificationBtn.disabled = false;
     }
 });
 
@@ -583,7 +593,7 @@ function showVerificationState(user) {
     verificationStatus.hidden = false;
     resendVerificationBtn.hidden = false;
     verificationStatus.textContent =
-        `A verification link was sent to ${user.email}. Open it, then return to SnapNotes.`;
+        "To verify your account, request a verification email below. Check your inbox and spam folder.";
 
     emailInput.focus();
 }
@@ -806,7 +816,7 @@ async function refreshSecurityCenter(forceReload = false) {
     const explanation = document.createElement("small");
     explanation.textContent = google && !password
         ? "Your Google account manages your password and sign-in security. Review it in Google Account settings."
-        : "Keep your email accessible for account recovery. Password reset links are sent by Firebase Authentication.";
+        : "Keep your email accessible for account recovery. Password reset links are delivered through SnapNotes.";
     securitySummary.append(heading, email, verification, explanation);
     securityVerify.hidden = Boolean(user.emailVerified || !user.email);
     securityReset.hidden = !password || !user.email;
@@ -828,10 +838,11 @@ securityVerify?.addEventListener("click", async () => {
     securityVerify.disabled = true;
     securityMessage("Sending verification email…");
     try {
-        await sendEmailVerification(user);
-        securityMessage("Verification email sent. Check your inbox and spam folder.");
+        await requestVerificationEmail(user);
+        securityMessage("Verification email requested. Check your inbox and spam folder.");
     } catch (error) {
-        securityMessage(error.code === "auth/too-many-requests" ? "Too many attempts. Try again later." : "Could not send verification email. Try again later.");
+        securityMessage(error?.message || "Could not request a verification email. Try again later.");
+        window.showToast(error?.message || "Could not request a verification email. Try again later.", "warning");
     } finally { securityBusy = false; securityVerify.disabled = false; }
 });
 securityReset?.addEventListener("click", async () => {
@@ -841,9 +852,10 @@ securityReset?.addEventListener("click", async () => {
     securityReset.disabled = true;
     securityMessage("Sending password reset link…");
     try {
-        await sendPasswordResetEmail(auth, user.email);
-        securityMessage("Password reset link sent. Check your inbox.");
+        await requestPasswordResetEmail(user.email);
+        securityMessage("If an eligible account exists, a password reset link will arrive shortly.");
     } catch (error) {
-        securityMessage(error.code === "auth/too-many-requests" ? "Too many attempts. Try again later." : "Could not send the password reset link.");
+        securityMessage(error?.message || "Could not request a password reset. Try again later.");
+        window.showToast(error?.message || "Could not request a password reset. Try again later.", "warning");
     } finally { securityBusy = false; securityReset.disabled = false; }
 });
