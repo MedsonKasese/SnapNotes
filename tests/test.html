@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><title>SnapNotes automated tests</title></head>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="../styles/main.css">
+  <link rel="stylesheet" href="../styles/styles.css">
+  <title>SnapNotes automated tests</title>
+</head>
 <body>
 <h1>SnapNotes automated tests</h1>
 <pre id="results">Running...</pre>
@@ -9,9 +14,24 @@
 <button id="folderNavViewAll" type="button" aria-controls="folderNavList" aria-expanded="false" hidden></button>
 <p id="folderNavEmpty" hidden></p>
 <div id="folderNavDivider" hidden></div>
+<div id="attachmentRenameDialog" role="dialog" aria-modal="true" aria-labelledby="attachmentRenameTitle" aria-hidden="true" hidden>
+  <section>
+    <h2 id="attachmentRenameTitle">Rename attachment</h2>
+    <form id="attachmentRenameForm">
+      <label for="attachmentRenameInput">File name</label>
+      <input id="attachmentRenameInput" type="text" maxlength="120">
+      <p id="attachmentRenameFeedback" role="status" aria-live="polite"></p>
+      <button id="attachmentRenameCancel" type="button">Cancel</button>
+      <button id="attachmentRenameSave" type="submit">Save</button>
+    </form>
+  </section>
+</div>
 <div id="attachmentViewer" aria-hidden="true" hidden>
-  <section role="dialog" aria-labelledby="attachmentViewerTitle">
+  <section role="dialog" aria-labelledby="attachmentViewerTitle" tabindex="-1">
+    <button id="attachmentViewerClose" type="button">Close</button>
     <h2 id="attachmentViewerTitle"></h2>
+    <button id="attachmentViewerShare" type="button">Share</button>
+    <button id="attachmentViewerDownload" type="button">Download</button>
     <div id="attachmentViewerContent"></div>
   </section>
 </div>
@@ -25,6 +45,7 @@
 <script type="module" src="../js/note-format.js"></script>
 <script type="module">
 import { buildPrivatePayload, lockedPrivateNote } from "../js/private-note-utils.js";
+import { packLibraryPages } from "../js/note-sync.js";
 const results = [];
 function test(name, fn) {
   try { fn(); results.push("PASS  " + name); }
@@ -57,12 +78,30 @@ test("rich-text and one-line AI subtitle markup converts to a safe heading", () 
 
 test("checklist tasks render as accessible, stateful checkbox controls", () => {
   const container = document.createElement("div");
-  container.textContent = "☐ Pending task\n☑ Finished task";
+  container.style.width = "250px";
+  container.textContent = "☐ Pending task with enough words to wrap beneath the activity text\n☑ Finished task";
+  document.body.appendChild(container);
   window.renderInteractiveChecklist(container, "note-1");
   const checkboxes = container.querySelectorAll('[data-checklist-toggle][role="checkbox"]');
   assert(checkboxes.length === 2, "checklist controls were not rendered");
   assert(checkboxes[0].getAttribute("aria-checked") === "false" && checkboxes[0].dataset.checklistIndex === "0", "incomplete item state or index is wrong");
   assert(checkboxes[1].getAttribute("aria-checked") === "true" && container.querySelectorAll(".checklist-item-text.is-complete").length === 1, "completed item styling or state is wrong");
+  assert(container.querySelectorAll(".checklist-item").length === 2 && checkboxes[0].parentElement.classList.contains("checklist-item"), "checkboxes and activity text are not grouped into aligned rows");
+  const row = container.querySelector(".checklist-item");
+  const label = row.querySelector(".checklist-item-text");
+  const checkboxRect = checkboxes[0].getBoundingClientRect();
+  const labelRect = label.getBoundingClientRect();
+  const textRange = document.createRange();
+  textRange.selectNodeContents(label);
+  const textRects = [...textRange.getClientRects()];
+  const lineLefts = [...textRects.reduce((lines, rect) => {
+    const lineTop = Math.round(rect.top);
+    lines.set(lineTop, Math.min(lines.get(lineTop) ?? Infinity, rect.left));
+    return lines;
+  }, new Map()).values()];
+  assert(Math.abs(checkboxRect.top - labelRect.top) < 1, "checkbox and activity label are not aligned on the same row");
+  assert(lineLefts.length >= 2 && lineLefts.every(left => Math.abs(left - lineLefts[0]) < 1), `wrapped activity lines do not share a straight left edge (${lineLefts.join(",")})`);
+  container.remove();
 });
 
 test("attachment limits are defined", () => {
@@ -92,18 +131,139 @@ await testAsync("saved attachment rows expose preview, upload date, rename and r
   assert(container.querySelector('[aria-label="Remove research.pdf"]'), "remove action is missing");
 });
 
-await testAsync("remote PDFs open from a local inline preview URL", async () => {
-  const originalFetch = window.fetch;
-  window.fetch = async () => new Response(new Blob(["%PDF-1.4\nfixture"], { type: "application/pdf" }), { status: 200 });
+await testAsync("attachment rename uses the custom modal and saves synced metadata", async () => {
+  const previousNotes = window.notes;
+  const previousSave = window.saveNotes;
+  const previousRender = window.renderNotes;
+  const previousOpenDetail = window.openNoteDetail;
+  const note = { id: "rename-note", updatedAt: "before", attachments: [{ id: "rename-file", name: "before.pdf" }] };
+  let saved = false;
+  const container = document.createElement("div");
+  document.body.appendChild(container);
   try {
-    await window.openAttachmentViewer({ name: "report.pdf", type: "application/pdf" }, "https://preview.example/report.pdf");
+    window.notes = [note];
+    window.saveNotes = async () => { saved = true; };
+    window.renderNotes = () => {};
+    window.openNoteDetail = () => {};
+    await window.renderNoteAttachments(container, note.attachments, { editable: true, noteId: note.id });
+    const renameButton = container.querySelector('[aria-label="Rename before.pdf"]');
+    renameButton.click();
+    const dialog = document.getElementById("attachmentRenameDialog");
+    const input = document.getElementById("attachmentRenameInput");
+    assert(!dialog.hidden && input.value === "before.pdf", "rename modal did not open with the current name");
+    input.value = "after.pdf";
+    document.getElementById("attachmentRenameForm").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert(saved && note.attachments[0].name === "after.pdf", "renamed metadata was not saved");
+    assert(note.attachments[0].updatedAt && note.updatedAt === note.attachments[0].updatedAt, "attachment and note timestamps were not synchronized");
+    assert(dialog.hidden, "rename modal stayed open after saving");
+  } finally {
+    container.remove();
+    window.notes = previousNotes;
+    window.saveNotes = previousSave;
+    window.renderNotes = previousRender;
+    window.openNoteDetail = previousOpenDetail;
+  }
+});
+
+await testAsync("PDF.js renders pages in-app with paging, zoom, and one-page canvas memory", async () => {
+  const trigger = document.createElement("button");
+  trigger.textContent = "Open attachment";
+  document.body.appendChild(trigger);
+  const originalPdfJs = window.__snapnotesPdfJsForTests;
+  let destroyed = 0;
+  const pdf = {
+    numPages: 2,
+    async getPage() {
+      return {
+        getViewport: ({ scale }) => ({ width: 400 * scale, height: 600 * scale }),
+        render: () => ({ promise: Promise.resolve(), cancel() {} }),
+        cleanup() {}
+      };
+    },
+    async destroy() { destroyed++; }
+  };
+  window.__snapnotesPdfJsForTests = {
+    GlobalWorkerOptions: {},
+    getDocument: () => ({ promise: Promise.resolve(pdf), async destroy() { destroyed++; } })
+  };
+  try {
+    await window.openAttachmentViewer({ name: "report.pdf", type: "application/pdf", size: 1234 }, "https://preview.example/report.pdf", trigger);
     const viewer = document.getElementById("attachmentViewer");
-    const frame = viewer.querySelector("iframe");
     assert(!viewer.hidden, "document viewer did not open");
-    assert(frame?.src.startsWith("blob:"), "remote PDF was not converted to an inline local preview");
+    assert(!viewer.querySelector("iframe"), "PDF preview still relies on a browser iframe");
+    assert(viewer.querySelector(".pdfjs-viewer canvas"), "PDF.js did not render a page canvas");
+    assert(viewer.querySelector(".pdfjs-page-label")?.textContent === "Page 1 of 2", "initial page count is missing");
+    viewer.querySelector('[aria-label="Next PDF page"]').click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert(viewer.querySelector(".pdfjs-page-label")?.textContent === "Page 2 of 2", "next-page navigation did not update the rendered page");
+    viewer.querySelector('[aria-label="Zoom in"]').click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert(viewer.querySelector(".pdfjs-viewer canvas"), "zoom removed the PDF canvas");
+    assert(document.activeElement.id === "attachmentViewerClose", "focus did not enter the viewer");
+  } finally {
+    window.closeAttachmentViewer();
+    window.__snapnotesPdfJsForTests = originalPdfJs;
+    assert(document.activeElement === trigger, "focus was not restored to the attachment control");
+    trigger.remove();
+  }
+});
+
+await testAsync("late text preview responses cannot update a closed viewer", async () => {
+  const originalFetch = window.fetch;
+  let resolveFetch;
+  window.fetch = () => new Promise(resolve => { resolveFetch = resolve; });
+  try {
+    const opening = window.openAttachmentViewer({ name: "notes.txt", type: "text/plain" }, "https://preview.example/notes.txt");
+    window.closeAttachmentViewer();
+    resolveFetch(new Response("stale text"));
+    await opening;
+    assert(document.getElementById("attachmentViewer").hidden, "the closed viewer reopened");
+    assert(!document.getElementById("attachmentViewerContent").textContent.includes("stale text"), "an outdated response repopulated the closed viewer");
   } finally {
     window.closeAttachmentViewer();
     window.fetch = originalFetch;
+  }
+});
+
+test("attachment cleanup detects a second note referencing the same file", () => {
+  const previousNotes = window.notes;
+  const firstAttachment = { id: "shared-id", storagePath: "users/u/attachments/n/shared" };
+  window.notes = [
+    { id: "first", attachments: [firstAttachment] },
+    { id: "second", attachments: [{ id: "another-id", storagePath: firstAttachment.storagePath }] }
+  ];
+  assert(window.attachmentIsReferencedElsewhere(window.notes[0], firstAttachment), "shared cloud object would be deleted while still referenced");
+  window.notes = previousNotes;
+});
+
+await testAsync("removing a shared attachment updates only the chosen note and invokes persistence", async () => {
+  const previousNotes = window.notes;
+  const previousConfirm = window.confirm;
+  const firstAttachment = { id: "shared-id", name: "shared.txt", type: "text/plain", storagePath: "users/u/attachments/n/shared" };
+  const first = { id: "first-note", attachments: [firstAttachment] };
+  const second = { id: "second-note", attachments: [{ ...firstAttachment, id: "copy-id" }] };
+  let persisted = false;
+  let saves = 0;
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  try {
+    window.notes = [first, second];
+    window.confirm = () => true;
+    await window.renderNoteAttachments(container, first.attachments, {
+      removable: true,
+      noteId: first.id,
+      onChange: async () => { saves++; persisted = true; }
+    });
+    container.querySelector('[aria-label="Remove shared.txt"]').click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert(first.attachments.length === 0, "the selected note still contains the removed attachment");
+    assert(second.attachments.length === 1 && second.attachments[0].storagePath === firstAttachment.storagePath, "the referenced cloud object was removed from another note");
+    assert(persisted && saves === 1, "the UI did not invoke its save/sync callback");
+  } finally {
+    container.remove();
+    window.notes = previousNotes;
+    window.confirm = previousConfirm;
   }
 });
 
@@ -182,6 +342,59 @@ test("folder navigation initially shows three folders and View all reveals every
   }
 });
 
+test("selecting a collapsed folder automatically reveals it", () => {
+  const previous = localStorage.getItem("SnapNotesFolders");
+  const previousActiveFolder = window.activeFolderId;
+  try {
+    localStorage.setItem("SnapNotesFolders", JSON.stringify(Array.from({ length: 5 }, (_, index) => ({
+      id: `selected-folder-${index + 1}`, name: `Selected folder ${index + 1}`
+    }))));
+    window.activeFolderId = "selected-folder-5";
+    window.loadFolders();
+    const rows = [...document.querySelectorAll("#folderNavList .folder-nav-row")];
+    assert(rows[4].hidden === false, "the selected folder is still hidden");
+    assert(document.getElementById("folderNavViewAll").getAttribute("aria-expanded") === "true", "expanded state was not exposed");
+  } finally {
+    window.activeFolderId = previousActiveFolder;
+    if (previous === null) localStorage.removeItem("SnapNotesFolders");
+    else localStorage.setItem("SnapNotesFolders", previous);
+    window.loadFolders();
+  }
+});
+
+test("folder appearance changes persist locally and request cloud sync", () => {
+  const previousFolders = localStorage.getItem("SnapNotesFolders");
+  const previousNotes = window.notes;
+  const previousPrompt = window.prompt;
+  const previousSync = window.syncToCloud;
+  const previousPersist = window.persistLocalLibrary;
+  let syncCalls = 0;
+  let savedFolder;
+  const promptValues = ["customize", "book", "blue"];
+  try {
+    localStorage.setItem("SnapNotesFolders", JSON.stringify([{ id: "custom-folder", name: "Research", icon: "folder", color: "" }]));
+    window.notes = [];
+    window.prompt = () => promptValues.shift();
+    window.syncToCloud = () => { syncCalls++; return Promise.resolve(true); };
+    window.persistLocalLibrary = (_id, _notes, folders) => { savedFolder = structuredClone(folders[0]); };
+    window.loadFolders();
+    window.manageFolder("custom-folder");
+    const folder = window.getFolderById("custom-folder");
+    assert(folder.icon === "book" && folder.color === "blue", "folder appearance was not updated");
+    assert(JSON.parse(localStorage.getItem("SnapNotesFolders"))[0].color === "blue", "folder appearance was not written to local storage");
+    assert(savedFolder.icon === "book" && savedFolder.color === "blue", "durable local folder snapshot is missing the appearance");
+    assert(syncCalls === 1, "customization did not request cloud synchronization");
+  } finally {
+    window.notes = previousNotes;
+    window.prompt = previousPrompt;
+    window.syncToCloud = previousSync;
+    window.persistLocalLibrary = previousPersist;
+    if (previousFolders === null) localStorage.removeItem("SnapNotesFolders");
+    else localStorage.setItem("SnapNotesFolders", previousFolders);
+    window.loadFolders();
+  }
+});
+
 test("notes can carry a folder id without changing categories", () => {
   const note = { id: "note-1", category: "work", folderId: "folder-1" };
   assert(note.category === "work" && note.folderId === "folder-1", "folder metadata is invalid");
@@ -200,8 +413,10 @@ test("folder view excludes archived, trashed, private, and unrelated notes", () 
 });
 
 test("folder sync payload keeps folders alongside notes", () => {
-  const payload = { notes: [], folders: [{ id: "f1", name: "Work" }] };
-  assert(Array.isArray(payload.folders) && payload.folders[0].name === "Work", "folder sync payload is invalid");
+  const folder = { id: "f1", name: "Work", icon: "book", color: "blue", updatedAt: "2026-10-17T00:00:00.000Z" };
+  const [page] = packLibraryPages([{ id: "note-1", title: "Linked note", folderId: folder.id }], [folder]);
+  assert(page.notes[0].folderId === folder.id, "note folder assignment was not serialized");
+  assert(page.folders[0].icon === "book" && page.folders[0].color === "blue", "folder appearance settings were not serialized for cloud sync");
 });
 
 test("one-time reminder dates round-trip through local input helpers", () => {

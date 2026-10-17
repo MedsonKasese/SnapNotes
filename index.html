@@ -469,6 +469,21 @@ Then write your notes below..."
 
     <div id="noteDetailModal" class="note-detail-modal" aria-hidden="true"></div>
 
+    <div id="attachmentRenameDialog" class="attachment-rename-overlay" role="dialog" aria-modal="true" aria-labelledby="attachmentRenameTitle" aria-hidden="true" hidden>
+        <section class="attachment-rename-sheet">
+            <h2 id="attachmentRenameTitle">Rename attachment</h2>
+            <form id="attachmentRenameForm">
+                <label for="attachmentRenameInput">File name</label>
+                <input id="attachmentRenameInput" type="text" maxlength="120" autocomplete="off" required>
+                <p id="attachmentRenameFeedback" role="status" aria-live="polite"></p>
+                <div class="attachment-rename-actions">
+                    <button id="attachmentRenameCancel" class="secondary-action" type="button">Cancel</button>
+                    <button id="attachmentRenameSave" class="primary-action" type="submit">Save</button>
+                </div>
+            </form>
+        </section>
+    </div>
+
     <div id="attachmentViewer" class="attachment-viewer" aria-hidden="true" hidden>
         <section class="attachment-viewer-dialog" role="dialog" aria-modal="true" aria-labelledby="attachmentViewerTitle">
             <header class="attachment-viewer-header">

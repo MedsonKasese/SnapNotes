@@ -91,6 +91,9 @@ function renderFolderNavigation() {
     const viewAll = document.getElementById("folderNavViewAll");
     if (!list) return;
 
+    const selectedFolderIndex = folders.findIndex(folder => folder.id === window.activeFolderId);
+    if (!foldersExpanded && selectedFolderIndex >= 3) foldersExpanded = true;
+
     list.innerHTML = "";
     if (!folders.length) {
         if (empty) empty.hidden = false;

@@ -20,6 +20,10 @@ let draftTimer = null;
 const DRAFT_KEY = "SnapNotesDraft";
 let activeDraftId = null;
 let pendingNotificationNoteId = null;
+let cloudStorageRequestId = 0;
+let cloudStorageAbortController = null;
+const cloudStorageUsageCache = new Map();
+const CLOUD_STORAGE_USAGE_CACHE_TTL = 30_000;
 document.addEventListener("DOMContentLoaded", () => {
     handleNotificationNoteFromUrl();
     loadNotes();
@@ -127,7 +131,7 @@ function setupEventListeners() {
 
     settingsBtn.addEventListener("click", openSettings);
     closeSettingsBtn.addEventListener("click", closeSettings);
-    refreshStorageUsageBtn?.addEventListener("click", refreshCloudStorageUsage);
+    refreshStorageUsageBtn?.addEventListener("click", () => refreshCloudStorageUsage({ force: true }));
     signOutSettingsBtn.addEventListener("click", () => document.getElementById("userAvatar").click());
     deleteAccountBtn.addEventListener("click", requestAccountDeletion);
     cancelAccountDeletionBtn.addEventListener("click", cancelScheduledAccountDeletion);
@@ -1220,38 +1224,81 @@ function formatCloudStorageSize(bytes) {
     return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-async function refreshCloudStorageUsage() {
+async function refreshCloudStorageUsage({ force = false } = {}) {
     const value = document.getElementById("cloudStorageUsage");
     const refreshButton = document.getElementById("refreshStorageUsageBtn");
     if (!value) return;
+    const requestId = ++cloudStorageRequestId;
+    cloudStorageAbortController?.abort();
+    cloudStorageAbortController = null;
     const user = window.firebaseAuth?.currentUser;
     if (!user) {
         value.textContent = "Sign in to check usage";
+        value.removeAttribute("title");
+        if (refreshButton) refreshButton.disabled = false;
         return;
     }
 
+    if (force) cloudStorageUsageCache.delete(user.uid);
+    const cached = cloudStorageUsageCache.get(user.uid);
+    if (!force && cached && cached.expiresAt > Date.now()) {
+        value.textContent = formatCloudStorageUsage(cached.usage);
+        value.title = formatCloudStorageUsageDetails(cached.usage);
+        if (refreshButton) refreshButton.disabled = false;
+        return;
+    }
+
+    const controller = new AbortController();
+    cloudStorageAbortController = controller;
     value.textContent = "Checking cloud storage…";
+    value.removeAttribute("title");
     if (refreshButton) refreshButton.disabled = true;
     try {
+        const token = await user.getIdToken();
+        if (requestId !== cloudStorageRequestId || window.firebaseAuth?.currentUser?.uid !== user.uid) return;
         const response = await fetch("/api/storage/usage", {
             method: "POST",
-            headers: { Authorization: `Bearer ${await user.getIdToken()}` }
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ force }),
+            signal: controller.signal
         });
         const result = await response.json().catch(() => ({}));
         if (!response.ok || !Number.isFinite(Number(result.bytes))) {
             throw new Error(result.error || "Storage usage could not be loaded.");
         }
-        const unknownSizeCount = Number(result.unknownSizeCount) || 0;
-        value.textContent = `${unknownSizeCount ? "At least " : ""}${formatCloudStorageSize(result.bytes)} used`;
-        value.title = unknownSizeCount
-            ? `${Number(result.fileCount) || 0} cloud files; ${unknownSizeCount} file size(s) unavailable`
-            : `${Number(result.fileCount) || 0} cloud files`;
+        if (requestId !== cloudStorageRequestId || window.firebaseAuth?.currentUser?.uid !== user.uid) return;
+        const usage = {
+            bytes: Math.max(0, Number(result.bytes) || 0),
+            fileCount: Math.max(0, Number(result.fileCount) || 0),
+            unknownSizeCount: Math.max(0, Number(result.unknownSizeCount) || 0)
+        };
+        cloudStorageUsageCache.set(user.uid, { usage, expiresAt: Date.now() + CLOUD_STORAGE_USAGE_CACHE_TTL });
+        value.textContent = formatCloudStorageUsage(usage);
+        value.title = formatCloudStorageUsageDetails(usage);
     } catch (error) {
+        if (error?.name === "AbortError" || requestId !== cloudStorageRequestId) return;
         value.textContent = "Usage unavailable · Try again";
         value.title = error?.message || "Could not load cloud storage usage.";
     } finally {
-        if (refreshButton) refreshButton.disabled = false;
+        if (requestId === cloudStorageRequestId) {
+            cloudStorageAbortController = null;
+            if (refreshButton) refreshButton.disabled = false;
+        }
     }
+}
+
+function formatCloudStorageUsage(usage) {
+    const unknownSizeCount = Number(usage?.unknownSizeCount) || 0;
+    const fileCount = Number(usage?.fileCount) || 0;
+    return `${unknownSizeCount ? "At least " : ""}${formatCloudStorageSize(usage?.bytes)} used · ${fileCount} ${fileCount === 1 ? "file" : "files"}`;
+}
+
+function formatCloudStorageUsageDetails(usage) {
+    const fileCount = Number(usage?.fileCount) || 0;
+    const unknownSizeCount = Number(usage?.unknownSizeCount) || 0;
+    return unknownSizeCount
+        ? `${fileCount} cloud files; ${unknownSizeCount} file size(s) unavailable`
+        : `${fileCount} cloud files`;
 }
 
 async function refreshAccountDeletionStatus(user = window.firebaseAuth?.currentUser) {

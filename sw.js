@@ -28,7 +28,7 @@ self.addEventListener("notificationclick", event => {
   );
 });
 
-const CACHE_NAME = "snapnotes-v79";
+const CACHE_NAME = "snapnotes-v82";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -41,6 +41,7 @@ const APP_SHELL = [
   "./js/local-library.js",
   "./js/note-deletions.js",
   "./js/attachments.js",
+  "./js/pdf-preview.js",
   "./js/attachment-cleanup.js",
   "./js/folders.js",
   "./js/reminder-utils.js",
@@ -98,6 +99,28 @@ self.addEventListener("fetch", event => {
   if (url.origin === self.location.origin && url.pathname.startsWith("/api/")) return;
 
   if (url.origin !== self.location.origin) {
+    const isPinnedPdfJsAsset =
+      url.origin === "https://cdnjs.cloudflare.com" &&
+      url.pathname.startsWith("/ajax/libs/pdf.js/4.10.38/");
+
+    if (isPinnedPdfJsAsset) {
+      event.respondWith((async () => {
+        const cache = await caches.open(CACHE_NAME);
+        const cached = await cache.match(event.request);
+        if (cached) return cached;
+        const response = await fetch(event.request);
+        if (response.ok && response.status === 200) {
+          await cache.put(event.request, response.clone());
+        }
+        return response;
+      })().catch(async () => {
+        const cached = await caches.match(event.request);
+        if (cached) return cached;
+        return new Response("", { status: 503, statusText: "PDF viewer unavailable offline" });
+      }));
+      return;
+    }
+
     event.respondWith(
       fetch(event.request).catch(() => caches.match(event.request))
     );

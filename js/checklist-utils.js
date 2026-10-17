@@ -50,11 +50,14 @@ export function renderInteractiveChecklist(container, noteId) {
       checkmark.textContent = complete ? "✓" : "";
       button.appendChild(checkmark);
 
+      const row = documentRef.createElement("span");
+      row.className = "checklist-item";
       const label = documentRef.createElement("span");
       label.className = "checklist-item-text";
       if (complete) label.classList.add("is-complete");
-      label.textContent = match[2];
-      fragment.append(button, label);
+      label.textContent = match[2].trimStart();
+      row.append(button, label);
+      fragment.appendChild(row);
       cursor = markerPattern.lastIndex;
     }
 
