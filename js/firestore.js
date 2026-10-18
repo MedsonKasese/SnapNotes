@@ -354,7 +354,12 @@ async function performSync(uid) {
         }
         recoveryBackupByUid.delete(uid);
         await clearPermanentNoteDeletions(uid, [...deletedIds]);
-        if (belongsToCurrentAccount(uid)) clearSyncPending(uid);
+        if (belongsToCurrentAccount(uid)) {
+            clearSyncPending(uid);
+            window.dispatchEvent(new CustomEvent("snapnotes:library-committed", {
+                detail: { uid, revision: stagedRevision, notes }
+            }));
+        }
         return true;
     } catch (error) {
         if (stagedRevision) await removeLibraryRevision(uid, stagedRevision);

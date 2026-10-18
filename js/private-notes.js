@@ -411,6 +411,7 @@ async function establishPrivateSessionWithKey(key, salt) {
     if (attachmentMigrationFailed) {
         window.showToast?.("Some older private attachments could not be fully protected yet. Keep the original files available and reattach them after reviewing their status.", "warning");
     }
+    window.dispatchEvent(new CustomEvent("snapnotes:private-unlocked"));
     window.checkDueReminders?.();
 
     return true;

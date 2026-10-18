@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: snapnotes-background-reminders
+    runtime: node
+    plan: 0.5c-512mb
+    autoDeployTrigger: "off"
+    buildCommand: npm ci
+    startCommand: node backend/reminders/server.mjs
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: APP_ORIGIN
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false

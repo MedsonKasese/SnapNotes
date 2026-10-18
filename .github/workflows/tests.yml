@@ -11,8 +11,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
       - name: Validate JavaScript files
         run: |
+          find backend/reminders -name '*.mjs' -exec node --check {} \;
+          node --check js/background-reminder-config.js
+          node --check js/background-reminder-utils.js
+          node --check js/background-reminders.js
+          node --check sw.js
           node --check js/reminder-utils.js
           node --check js/reminder-controls.js
           node --check js/app.js

@@ -26,7 +26,9 @@ Choose a date and time, then **Repeat** when creating or editing a note. Select 
 
 Repeats retain the selected wall-clock time in the timezone where the schedule was set, including daylight-saving changes. Monthly schedules use the original day and clamp to the last day of shorter months (January 31 → February 28 → March 31). Editing the reminder time resets that schedule's anchor and timezone to the current device.
 
-Reminders are checked every 30 seconds **while SnapNotes is open**, and when returning to the app. Browser timers may be delayed; this is not server push or guaranteed closed-app delivery. After time away, a repeating reminder alerts once and moves to the next future occurrence instead of replaying every missed alert. Private reminders are checked only while Private Notes is unlocked. If browser notifications are unavailable or denied, an in-app alert is shown instead.
+By default, reminders are checked every 30 seconds **while SnapNotes is open**, and when returning to the app. After time away, a repeating reminder alerts once and moves to the next future occurrence instead of replaying every missed alert. Private reminders are checked only while Private Notes is unlocked. If browser notifications are unavailable or denied, an in-app alert is shown instead.
+
+Optional [background reminder hosting](docs/BACKGROUND_REMINDERS.md) adds an authenticated Render service and Web Push receiver for delivery while the PWA is closed. It is **disabled until you configure and deploy the service yourself**, then opt in from Settings. Delivery is best-effort, not an alarm guarantee. Private schedules require separate consent: only reminder times, repeat settings, note IDs, and edit-version metadata are shared; private note contents stay encrypted. All background notifications use generic text, and private foreground OS notifications are generic too.
 
 ## Local development
 
@@ -43,10 +45,11 @@ Then open <http://localhost:8000>. Basic note editing works locally. Firebase si
 Run the automated Node regression suite with:
 
 ```bash
+npm ci
 npm test
 ```
 
-Node.js 20 or newer is required. The Node tests use the built-in test runner; application dependencies are needed when running the API routes in a deployment environment.
+Node.js 22 or newer is required (CI uses Node 22). The Node tests use the built-in test runner; install the locked dependencies before running backend tests or API routes.
 
 ## Deployment configuration
 

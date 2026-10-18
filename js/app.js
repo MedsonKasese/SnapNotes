@@ -1052,12 +1052,14 @@ async function checkDueReminders() {
     if (reminderCheckRunning) return;
     reminderCheckRunning = true;
     try {
+        await window.prepareBackgroundReminderCheck?.();
         const notes = Array.isArray(window.notes) ? window.notes : [];
         const now = Date.now();
         let changed = false;
         for (const note of notes) {
             const readable = window.getReadablePrivateNote?.(note) || note;
             if (note.isPrivate && !window.isPrivateNotesUnlocked?.()) continue;
+            if (window.shouldManageBackgroundReminder?.(readable)) continue;
             if (!readable.reminderAt || readable.reminderNotified || note.deletedAt) continue;
             const due = Date.parse(readable.reminderAt);
             if (Number.isNaN(due) || due > now) continue;
@@ -1091,8 +1093,8 @@ async function showReminderNotification(note) {
     try {
         const registration = await navigator.serviceWorker?.getRegistration?.();
         if (registration?.showNotification) {
-            await registration.showNotification(note.title || "SnapNotes reminder", {
-                body: note.text || "You set a reminder for this note.",
+            await registration.showNotification(note.isPrivate ? "SnapNotes reminder" : (note.title || "SnapNotes reminder"), {
+                body: note.isPrivate ? "You have a private note reminder." : (note.text || "You set a reminder for this note."),
                 icon: "./assets/icons/snapnotes-notification.png",
                 badge: "./assets/icons/snapnotes-notification-badge.png",
                 tag: `snapnotes-reminder-${note.id}`,
