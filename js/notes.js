@@ -257,6 +257,13 @@ function createNoteElement(note) {
         reminder.className = "note-reminder";
         reminder.innerHTML = '<i class="fa-regular fa-bell"></i>';
         reminder.append(document.createTextNode(formatReminder(note.reminderAt)));
+        const repeatLabel = getReminderRepeatLabel(note.reminderRepeat);
+        if (repeatLabel) {
+            const repeat = document.createElement("span");
+            repeat.className = "note-reminder-repeat";
+            repeat.textContent = repeatLabel;
+            reminder.appendChild(repeat);
+        }
         content.appendChild(reminder);
     }
 
@@ -380,6 +387,14 @@ function startEditing(card, note) {
     reminderInput.value = note.reminderAt
         ? (window.formatReminderDateTimeLocal?.(note.reminderAt) || "")
         : "";
+    reminderInput.id = `edit-reminder-${String(note.id).replace(/[^a-zA-Z0-9_-]/g, "")}`;
+    reminderInput.setAttribute("aria-label", "Reminder date and time");
+    const reminderField = document.createElement("label");
+    reminderField.className = "note-detail-reminder-field";
+    const reminderLabel = document.createElement("span");
+    reminderLabel.textContent = "Reminder date and time";
+    reminderField.append(reminderLabel, reminderInput);
+    const repeatControls = window.createReminderRepeatControls?.(reminderInput, note.reminderRepeat || null);
 
     const attachmentEditor = document.createElement("div");
     attachmentEditor.className = "edit-note-attachments";
@@ -395,7 +410,9 @@ function startEditing(card, note) {
     const attachmentList = document.createElement("div");
     attachmentList.className = "note-attachments-list edit-attachments-list";
     attachmentEditor.append(attachmentButton, attachmentInput, attachmentList);
-    metadata.append(tagsInput, reminderInput, attachmentEditor);
+    metadata.append(tagsInput, reminderField);
+    if (repeatControls) metadata.appendChild(repeatControls.element);
+    metadata.appendChild(attachmentEditor);
 
     const editAttachmentFiles = [];
     attachmentButton.addEventListener("click", () => attachmentInput.click());
@@ -488,6 +505,8 @@ function startEditing(card, note) {
             return;
         }
 
+        if (repeatControls && !repeatControls.validate()) return;
+
         const characterCount = `${title ? `## ${title}\n` : ""}${body}`.length;
         if (characterCount > MAX_NOTE_CHARACTERS) {
             showToast(`Note is too long. Keep it under ${MAX_NOTE_CHARACTERS} characters.`, "warning");
@@ -501,16 +520,45 @@ function startEditing(card, note) {
             return;
         }
 
+        const previous = window.notes[noteIndex];
+        const latestReadable = window.getReadablePrivateNote?.(previous) || previous;
+        const originalReminderValue = note.reminderAt
+            ? (window.formatReminderDateTimeLocal?.(note.reminderAt) || "")
+            : "";
+        let reminderAt = window.parseReminderDateTimeLocal?.(reminderInput.value) || null;
+        let reminderRepeat = repeatControls?.read?.() || null;
+        // A reminder tick may advance the live due date while this editor is open.
+        // If the user did not touch the date, retain that newer schedule instead of restoring stale values.
+        if (reminderInput.value === originalReminderValue && latestReadable?.reminderAt
+            && latestReadable.reminderAt !== note.reminderAt) {
+            reminderAt = latestReadable.reminderAt;
+            reminderRepeat = latestReadable.reminderRepeat || null;
+        }
+        if (reminderAt && reminderRepeat && typeof window.normalizeReminderRepeat === "function") {
+            reminderRepeat = window.normalizeReminderRepeat(reminderRepeat, reminderAt);
+        } else if (!reminderAt) {
+            reminderRepeat = null;
+        }
+        const latestReminderAt = latestReadable?.reminderAt || null;
+        const sameReminderTime = (!reminderAt && !latestReminderAt)
+            || (Boolean(reminderAt) && Boolean(latestReminderAt)
+                && Date.parse(reminderAt) === Date.parse(latestReminderAt));
+        const reminderChanged = !sameReminderTime
+            || JSON.stringify(reminderRepeat || null) !== JSON.stringify(latestReadable?.reminderRepeat || null);
+        if (reminderAt) {
+            Promise.resolve().then(() => window.requestReminderPermission?.())
+                .catch(error => console.warn("Could not request reminder permission:", error));
+        }
+
         if (note.isPrivate && typeof window.updatePrivateNote === "function") {
             const updated = await window.updatePrivateNote(note.id, {
                 title,
                 text: body,
                 html,
                 tags: typeof window.parseTags === "function" ? window.parseTags(tagsInput.value) : [],
-                reminderAt: window.parseReminderDateTimeLocal?.(reminderInput.value) || null,
-                reminderNotified: reminderInput.value === (note.reminderAt
-                    ? (window.formatReminderDateTimeLocal?.(note.reminderAt) || "")
-                    : "") ? Boolean(note.reminderNotified) : false
+                reminderAt,
+                reminderRepeat,
+                reminderNotified: reminderChanged ? false : Boolean(latestReadable?.reminderNotified)
             });
 
             if (updated) {
@@ -523,14 +571,9 @@ function startEditing(card, note) {
             return;
         }
 
-        if (reminderInput.value) {
-            await window.requestReminderPermission?.();
-        }
-
         const updatedAt = new Date().toISOString();
 
         recordHistory(note.id);
-        const previous = window.notes[noteIndex];
         previous.versions = typeof window.appendVersion === "function"
             ? window.appendVersion(previous.versions, previous)
             : (previous.versions || []);
@@ -547,10 +590,9 @@ function startEditing(card, note) {
             text: body,
             html,
             tags: typeof window.parseTags === "function" ? window.parseTags(tagsInput.value) : [],
-            reminderAt: window.parseReminderDateTimeLocal?.(reminderInput.value) || null,
-            reminderNotified: reminderInput.value === (note.reminderAt
-                ? (window.formatReminderDateTimeLocal?.(note.reminderAt) || "")
-                : "") ? Boolean(previous.reminderNotified) : false,
+            reminderAt,
+            reminderRepeat,
+            reminderNotified: reminderChanged ? false : Boolean(previous.reminderNotified),
             updatedAt
         };
 
@@ -589,6 +631,18 @@ function formatReminder(value) {
     return formatted;
 }
 
+function getReminderRepeatLabel(repeat) {
+    if (!repeat) return "";
+    if (typeof window.formatReminderRepeat === "function") {
+        return String(window.formatReminderRepeat(repeat) || "");
+    }
+    const units = { daily: "day", weekly: "week", monthly: "month" };
+    const unit = units[repeat.frequency];
+    if (!unit) return "";
+    const interval = Number(repeat.interval) || 1;
+    return interval === 1 ? `Every ${unit}` : `Every ${interval} ${unit}${interval === 1 ? "" : "s"}`;
+}
+
 async function openNoteDetail(id) {
     const rawNote = window.notes.find(item => item.id === id);
     if (!rawNote) return false;
@@ -613,6 +667,7 @@ async function openNoteDetail(id) {
     const privateAttachmentWarning = note.isPrivate && (note.attachments || []).some(attachment => attachment?.encrypted !== true)
         ? '<p class="private-attachment-warning" role="status"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> An older attachment could not be encrypted on this device. Its file may still exist at its original storage location; reattach it or remove it before relying on attachment protection.</p>'
         : "";
+    const reminderRepeatLabel = getReminderRepeatLabel(note.reminderRepeat);
     modal.innerHTML = `
         <div class="note-detail-sheet" role="dialog" aria-modal="true" aria-labelledby="noteDetailTitle">
             <div class="note-detail-heading">
@@ -625,7 +680,7 @@ async function openNoteDetail(id) {
             </div>
             <div class="note-tags">${tags}</div>
             ${privateAttachmentWarning}
-            ${note.reminderAt ? `<div class="note-reminder"><i class="fa-regular fa-bell"></i>${escapeHtml(formatReminder(note.reminderAt))}</div>` : ""}
+            ${note.reminderAt ? `<div class="note-reminder"><i class="fa-regular fa-bell"></i>${escapeHtml(formatReminder(note.reminderAt))}${reminderRepeatLabel ? `<span class="note-reminder-repeat">${escapeHtml(reminderRepeatLabel)}</span>` : ""}</div>` : ""}
             <div class="note-detail-attachments" data-note-attachments></div>
             <div class="note-detail-body">${bodyHtml || "<em>No note body.</em>"}</div>
             <div class="note-detail-actions">
@@ -873,7 +928,10 @@ async function duplicateNote(id) {
         time: new Date(now).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         pinned: false,
         archived: false,
-        deletedAt: null
+        deletedAt: null,
+        reminderAt: null,
+        reminderNotified: false,
+        reminderRepeat: null
     };
 
     window.notes.unshift(duplicate);

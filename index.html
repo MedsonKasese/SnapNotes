@@ -115,12 +115,13 @@ Then write your notes below..."
                     <span><i class="fa-solid fa-tags"></i> Tags</span>
                     <input id="noteTagsInput" type="text" maxlength="200" placeholder="work, ideas, urgent" autocomplete="off">
                 </label>
-                <label class="editor-metadata-field">
-                    <span><i class="fa-regular fa-bell"></i> Reminder</span>
+                <div class="editor-metadata-field">
+                    <label for="noteReminderInput"><span><i class="fa-regular fa-bell"></i> Reminder</span></label>
                     <div class="reminder-input-wrap">
                         <input id="noteReminderInput" type="datetime-local" aria-label="Reminder date and time">
                     </div>
-                </label>
+                    <div id="noteReminderRepeatControls"></div>
+                </div>
             </div>
 
             <div class="editor-attachments">
@@ -616,6 +617,7 @@ Then write your notes below..."
     <script type="module" src="js/note-deletions.js"></script>
     <script src="js/notes.js"></script>
     <script src="js/reminder-utils.js"></script>
+    <script src="js/reminder-controls.js"></script>
     <script src="js/ai-format.js"></script>
     <script type="module" src="js/drafts.js"></script>
     <script type="module" src="js/note-format.js"></script>

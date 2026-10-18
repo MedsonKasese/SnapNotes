@@ -81,6 +81,13 @@ function setupEventListeners() {
     const searchInput = document.getElementById("searchInput");
     const categoryFilter = document.getElementById("categoryFilter");
     const reminderInput = document.getElementById("noteReminderInput");
+    const repeatHost = document.getElementById("noteReminderRepeatControls");
+    if (reminderInput && repeatHost && window.createReminderRepeatControls) {
+        window.composerReminderRepeatControls = window.createReminderRepeatControls(reminderInput);
+        repeatHost.replaceChildren(window.composerReminderRepeatControls.element);
+        repeatHost.addEventListener("change", scheduleDraftSave);
+        repeatHost.addEventListener("input", scheduleDraftSave);
+    }
     const settingsBtn = document.getElementById("settingsBtn");
     const settingsModal = document.getElementById("settingsModal");
     const closeSettingsBtn = document.getElementById("closeSettingsBtn");
@@ -336,6 +343,7 @@ function openNewNoteView() {
     const reminderInput = document.getElementById("noteReminderInput");
     if (tagsInput) tagsInput.value = "";
     if (reminderInput) reminderInput.value = "";
+    window.composerReminderRepeatControls?.set(null);
     document.getElementById("newNoteView").hidden = false;
     document.getElementById("notesView").hidden = true;
     document.getElementById("addBtn").hidden = true;
@@ -575,6 +583,7 @@ function saveDraft() {
             category: selectedEditorCategory,
             tags: parseTags(document.getElementById("noteTagsInput")?.value || ""),
             reminderAt: document.getElementById("noteReminderInput")?.value || "",
+            reminderRepeat: window.composerReminderRepeatControls?.read() || null,
             savedAt: new Date().toISOString()
         });
         activeDraftId = draft.id;
@@ -681,6 +690,7 @@ function openDraft(id) {
     const reminderInput = document.getElementById("noteReminderInput");
     if (tagsInput) tagsInput.value = Array.isArray(draft.tags) ? draft.tags.join(", ") : "";
     if (reminderInput) reminderInput.value = draft.reminderAt ? String(draft.reminderAt).slice(0, 16) : "";
+    window.composerReminderRepeatControls?.set(draft.reminderRepeat || null);
 
     if (activeView === "private") window.schedulePrivateLockOnLeave?.();
     activeView = "all";
@@ -773,6 +783,7 @@ async function saveEditorNote() {
         hour12: true
     });
 
+    if (window.composerReminderRepeatControls && !window.composerReminderRepeatControls.validate()) return;
     const newNote = {
         id: crypto.randomUUID(),
         title,
@@ -781,6 +792,8 @@ async function saveEditorNote() {
         category: selectedEditorCategory,
         tags: parseTags(document.getElementById("noteTagsInput")?.value || ""),
         reminderAt: window.parseReminderDateTimeLocal?.(document.getElementById("noteReminderInput")?.value) || null,
+        reminderRepeat: window.composerReminderRepeatControls?.read() || null,
+        reminderNotified: false,
         folderId: window.activeFolderId || null,
         versions: [],
         attachments: [],
@@ -801,7 +814,8 @@ async function saveEditorNote() {
     }
 
     window.notes.unshift(newNote);
-    if (newNote.reminderAt) await requestReminderPermission();
+    // Permission prompts may remain pending; never block local note persistence.
+    if (newNote.reminderAt) requestReminderPermission().catch(error => console.warn("Could not request reminder permission:", error));
     window.recordNoteCreation?.(newNote);
     const saveResult = await saveNotes();
     window.retryPendingAttachmentUploads?.();
@@ -813,6 +827,7 @@ async function saveEditorNote() {
     const reminderInput = document.getElementById("noteReminderInput");
     if (tagsInput) tagsInput.value = "";
     if (reminderInput) reminderInput.value = "";
+    window.composerReminderRepeatControls?.set(null);
     renderNotes("", activeCategory);
     updateNavigationCounts();
     window.renderFolderNavigation?.();
@@ -977,6 +992,8 @@ async function importNotes(event) {
                 pinned: Boolean(note.pinned),
                 tags: typeof window.parseTags === "function" ? window.parseTags(Array.isArray(note.tags) ? note.tags.join(",") : String(note.tags || "")) : [],
                 reminderAt: note.reminderAt || null,
+                reminderRepeat: window.normalizeReminderRepeat?.(note.reminderRepeat, note.reminderAt) || null,
+                reminderNotified: Boolean(note.reminderNotified),
                 archived: Boolean(note.archived),
                 deletedAt: note.deletedAt || null,
                 isPrivate: Boolean(note.isPrivate && note.privateData),
@@ -1020,51 +1037,59 @@ function parseTags(value) {
     return [...new Set(String(value || "").split(",").map(tag => tag.trim().toLowerCase().replace(/^#/, "")).filter(Boolean))].slice(0, 10);
 }
 
+let reminderCheckRunning = false;
 function setupReminderChecks() {
     clearInterval(window.snapNotesReminderTimer);
     window.snapNotesReminderTimer = setInterval(checkDueReminders, 30000);
+    // Browser timers may be suspended in the background. Catch up once on return.
+    window.addEventListener("focus", checkDueReminders);
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") checkDueReminders();
+    });
     checkDueReminders();
 }
-
 async function checkDueReminders() {
-    const notes = Array.isArray(window.notes) ? window.notes : [];
-    const now = Date.now();
-    let changed = false;
-
-    for (const note of notes) {
-        const readable = window.getReadablePrivateNote?.(note) || note;
-        if (note.isPrivate && !window.isPrivateNotesUnlocked?.()) continue;
-        if (!readable.reminderAt || readable.reminderNotified || note.deletedAt) continue;
-        const due = Date.parse(readable.reminderAt);
-        if (Number.isNaN(due) || due > now) continue;
-
-        if ("Notification" in window && Notification.permission === "granted") {
-            const shown = await showReminderNotification(readable);
-            if (!shown) showToast(`Reminder: ${readable.title || "Untitled note"}`, "update");
-        } else {
-            showToast(`Reminder: ${readable.title || "Untitled note"}`, "update");
-        }
-        if (note.isPrivate) {
-            try {
-                changed = Boolean(await window.markPrivateReminderNotified?.(note.id)) || changed;
-            } catch (error) {
-                console.warn("Could not update encrypted private reminder state:", error);
+    if (reminderCheckRunning) return;
+    reminderCheckRunning = true;
+    try {
+        const notes = Array.isArray(window.notes) ? window.notes : [];
+        const now = Date.now();
+        let changed = false;
+        for (const note of notes) {
+            const readable = window.getReadablePrivateNote?.(note) || note;
+            if (note.isPrivate && !window.isPrivateNotesUnlocked?.()) continue;
+            if (!readable.reminderAt || readable.reminderNotified || note.deletedAt) continue;
+            const due = Date.parse(readable.reminderAt);
+            if (Number.isNaN(due) || due > now) continue;
+            const completion = window.getReminderCompletionState(readable, now);
+            if ("Notification" in window && Notification.permission === "granted") {
+                const shown = await showReminderNotification(readable);
+                if (!shown) showToast(`Reminder: ${readable.title || "Untitled note"}`, "update");
+            } else {
+                showToast(`Reminder: ${readable.title || "Untitled note"}`, "update");
             }
-        } else {
-            note.reminderNotified = true;
-            changed = true;
+            if (note.isPrivate) {
+                try {
+                    changed = Boolean(await window.markPrivateReminderNotified?.(note.id, completion)) || changed;
+                } catch (error) {
+                    console.warn("Could not update encrypted private reminder state:", error);
+                }
+            } else {
+                Object.assign(note, completion, { updatedAt: new Date().toISOString() });
+                changed = true;
+            }
         }
-    }
-
-    if (changed) {
-        await saveNotes();
-        renderNotes();
+        if (changed) {
+            await saveNotes();
+            renderNotes();
+        }
+    } finally {
+        reminderCheckRunning = false;
     }
 }
-
 async function showReminderNotification(note) {
     try {
-        const registration = await navigator.serviceWorker?.ready;
+        const registration = await navigator.serviceWorker?.getRegistration?.();
         if (registration?.showNotification) {
             await registration.showNotification(note.title || "SnapNotes reminder", {
                 body: note.text || "You set a reminder for this note.",
