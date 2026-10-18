@@ -81,7 +81,7 @@
         const help = document.createElement("p");
         help.id = `${id}-help`;
         help.className = "reminder-repeat-help";
-        help.textContent = "Reminders are checked while SnapNotes is open. Overdue repeats show once, then resume their schedule. Private-note reminders are checked only while Private Notes is unlocked.";
+        help.textContent = "Reminders work while SnapNotes is open. Enable background reminders in Settings for delivery while closed. Overdue repeats show once, then resume their schedule. Private reminders require unlocking, or explicit private schedule sharing for background delivery.";
         frequency.setAttribute("aria-describedby", help.id);
         element.append(repeatLabel, custom, help);
 

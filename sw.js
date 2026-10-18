@@ -1,3 +1,20 @@
+// Push payloads are metadata only. Ignore any supplied title/body/URL so even a
+// malformed payload can never expose private note contents or navigate off-site.
+self.addEventListener("push", event => {
+  event.waitUntil((async () => {
+    let payload;
+    try { payload = event.data?.json(); } catch { return; }
+    const noteId = payload?.data?.noteId;
+    if (typeof noteId !== "string" || !noteId || noteId.length > 256) return;
+    await self.registration.showNotification("SnapNotes reminder", {
+      body: "You have a note reminder. Open SnapNotes to view it.",
+      icon: "./assets/icons/snapnotes-notification.png",
+      badge: "./assets/icons/snapnotes-notification-badge.png",
+      tag: `snapnotes-reminder-${noteId}`,
+      data: { noteId }
+    });
+  })());
+});
 
 self.addEventListener("notificationclick", event => {
   const noteId = event.notification?.data?.noteId;
@@ -28,7 +45,7 @@ self.addEventListener("notificationclick", event => {
   );
 });
 
-const CACHE_NAME = "snapnotes-v86";
+const CACHE_NAME = "snapnotes-v87";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -46,6 +63,9 @@ const APP_SHELL = [
   "./js/folders.js",
   "./js/reminder-utils.js",
   "./js/reminder-controls.js",
+  "./js/background-reminder-config.js",
+  "./js/background-reminder-utils.js",
+  "./js/background-reminders.js",
   "./js/ai-format.js",
   "./js/drafts.js",
   "./js/note-format.js",

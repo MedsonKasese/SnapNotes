@@ -397,6 +397,23 @@ Then write your notes below..."
                 </label>
             </section>
 
+            <section class="settings-section" aria-labelledby="backgroundRemindersTitle">
+                <div class="settings-section-heading">
+                    <div>
+                        <p class="settings-section-title" id="backgroundRemindersTitle">Background reminders</p>
+                        <p class="settings-section-description">Receive generic notifications when SnapNotes is closed. Requires sign-in, cloud sync, notification permission, and a configured reminder service.</p>
+                    </div>
+                </div>
+                <p id="backgroundReminderStatus" role="status" aria-live="polite">Checking background reminder setup…</p>
+                <label class="settings-option" for="backgroundPrivateReminders">
+                    <span>Share Private Notes reminder times and repeat settings with the reminder service. Note contents stay encrypted.</span>
+                    <input type="checkbox" id="backgroundPrivateReminders" disabled>
+                </label>
+                <p class="settings-section-description">Private schedules are shared only after you opt in and unlock Private Notes. Turning this off removes current private background schedules for this account; other devices with sharing enabled can publish them again. Disable below to stop all background reminders on all devices. Signing out only disconnects this device.</p>
+                <button id="enableBackgroundReminders" type="button" class="secondary-auth" disabled>Enable on this device</button>
+                <button id="disableBackgroundReminders" type="button" class="secondary-auth" disabled>Disable on all devices</button>
+            </section>
+
             <section class="settings-section settings-info-section" aria-labelledby="aboutTitle">
                 <div class="settings-section-heading">
                     <div>
@@ -625,6 +642,7 @@ Then write your notes below..."
     <script type="module" src="js/firestore.js"></script>
     <script type="module" src="js/auth.js"></script>
     <script type="module" src="js/settings-account.js"></script>
+    <script type="module" src="js/background-reminders.js"></script>
     <script src="js/app.js"></script>
     <script src="js/ai.js"></script>
     <script src="js/sync-center.js"></script>
