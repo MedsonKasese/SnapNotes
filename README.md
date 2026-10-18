@@ -12,13 +12,21 @@ SnapNotes is a vanilla HTML, CSS, and JavaScript note-taking app for capturing a
 |---|---|
 | Notes and formatting | Create and edit notes with formatted text; each note is limited to **1,500 characters**. |
 | Search and organization | Search notes, filter by category, tags, pinned state, archive, Trash, and folders. |
-| Reminders | Set one-time reminders, with browser/service-worker notifications where supported. |
+| Reminders | Set one-time, daily, weekly, monthly, or custom-interval reminders, with browser/service-worker notifications where supported. |
 | Private Notes | Encrypt note content and metadata with a passphrase-derived AES-GCM key. Supported attachments are encrypted on-device before storage; legacy files that cannot be migrated are flagged for re-attachment. Lock immediately, after 1 or 5 minutes, or when the app closes; supported devices can also unlock locally with a passkey or biometric. |
 | Attachments | Store supported images, PDFs, and text files locally first; signed-in users can sync them through private Supabase Storage. Private-note attachment bytes are encrypted on-device during migration and before sync. |
 | Cloud sync | Sync notes and folders across signed-in devices. The library is written in bounded Firestore pages rather than one unbounded account document. |
 | Ask My Notes | Search eligible regular notes with the configured Gemini API; private, archived, trashed, and conflict-copy notes are excluded. Answers include links to their source notes. |
 | Account security | Edit account profile details, schedule account deletion with a 10-day cancellation window, and manage sign-in security. |
 | Local-first use | Notes are saved locally first, mirrored to IndexedDB and localStorage, and queued for cloud sync when offline. The app requests persistent browser storage where supported, while keeping a localStorage fallback. |
+
+## Repeating reminders
+
+Choose a date and time, then **Repeat** when creating or editing a note. Select **Every day**, **Every week**, **Every month**, or **Custom** (every 1–365 days, weeks, or months). **Does not repeat** keeps the existing one-time behavior. Clear the reminder date to remove the reminder and its repeat rule.
+
+Repeats retain the selected wall-clock time in the timezone where the schedule was set, including daylight-saving changes. Monthly schedules use the original day and clamp to the last day of shorter months (January 31 → February 28 → March 31). Editing the reminder time resets that schedule's anchor and timezone to the current device.
+
+Reminders are checked every 30 seconds **while SnapNotes is open**, and when returning to the app. Browser timers may be delayed; this is not server push or guaranteed closed-app delivery. After time away, a repeating reminder alerts once and moves to the next future occurrence instead of replaying every missed alert. Private reminders are checked only while Private Notes is unlocked. If browser notifications are unavailable or denied, an in-app alert is shown instead.
 
 ## Local development
 

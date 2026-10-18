@@ -13,6 +13,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate JavaScript files
         run: |
+          node --check js/reminder-utils.js
+          node --check js/reminder-controls.js
           node --check js/app.js
           node --check js/notes.js
           node --check js/drafts.js
