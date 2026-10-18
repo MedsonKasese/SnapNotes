@@ -330,6 +330,7 @@ async function establishPrivateSessionWithKey(key, salt) {
             time: Object.hasOwn(decrypted, "time") ? decrypted.time : (note.time || ""),
             reminderAt: Object.hasOwn(decrypted, "reminderAt") ? decrypted.reminderAt : (note.reminderAt || null),
             reminderNotified: Object.hasOwn(decrypted, "reminderNotified") ? Boolean(decrypted.reminderNotified) : Boolean(note.reminderNotified),
+            reminderRepeat: Object.hasOwn(decrypted, "reminderRepeat") ? structuredClone(decrypted.reminderRepeat || null) : structuredClone(note.reminderRepeat || null),
             folderId: Object.hasOwn(decrypted, "folderId") ? (decrypted.folderId || null) : (note.folderId || null),
             attachments: Array.isArray(decrypted.attachments)
                 ? structuredClone(decrypted.attachments)
@@ -546,6 +547,9 @@ async function updatePrivateNote(id, updates) {
             folderId: current?.folderId || null,
             reminderAt: updates.reminderAt || null,
             reminderNotified: Boolean(updates.reminderNotified),
+            reminderRepeat: Object.hasOwn(updates, "reminderRepeat")
+                ? structuredClone(updates.reminderRepeat || null)
+                : structuredClone(current?.reminderRepeat || null),
             attachments: Array.isArray(updates.attachments) ? structuredClone(updates.attachments) : (current?.attachments || []),
             history: typeof window.appendVersion === "function"
                 ? window.appendVersion(current?.history, current || {})
@@ -594,6 +598,7 @@ async function moveNoteFromPrivate(id) {
             attachments: conversion.attachments,
             reminderAt: payload.reminderAt || null,
             reminderNotified: Boolean(payload.reminderNotified),
+            reminderRepeat: structuredClone(payload.reminderRepeat || null),
             time: payload.time || note.time || "",
             versions: Array.isArray(payload.history) ? structuredClone(payload.history) : [],
             isPrivate: false,
@@ -666,6 +671,7 @@ async function restorePrivateNoteVersion(id, version) {
             attachments: Array.isArray(version.attachments) ? structuredClone(version.attachments) : (current.attachments || []),
             reminderAt: version.reminderAt || null,
             reminderNotified: Boolean(version.reminderNotified),
+            reminderRepeat: structuredClone(version.reminderRepeat || null),
             history
         };
 
@@ -707,7 +713,13 @@ async function duplicatePrivateNote(id) {
         showToast(error?.message || "Could not duplicate this private note.", "warning");
         return false;
     }
-    const duplicatePayload = { ...structuredClone(payload), attachments: duplicateAttachments };
+    const duplicatePayload = {
+        ...structuredClone(payload),
+        attachments: duplicateAttachments,
+        reminderAt: null,
+        reminderNotified: false,
+        reminderRepeat: null
+    };
     const now = new Date().toISOString();
     const duplicate = {
         ...structuredClone(source),
@@ -719,6 +731,7 @@ async function duplicatePrivateNote(id) {
         tags: [],
         reminderAt: null,
         reminderNotified: false,
+        reminderRepeat: null,
         time: "Private note",
         createdAt: now,
         updatedAt: now,
@@ -756,11 +769,17 @@ async function savePrivateAttachmentMetadata(id, attachments) {
     return true;
 }
 
-async function markPrivateReminderNotified(id) {
+async function markPrivateReminderNotified(id, completionState = { reminderNotified: true }) {
     const note = window.notes.find(item => item.id === id);
     const current = privateUnlockCache.get(id);
     if (!note?.isPrivate || !current || !privateKey || !privateSalt) return false;
-    const payload = { ...current, reminderNotified: true };
+    const payload = {
+        ...current,
+        ...completionState,
+        reminderRepeat: Object.hasOwn(completionState || {}, "reminderRepeat")
+            ? structuredClone(completionState.reminderRepeat || null)
+            : structuredClone(current.reminderRepeat || null)
+    };
     note.privateData = await encryptPrivatePayload(payload, privateKey, privateSalt);
     stripPrivateMetadata(note);
     note.updatedAt = new Date().toISOString();

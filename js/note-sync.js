@@ -101,6 +101,7 @@ function currentVersionSnapshot(note) {
         tags: Array.isArray(note?.tags) ? [...note.tags] : [],
         reminderAt: note?.reminderAt || null,
         reminderNotified: Boolean(note?.reminderNotified),
+        reminderRepeat: structuredClone(note?.reminderRepeat || null),
         time: String(note?.time || ""),
         savedAt: note?.updatedAt || note?.createdAt || ""
     };

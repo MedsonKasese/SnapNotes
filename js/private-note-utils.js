@@ -9,6 +9,7 @@ export function buildPrivatePayload(note = {}) {
         folderId: note.folderId || null,
         reminderAt: note.reminderAt || null,
         reminderNotified: Boolean(note.reminderNotified),
+        reminderRepeat: structuredClone(note.reminderRepeat || null),
         attachments: Array.isArray(note.attachments) ? structuredClone(note.attachments) : [],
         history: Array.isArray(note.history)
             ? structuredClone(note.history)
@@ -27,6 +28,7 @@ export function lockedPrivateNote(note) {
         folderId: null,
         reminderAt: null,
         reminderNotified: false,
+        reminderRepeat: null,
         attachments: [],
         versions: [],
         history: [],
@@ -46,7 +48,7 @@ export function privateNoteMetadataNeedsMigration(note) {
         (Array.isArray(note.history) && note.history.length) ||
         (note.time && note.time !== "Private note" && note.time !== "Locked") ||
         (Array.isArray(note.attachments) && note.attachments.length) ||
-        note.reminderAt || note.reminderNotified || note.folderId
+        note.reminderAt || note.reminderNotified || note.reminderRepeat || note.folderId
     );
 }
 
@@ -63,5 +65,6 @@ export function stripPrivateMetadata(note) {
     delete note.folderId;
     note.reminderAt = null;
     note.reminderNotified = false;
+    note.reminderRepeat = null;
     return note;
 }
