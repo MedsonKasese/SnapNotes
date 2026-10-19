@@ -65,6 +65,7 @@ const APP_SHELL = [
   "./js/firebaseConfig.js",
   "./js/firestore.js",
   "./js/auth.js",
+  "./js/auth-email.js",
   "./assets/icons/snapnotes-icon.png",
   "./assets/icons/snapnotes-notification.png",
   "./assets/icons/snapnotes-notification-badge.png"

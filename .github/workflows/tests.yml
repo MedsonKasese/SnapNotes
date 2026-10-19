@@ -23,6 +23,9 @@ jobs:
           node --check js/local-library.js
           node --check js/note-deletions.js
           node --check js/auth.js
+          node --check js/auth-email.js
+          node --check lib/auth-email.js
+          node --check api/auth/email.js
           node --check lib/supabase-storage.js
           node --check api/storage/sign-upload.js
           node --check api/storage/complete-upload.js

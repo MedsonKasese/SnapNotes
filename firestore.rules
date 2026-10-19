@@ -35,5 +35,9 @@ service cloud.firestore {
       allow get: if isOwner(uid);
       allow list, create, update, delete: if false;
     }
+    // Authentication email quotas are written only by the Admin SDK.
+    match /authEmailRateLimits/{counterId} {
+      allow read, write: if false;
+    }
   }
 }
