@@ -4,6 +4,7 @@
 
 import { enqueueAndProcessAttachmentCleanup, processAttachmentCleanupQueue, enqueueAttachmentCleanup, cancelQueuedAttachmentCleanup } from "./attachment-cleanup.js";
 import { renderPdfPreview, disposePdfPreview } from "./pdf-preview.js";
+import { canRetryAttachmentUploads, isAttachmentOwnedByUser } from "./attachment-ownership.js";
 
 const ATTACHMENT_DB = "SnapNotesAttachments";
 const ATTACHMENT_STORE = "files";
@@ -46,8 +47,6 @@ function updateAttachmentAccess() {
 
 window.addEventListener("snapnotes:auth-changed", () => {
     updateAttachmentAccess();
-    retryPendingAttachmentUploads();
-    retryPendingAttachmentCleanup();
 });
 window.addEventListener("online", retryPendingAttachmentUploads);
 window.addEventListener("online", retryPendingAttachmentCleanup);
@@ -157,16 +156,21 @@ async function putAttachmentFile(id, file) {
     });
 }
 
-async function getAttachmentFile(id) {
+async function getAttachmentFileRecord(id) {
     const db = await openAttachmentDb();
     return new Promise((resolve, reject) => {
         const tx = db.transaction(ATTACHMENT_STORE, "readonly");
         const request = tx.objectStore(ATTACHMENT_STORE).get(id);
-        request.onsuccess = () => resolve(request.result?.blob || null);
+        request.onsuccess = () => resolve(request.result || null);
         request.onerror = () => reject(request.error);
         tx.oncomplete = () => db.close();
         tx.onerror = () => { db.close(); reject(tx.error); };
     });
+}
+
+async function getAttachmentFile(id) {
+    const record = await getAttachmentFileRecord(id);
+    return record?.blob || null;
 }
 
 async function deleteAttachmentFile(id) {
@@ -374,9 +378,12 @@ function renderPendingAttachments() {
     });
 }
 
-async function storageApi(path, body) {
+async function storageApi(path, body, expectedUid = null) {
     const user = window.firebaseAuth?.currentUser;
     if (!user) throw new Error("Sign in to sync files.");
+    if (expectedUid && (user.uid !== expectedUid || !canRetryAttachmentUploads(window.snapNotesDataUid, expectedUid))) {
+        throw new Error("The signed-in account or active library changed before the attachment upload started.");
+    }
     const response = await fetch("/api/storage/" + path, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + await user.getIdToken() },
@@ -387,20 +394,36 @@ async function storageApi(path, body) {
     return result;
 }
 
-async function uploadAttachmentToCloud(noteId, attachment, file) {
+async function uploadAttachmentToCloud(noteId, attachment, file, expectedUid) {
     if (!navigator.onLine) throw new Error("Offline. The attachment is saved on this device.");
+    if (!expectedUid || window.firebaseAuth?.currentUser?.uid !== expectedUid ||
+        !canRetryAttachmentUploads(window.snapNotesDataUid, expectedUid)) {
+        throw new Error("The signed-in account changed before the attachment upload started.");
+    }
     const signed = await storageApi("sign-upload", {
         purpose: "attachment", noteId: String(noteId), attachmentId: String(attachment.id),
         contentType: file.type, size: file.size
-    });
+    }, expectedUid);
+    if (window.firebaseAuth?.currentUser?.uid !== expectedUid ||
+        !canRetryAttachmentUploads(window.snapNotesDataUid, expectedUid)) {
+        throw new Error("The signed-in account changed before the attachment upload started.");
+    }
     const uploaded = await fetch(signed.uploadUrl, {
         method: "PUT", headers: { "Content-Type": file.type, "x-upsert": "false" }, body: file
     });
     if (!uploaded.ok) throw new Error("Upload failed (HTTP " + uploaded.status + ").");
+    if (window.firebaseAuth?.currentUser?.uid !== expectedUid ||
+        !canRetryAttachmentUploads(window.snapNotesDataUid, expectedUid)) {
+        throw new Error("The signed-in account changed before the attachment upload could be completed.");
+    }
     await storageApi("complete-upload", {
         purpose: "attachment", objectKey: signed.objectKey,
         expectedSize: file.size, contentType: file.type
-    });
+    }, expectedUid);
+    if (window.firebaseAuth?.currentUser?.uid !== expectedUid ||
+        !canRetryAttachmentUploads(window.snapNotesDataUid, expectedUid)) {
+        throw new Error("The signed-in account or active library changed before attachment metadata could be updated.");
+    }
     attachment.storageProvider = "supabase";
     attachment.storagePath = signed.objectKey;
     attachment.downloadUrl = null; // Signed URLs expire; never store them in Firestore.
@@ -599,8 +622,12 @@ async function retryPendingAttachmentUploads(options = {}) {
     if (!navigator.onLine) {
         return { uploadedCount: 0, failedCount: 0, offline: true, uploadedIds: [] };
     }
-    if (!isAttachmentUserSignedIn()) {
+    const currentUid = window.firebaseAuth?.currentUser?.uid;
+    if (!currentUid) {
         return { uploadedCount: 0, failedCount: 0, signedOut: true, uploadedIds: [] };
+    }
+    if (!canRetryAttachmentUploads(window.snapNotesDataUid, currentUid)) {
+        return { uploadedCount: 0, failedCount: 0, localLibrary: true, uploadedIds: [] };
     }
     if (!Array.isArray(window.notes) || !window.notes.length) {
         return { uploadedCount: 0, failedCount: 0, uploadedIds: [] };
@@ -624,7 +651,9 @@ async function retryPendingAttachmentUploads(options = {}) {
 
                 let file;
                 try {
-                    file = await getAttachmentFile(attachment.id);
+                    const record = await getAttachmentFileRecord(attachment.id);
+                    if (!isAttachmentOwnedByUser(record?.uid, currentUid)) continue;
+                    file = record?.blob || null;
                 } catch (error) {
                     attachment.uploadStatus = "pending";
                     attachment.uploadError = getAttachmentUploadErrorMessage(error);
@@ -638,7 +667,7 @@ async function retryPendingAttachmentUploads(options = {}) {
                 if (!file) continue;
 
                 try {
-                    await uploadAttachmentToCloud(note.id, attachment, file);
+                    await uploadAttachmentToCloud(note.id, attachment, file, currentUid);
                     changed = true;
                     uploadedCount++;
                     uploadedIds.push(attachment.id);

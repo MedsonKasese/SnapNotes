@@ -45,7 +45,13 @@ function normaliseFolder(folder) {
 function loadFolders() {
     foldersExpanded = false;
     try {
-        const saved = JSON.parse(localStorage.getItem(FOLDERS_KEY) || "[]");
+        const activeLibraryUid = window.snapNotesDataUid !== undefined
+            ? window.snapNotesDataUid || "local"
+            : window.firebaseAuth?.currentUser?.uid || "local";
+        const rootLibraryUid = localStorage.getItem("SnapNotesRootLibraryUid");
+        const saved = rootLibraryUid !== null && rootLibraryUid !== activeLibraryUid
+            ? []
+            : JSON.parse(localStorage.getItem(FOLDERS_KEY) || "[]");
         folders = Array.isArray(saved) ? saved.map(normaliseFolder).filter(Boolean).slice(0, MAX_FOLDERS) : [];
     } catch {
         folders = [];
@@ -54,11 +60,24 @@ function loadFolders() {
     return folders;
 }
 
+function setFoldersInMemory(nextFolders) {
+    foldersExpanded = false;
+    folders = Array.isArray(nextFolders)
+        ? nextFolders.map(normaliseFolder).filter(Boolean).slice(0, MAX_FOLDERS)
+        : [];
+    renderFolderNavigation();
+    return folders;
+}
+
 function saveFolders() {
-    localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders));
     const libraryId = window.snapNotesDataUid !== undefined
         ? window.snapNotesDataUid || "local"
         : window.firebaseAuth?.currentUser?.uid || "local";
+    let rootLibraryUid = null;
+    try { rootLibraryUid = localStorage.getItem("SnapNotesRootLibraryUid"); } catch {}
+    if (rootLibraryUid === null || rootLibraryUid === libraryId) {
+        try { localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders)); } catch {}
+    }
     void window.persistLocalLibrary?.(
         libraryId,
         Array.isArray(window.notes) ? window.notes : [],
@@ -335,6 +354,7 @@ function clearFolderAssignments(folderId) {
 
 window.loadFolders = loadFolders;
 window.getFolders = getFolders;
+window.setFoldersInMemory = setFoldersInMemory;
 window.getFolderById = getFolderById;
 window.createFolder = createFolder;
 window.renameFolder = renameFolder;
