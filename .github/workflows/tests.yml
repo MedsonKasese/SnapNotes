@@ -23,6 +23,10 @@ jobs:
           node --check js/local-library.js
           node --check js/note-deletions.js
           node --check js/auth.js
+          node --check js/auth-transition-guard.js
+          node --check js/cloud-sync-guard.js
+          node --check js/attachment-ownership.js
+          node --check js/sync-center.js
           node --check lib/supabase-storage.js
           node --check api/storage/sign-upload.js
           node --check api/storage/complete-upload.js

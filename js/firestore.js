@@ -10,6 +10,7 @@ import {
     setDoc
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 import { createCloudSessionGuard } from "./cloud-session.js";
+import { isLibraryBoundToUser, shouldSyncPendingChanges } from "./cloud-sync-guard.js";
 import { isLibraryRevisionComplete, mergeNotes, noteSignature, noteTimestamp, packLibraryPages } from "./note-sync.js";
 import { clearPermanentNoteDeletions, readPermanentNoteDeletions } from "./note-deletions.js";
 import { privateNoteMetadataNeedsMigration } from "./private-note-utils.js";
@@ -65,7 +66,7 @@ function clearSyncPending(uid) {
 
 function belongsToCurrentAccount(uid) {
     return Boolean(uid && auth?.currentUser?.uid === uid &&
-        (window.snapNotesDataUid === undefined || window.snapNotesDataUid === uid));
+        isLibraryBoundToUser(window.snapNotesDataUid, uid));
 }
 
 function isCurrentLoad(snapshot) {
@@ -623,12 +624,20 @@ export async function cancelAccountDeletion(uid) {
 
 async function syncPendingChanges() {
     const uid = auth?.currentUser?.uid;
-    if (!uid || !navigator.onLine || !belongsToCurrentAccount(uid)) return;
-    if (localStorage.getItem(pendingKey(uid)) !== "true" && localStorage.getItem(PENDING_KEY) !== "true") return;
+    const pending = localStorage.getItem(pendingKey(uid)) === "true" || localStorage.getItem(PENDING_KEY) === "true";
+    if (!shouldSyncPendingChanges({
+        uid,
+        authUid: auth?.currentUser?.uid,
+        activeLibraryUid: window.snapNotesDataUid,
+        online: navigator.onLine,
+        pending
+    })) return;
     await syncToCloud(uid);
 }
 
 window.syncToCloud = syncToCloud;
+window.loadFromCloud = loadFromCloud;
+window.isCloudLibraryReady = uid => Boolean(uid && cloudReadyUids.has(uid) && belongsToCurrentAccount(uid));
 window.getAccountDeletionStatus = getAccountDeletionStatus;
 window.scheduleAccountDeletion = scheduleAccountDeletion;
 window.cancelAccountDeletion = cancelAccountDeletion;

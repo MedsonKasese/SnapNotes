@@ -1,4 +1,5 @@
 import { deleteLocalLibrary, persistLocalLibrary as writeIndexedDbLibrary, readLocalLibrary } from "./local-library.js";
+import { isLibraryBoundToUser, rootSnapshotBelongsToLibrary } from "./cloud-sync-guard.js";
 
 // =========================
 // CENTRALIZED STATE
@@ -6,6 +7,7 @@ import { deleteLocalLibrary, persistLocalLibrary as writeIndexedDbLibrary, readL
 
 let notes = [];
 window.notes = notes;
+if (window.snapNotesDataUid === undefined) window.snapNotesDataUid = "local";
 let localLoadGeneration = 0;
 let localStateRevision = 0;
 
@@ -62,10 +64,15 @@ async function persistLibrarySnapshot(id, noteSnapshot, folderSnapshot, savedAt 
     }
 
     if (libraryId === String(activeLibraryId())) {
-        const notesSaved = trySetLocalStorage("SnapNotes", JSON.stringify(noteSnapshot));
-        const foldersSaved = trySetLocalStorage("SnapNotesFolders", JSON.stringify(folderSnapshot));
-        const timeSaved = trySetLocalStorage("SnapNotesSavedAt", String(savedAt));
-        localStorageSaved = notesSaved && foldersSaved && timeSaved;
+        const rootOwnerKey = "SnapNotesRootLibraryUid";
+        const currentRootOwner = tryGetLocalStorage(rootOwnerKey);
+        const rootOwnerReady = currentRootOwner === libraryId || trySetLocalStorage(rootOwnerKey, libraryId);
+        if (rootOwnerReady) {
+            const notesSaved = trySetLocalStorage("SnapNotes", JSON.stringify(noteSnapshot));
+            const foldersSaved = trySetLocalStorage("SnapNotesFolders", JSON.stringify(folderSnapshot));
+            const timeSaved = trySetLocalStorage("SnapNotesSavedAt", String(savedAt));
+            localStorageSaved = notesSaved && foldersSaved && timeSaved;
+        }
     }
 
     return { savedAt, indexedDbSaved, localStorageSaved, locallySaved: indexedDbSaved || localStorageSaved };
@@ -88,8 +95,8 @@ async function saveNotes() {
     }
 
     const syncUid = window.firebaseAuth?.currentUser?.uid;
-    if (syncUid) markCloudSyncPending(syncUid);
-    const cloudEnabled = Boolean(window.firebaseAuth?.currentUser);
+    const cloudEnabled = isLibraryBoundToUser(String(libraryId), syncUid);
+    if (cloudEnabled) markCloudSyncPending(syncUid);
     if (!cloudEnabled || typeof window.syncToCloud !== "function") {
         return { synced: false, cloudEnabled, locallySaved: localResult.locallySaved };
     }
@@ -111,7 +118,9 @@ function loadNotes() {
     const generation = ++localLoadGeneration;
     const revision = localStateRevision;
     const libraryId = String(activeLibraryId());
-    const savedNotes = tryGetLocalStorage("SnapNotes");
+    const rootLibraryUid = tryGetLocalStorage("SnapNotesRootLibraryUid");
+    const rootBelongsToLibrary = rootSnapshotBelongsToLibrary(rootLibraryUid, libraryId);
+    const savedNotes = rootBelongsToLibrary ? tryGetLocalStorage("SnapNotes") : null;
     let hasLocalNotes = false;
 
     if (savedNotes) {
@@ -135,11 +144,7 @@ function loadNotes() {
         if (hasLocalNotes && Number(record.savedAt) <= localSavedAt) return;
 
         window.notes = record.notes;
-        const savedAt = Number(record.savedAt) || Date.now();
-        trySetLocalStorage("SnapNotes", JSON.stringify(record.notes));
-        trySetLocalStorage("SnapNotesSavedAt", String(savedAt));
-        if (Array.isArray(record.folders)) trySetLocalStorage("SnapNotesFolders", JSON.stringify(record.folders));
-        window.loadFolders?.();
+        window.setFoldersInMemory?.(Array.isArray(record.folders) ? record.folders : []);
         renderNotes();
         window.updateNavigationCounts?.();
     }).catch(error => {

@@ -5,7 +5,20 @@ import vm from "node:vm";
 
 const syncCenterSource = await readFile(new URL("../js/sync-center.js", import.meta.url), "utf8");
 
-function makeSyncCenter({ syncToCloud, initialStorage = {} }) {
+function makeSyncCenter({
+  syncToCloud = async () => true,
+  loadFromCloud = async () => {},
+  cloudReady = true,
+  confirm = true,
+  activeLibraryUid = "user-1",
+  deletionStatus = null,
+  getAccountDeletionStatus = async () => deletionStatus,
+  notes = [],
+  folders = [],
+  readLocalLibrary = async () => ({ notes, folders }),
+  localNotesReady = Promise.resolve(),
+  initialStorage = {}
+} = {}) {
   const elements = new Map();
   for (const id of ["syncCenterStatus", "syncCenterLast", "syncCenterRetry"]) {
     elements.set(id, {
@@ -18,11 +31,21 @@ function makeSyncCenter({ syncToCloud, initialStorage = {} }) {
 
   const windowListeners = new Map();
   const values = new Map(Object.entries(initialStorage));
+  const calls = { sync: 0, load: 0, attachmentRetry: 0, cleanupRetry: 0, confirm: 0, localRead: 0, deletionRead: 0 };
   const window = {
     firebaseAuth: { currentUser: { uid: "user-1" } },
-    syncToCloud,
-    retryPendingAttachmentUploads: async () => {},
-    retryPendingAttachmentCleanup: async () => {},
+    snapNotesDataUid: activeLibraryUid,
+    notes,
+    localNotesReady,
+    getFolders: () => folders,
+    readLocalLibrary: async (...args) => { calls.localRead++; return readLocalLibrary(...args); },
+    getAccountDeletionStatus: async (...args) => { calls.deletionRead++; return getAccountDeletionStatus(...args); },
+    syncToCloud: async (...args) => { calls.sync++; return syncToCloud(...args); },
+    loadFromCloud: async (...args) => { calls.load++; return loadFromCloud(...args); },
+    isCloudLibraryReady: () => cloudReady,
+    confirm: () => { calls.confirm++; return confirm; },
+    retryPendingAttachmentUploads: async () => { calls.attachmentRetry++; },
+    retryPendingAttachmentCleanup: async () => { calls.cleanupRetry++; },
     addEventListener(type, listener) { windowListeners.set(type, listener); },
     dispatchEvent(event) { windowListeners.get(event.type)?.(event); }
   };
@@ -43,7 +66,7 @@ function makeSyncCenter({ syncToCloud, initialStorage = {} }) {
     Date,
     console
   });
-  return { elements, localStorage, window };
+  return { elements, localStorage, window, calls };
 }
 
 test("successful background sync clears a previous manual retry error", async () => {
@@ -83,4 +106,98 @@ test("Sync now re-enables when local changes become pending after a successful s
     detail: { status: "pending", uid: "user-1" }
   });
   assert.equal(retry.disabled, false, "pending local changes should make retry available");
+});
+
+test("first-time cloud activation requires a verified local backup and explicit warning confirmation", async () => {
+  const { elements, window, calls } = makeSyncCenter({
+    activeLibraryUid: "local",
+    confirm: true,
+    cloudReady: true,
+    loadFromCloud: async () => {},
+    notes: [{ id: "local-note" }],
+    folders: [],
+    readLocalLibrary: async () => ({ notes: [{ id: "local-note" }], folders: [] })
+  });
+  const retry = elements.get("syncCenterRetry");
+  assert.equal(retry.textContent, "Start cloud sync");
+  await retry.listeners.get("click")();
+
+  assert.equal(calls.localRead, 1);
+  assert.equal(calls.deletionRead, 1);
+  assert.equal(calls.confirm, 1);
+  assert.equal(calls.load, 1);
+  assert.equal(calls.sync, 0);
+  assert.equal(window.snapNotesDataUid, "user-1");
+  assert.match(elements.get("syncCenterStatus").textContent, /Last cloud note synchronization succeeded|Cloud sync not yet confirmed/);
+});
+
+test("missing local backup blocks first-time cloud merge without changing ownership or calling cloud", async () => {
+  const localNotes = [{ id: "local-note" }];
+  const { elements, window, calls } = makeSyncCenter({
+    activeLibraryUid: "local",
+    notes: localNotes,
+    readLocalLibrary: async () => null
+  });
+  await elements.get("syncCenterRetry").listeners.get("click")();
+
+  assert.equal(calls.confirm, 0);
+  assert.equal(calls.load, 0);
+  assert.equal(calls.sync, 0);
+  assert.equal(window.snapNotesDataUid, "local");
+  assert.deepEqual(window.notes, localNotes);
+  assert.match(elements.get("syncCenterStatus").textContent, /local backup could not be verified/i);
+});
+
+test("first-time cloud activation waits for a successful local library load", async () => {
+  const localNotes = [{ id: "local-note" }];
+  const { elements, window, calls } = makeSyncCenter({
+    activeLibraryUid: "local",
+    notes: localNotes,
+    localNotesReady: Promise.reject(new Error("IndexedDB load failed"))
+  });
+  await elements.get("syncCenterRetry").listeners.get("click")();
+
+  assert.equal(calls.localRead, 0);
+  assert.equal(calls.confirm, 0);
+  assert.equal(calls.load, 0);
+  assert.equal(window.snapNotesDataUid, "local");
+  assert.deepEqual(window.notes, localNotes);
+  assert.match(elements.get("syncCenterStatus").textContent, /local backup could not be verified/i);
+});
+
+test("declining first-time cloud activation leaves local mode untouched", async () => {
+  const { elements, window, calls } = makeSyncCenter({ activeLibraryUid: "local", confirm: false });
+  await elements.get("syncCenterRetry").listeners.get("click")();
+
+  assert.equal(calls.confirm, 1);
+  assert.equal(calls.load, 0);
+  assert.equal(calls.sync, 0);
+  assert.equal(window.snapNotesDataUid, "local");
+});
+
+test("account deletion processing blocks first-time sync before confirmation or cloud loading", async () => {
+  const { elements, window, calls } = makeSyncCenter({
+    activeLibraryUid: "local",
+    deletionStatus: { status: "processing", tombstone: true }
+  });
+  await elements.get("syncCenterRetry").listeners.get("click")();
+
+  assert.equal(calls.deletionRead, 1);
+  assert.equal(calls.confirm, 0);
+  assert.equal(calls.load, 0);
+  assert.equal(window.snapNotesDataUid, "local");
+  assert.match(elements.get("syncCenterStatus").textContent, /account deletion is being processed/i);
+});
+
+test("an unverified cloud library load rolls the PWA back to local mode", async () => {
+  const { elements, window, calls } = makeSyncCenter({
+    activeLibraryUid: "local",
+    confirm: true,
+    cloudReady: false
+  });
+  await elements.get("syncCenterRetry").listeners.get("click")();
+
+  assert.equal(calls.load, 1);
+  assert.equal(window.snapNotesDataUid, "local");
+  assert.match(elements.get("syncCenterStatus").textContent, /cloud library could not be verified/i);
 });
