@@ -183,6 +183,12 @@ function createNoteElement(note) {
     const title = document.createElement("h2");
     title.className = "note-card-title";
     title.textContent = note.title || "Untitled note";
+    if (note.privateRecovery) {
+        const recoveryBadge = document.createElement("span");
+        recoveryBadge.className = "private-recovery-badge";
+        recoveryBadge.textContent = "Recovered copy";
+        title.appendChild(recoveryBadge);
+    }
 
     const body = document.createElement("div");
     body.className = "note-card-body";
