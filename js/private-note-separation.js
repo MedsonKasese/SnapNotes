@@ -214,9 +214,42 @@ export function localPrivateSnapshotVerified(persisted, localStorageMatches) {
     return persisted?.indexedDbSaved === true && persisted?.localStorageSaved === true && localStorageMatches === true;
 }
 
-export function privateMigrationPreflightComplete(preflight) {
-    return preflight?.complete === true && typeof preflight.inventoryId === "string" &&
-        preflight.inventoryId.trim().length > 0;
+function hasText(value) {
+    return typeof value === "string" && value.trim().length > 0;
+}
+
+export function privateMigrationPreflightComplete(preflight, uid, accountData = {}) {
+    if (preflight?.complete !== true || !hasText(preflight.inventoryId) ||
+        !hasText(uid) || !Number.isSafeInteger(preflight.accountCount) ||
+        preflight.accountCount < 1 || !Array.isArray(preflight.accounts) ||
+        preflight.accounts.length !== preflight.accountCount) return false;
+
+    const accountsByUid = new Map();
+    for (const account of preflight.accounts) {
+        if (!account || !hasText(account.uid) ||
+            !Number.isSafeInteger(account.unlistedRevisionCount) || account.unlistedRevisionCount < 0 ||
+            !Array.isArray(account.unlistedRevisions) ||
+            account.unlistedRevisions.length !== account.unlistedRevisionCount ||
+            accountsByUid.has(account.uid)) return false;
+
+        const seenRevisions = new Set();
+        for (const item of account.unlistedRevisions) {
+            if (!item || !hasText(item.revision) || seenRevisions.has(item.revision)) return false;
+            seenRevisions.add(item.revision);
+            if (item.resolution === "retained") continue;
+            if (item.resolution !== "admin-reviewed" || !hasText(item.reviewedDisposition) ||
+                !hasText(item.reviewedBy) || typeof item.reviewedAt !== "string" ||
+                !Number.isFinite(Date.parse(item.reviewedAt))) return false;
+        }
+        accountsByUid.set(account.uid, account);
+    }
+
+    const account = accountsByUid.get(uid);
+    if (!account) return false;
+    const listedRevisions = new Set((Array.isArray(accountData.inactiveLibraryRevisions)
+        ? accountData.inactiveLibraryRevisions : []).filter(hasText));
+    return account.unlistedRevisions.every(item =>
+        item.resolution !== "retained" || listedRevisions.has(item.revision));
 }
 
 export async function preservePrivateNotesBeforeCommit({ candidates = [], store, beforeCommit, commit }) {

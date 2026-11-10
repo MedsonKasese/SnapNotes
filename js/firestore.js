@@ -504,9 +504,9 @@ async function performSync(uid) {
             const preflightSnapshot = await getDoc(privateMigrationPreflightRef());
             if (!belongsToCurrentAccount(uid)) return false;
             if (!preflightSnapshot.exists() ||
-                !privateMigrationPreflightComplete(preflightSnapshot.data() || {})) {
+                !privateMigrationPreflightComplete(preflightSnapshot.data() || {}, uid, existingData)) {
                 markSyncPending(uid);
-                window.showToast?.("Cloud sync is paused until the Admin inventory of legacy library revisions is completed.", "warning");
+                window.showToast?.("Cloud sync is paused until every unlisted legacy library revision is resolved in the Admin inventory.", "warning");
                 return false;
             }
         }

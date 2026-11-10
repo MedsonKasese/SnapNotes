@@ -177,11 +177,82 @@ test("local sanitation requires verified writes to both IndexedDB and localStora
   assert.equal(localPrivateSnapshotVerified({ indexedDbSaved: true, localStorageSaved: true }, false), false);
 });
 
-test("the Admin inventory preflight is fail-closed and requires a non-empty inventory ID", () => {
-  assert.equal(privateMigrationPreflightComplete({ complete: true, inventoryId: "audit-2026-11" }), true);
-  assert.equal(privateMigrationPreflightComplete({ complete: true, inventoryId: "  " }), false);
-  assert.equal(privateMigrationPreflightComplete({ complete: false, inventoryId: "audit-2026-11" }), false);
-  assert.equal(privateMigrationPreflightComplete(null), false);
+test("the Admin preflight requires complete per-account coverage and explicit resolution of every unlisted revision", () => {
+  const preflight = {
+    complete: true,
+    inventoryId: "audit-2026-11",
+    accountCount: 3,
+    accounts: [
+      {
+        uid: "account-a",
+        unlistedRevisionCount: 1,
+        unlistedRevisions: [{ revision: "orphan-a", resolution: "retained" }]
+      },
+      {
+        uid: "account-b",
+        unlistedRevisionCount: 1,
+        unlistedRevisions: [{
+          revision: "orphan-b",
+          resolution: "admin-reviewed",
+          reviewedDisposition: "Synthetic test disposition; no automatic deletion or rewrite is authorized.",
+          reviewedBy: "admin-reviewer",
+          reviewedAt: "2026-11-10T12:00:00.000Z"
+        }]
+      },
+      {
+        uid: "account-c",
+        unlistedRevisionCount: 0,
+        unlistedRevisions: []
+      }
+    ]
+  };
+
+  assert.equal(privateMigrationPreflightComplete(preflight, "account-a", {
+    inactiveLibraryRevisions: ["orphan-a"]
+  }), true);
+  assert.equal(privateMigrationPreflightComplete(preflight, "account-b", {}), true);
+  assert.equal(privateMigrationPreflightComplete({ complete: true, inventoryId: "audit-2026-11" }, "account-a", {}), false,
+    "a global complete label without per-account revision records must not open the gate");
+  assert.equal(privateMigrationPreflightComplete({ ...preflight, accountCount: 4 }, "account-a", {
+    inactiveLibraryRevisions: ["orphan-a"]
+  }), false, "the manifest must account for the complete inventory account count");
+  assert.equal(privateMigrationPreflightComplete(preflight, "account-c", {}), true,
+    "accounts with no unlisted revisions must still be explicitly included");
+  assert.equal(privateMigrationPreflightComplete(preflight, "missing-account", {}), false,
+    "every account being migrated must have an explicit manifest entry");
+  assert.equal(privateMigrationPreflightComplete(preflight, "account-a", {}), false,
+    "a retained revision must be present in the account's listed retained revisions");
+  assert.equal(privateMigrationPreflightComplete({
+    ...preflight,
+    accounts: preflight.accounts.map((account, index) => index === 1
+      ? { ...account, unlistedRevisions: [{ revision: "orphan-b", resolution: "pending" }] }
+      : account)
+  }, "account-a", { inactiveLibraryRevisions: ["orphan-a"] }), false,
+  "an unresolved revision anywhere in the project inventory must keep the global gate closed");
+  assert.equal(privateMigrationPreflightComplete({
+    ...preflight,
+    accounts: preflight.accounts.map((account, index) => index === 1
+      ? { ...account, unlistedRevisionCount: 0 }
+      : account)
+  }, "account-a", { inactiveLibraryRevisions: ["orphan-a"] }), false,
+  "the declared orphan count must match the exact per-account resolution list");
+  assert.equal(privateMigrationPreflightComplete({
+    ...preflight,
+    accounts: preflight.accounts.map((account, index) => index === 1
+      ? { ...account, uid: "account-a" }
+      : account)
+  }, "account-a", { inactiveLibraryRevisions: ["orphan-a"] }), false,
+  "duplicate account entries must not satisfy complete inventory coverage");
+  assert.equal(privateMigrationPreflightComplete({
+    ...preflight,
+    accounts: preflight.accounts.map((account, index) => index === 1
+      ? { ...account, unlistedRevisions: [{ revision: "orphan-b", resolution: "admin-reviewed" }] }
+      : account)
+  }, "account-a", { inactiveLibraryRevisions: ["orphan-a"] }), false,
+  "an Admin-reviewed resolution must include its documented disposition, reviewer, and timestamp");
+  assert.equal(privateMigrationPreflightComplete({ ...preflight, inventoryId: "  " }, "account-a", {
+    inactiveLibraryRevisions: ["orphan-a"]
+  }), false);
 });
 
 test("permanent deletion and move-out select existing private records and all matching recovery lineage", () => {
@@ -222,7 +293,7 @@ test("Firestore sync verifies private preservation before it stages ordinary pag
   assert.match(performSync, /beforeCommit: async \(\) =>/);
   assert.match(performSync, /persistLocalLibrary\?\./);
   assert.match(performSync, /localPrivateSnapshotVerified\(persisted, localStorageMatches\)/);
-  assert.match(performSync, /privateMigrationPreflightComplete\(preflightSnapshot\.data\(\) \|\| \{\}\)/);
+  assert.match(performSync, /privateMigrationPreflightComplete\(preflightSnapshot\.data\(\) \|\| \{\}, uid, existingData\)/);
   assert.ok(performSync.indexOf("privateMigrationPreflightComplete") < performSync.indexOf("await preservePrivateNotesBeforeCommit"));
   assert.ok(performSync.indexOf("privateMigrationPreflightComplete") < performSync.indexOf("await persistNoteDeletionMarkers"));
   assert.ok(performSync.indexOf("readCleanupSnapshot") < performSync.indexOf("stagedRevision = crypto.randomUUID()"));
