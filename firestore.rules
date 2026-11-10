@@ -13,26 +13,209 @@ service cloud.firestore {
     function hasDeletionTombstone(uid) {
       return exists(/databases/$(database)/documents/accountDeletionTombstones/$(uid));
     }
+    function separationWriteCompatible(uid) {
+      let userPath = /databases/$(database)/documents/users/$(uid);
+      return request.resource.data.get('privateNotesSchemaRequired', false) == true
+        && request.resource.data.get('syncVersion', 0) == 3
+        && request.resource.data.get('schemaWriteNonce', '') is string
+        && request.resource.data.get('schemaWriteNonce', '').size() > 0
+        && (!exists(userPath)
+          || request.resource.data.schemaWriteNonce != get(userPath).data.get('schemaWriteNonce', ''));
+    }
+    function schemaV3PageWrite() {
+      return request.resource.data.get('syncVersion', 0) == 3
+        && request.resource.data.get('schemaWriteNonce', '') is string
+        && request.resource.data.get('schemaWriteNonce', '').size() > 0;
+    }
+    function archiveRevisionBumped(uid, documentKey, noteId) {
+      let revisionPath = /databases/$(database)/documents/users/$(uid)/privateNoteRevisions/$(documentKey);
+      return existsAfter(revisionPath)
+        && getAfter(revisionPath).data.documentKey == documentKey
+        && getAfter(revisionPath).data.noteId == noteId
+        && getAfter(revisionPath).data.revision is int
+        && ((!exists(revisionPath) && getAfter(revisionPath).data.revision == 1)
+          || (exists(revisionPath)
+            && get(revisionPath).data.revision is int
+            && get(revisionPath).data.noteId == noteId
+            && getAfter(revisionPath).data.revision == get(revisionPath).data.revision + 1));
+    }
+    function revisionMatchesCanonical(uid, revisionId, noteId) {
+      let canonicalPath = /databases/$(database)/documents/users/$(uid)/privateNotes/$(revisionId);
+      return existsAfter(canonicalPath)
+        && getAfter(canonicalPath).data.documentKey == revisionId
+        && getAfter(canonicalPath).data.id == noteId;
+    }
+    function safePrivateNote(record, noteId) {
+      return record is map
+        && record.keys().hasOnly([
+          'id', 'documentKey', 'privateRecovery', 'privateRecoveryFingerprint',
+          'privateRecoverySourceId', 'privateRecoveryParentId',
+          'isPrivate', 'privateData', 'createdAt', 'updatedAt', 'pinned',
+          'archived', 'deletedAt', 'restoredAt', 'title', 'text', 'html',
+          'category', 'tags', 'time', 'reminderAt', 'reminderNotified',
+          'reminderRepeat', 'versions', 'attachments', 'folderId', 'history'
+        ])
+        && record.keys().hasAll(['id', 'isPrivate', 'privateData'])
+        && noteId is string
+        && record.id is string
+        && record.documentKey is string
+        && record.documentKey == noteId
+        && record.isPrivate == true
+        && ((!('privateRecovery' in record) && !('privateRecoveryFingerprint' in record))
+          || (record.privateRecovery == true
+            && record.privateRecoveryFingerprint is string
+            && record.privateRecoveryFingerprint.matches('^[a-f0-9]{64}$')
+            && record.privateRecoverySourceId is string
+            && record.privateRecoverySourceId.size() > 0
+            && record.privateRecoveryParentId is string
+            && record.privateRecoveryParentId.size() > 0))
+        && (!('createdAt' in record) || record.createdAt is string)
+        && (!('updatedAt' in record) || record.updatedAt is string)
+        && (!('pinned' in record) || record.pinned is bool)
+        && (!('archived' in record) || record.archived is bool)
+        && (!('deletedAt' in record) || record.deletedAt == null || record.deletedAt is string)
+        && (!('restoredAt' in record) || record.restoredAt == null || record.restoredAt is string)
+        && (!('title' in record) || record.title == 'Private note')
+        && (!('text' in record) || record.text == '')
+        && (!('html' in record) || record.html == '')
+        && (!('category' in record) || record.category == 'general')
+        && (!('tags' in record) || (record.tags is list && record.tags.size() == 0))
+        && (!('time' in record) || record.time == 'Private note' || record.time == 'Locked')
+        && (!('reminderAt' in record) || record.reminderAt == null)
+        && (!('reminderNotified' in record) || record.reminderNotified == false)
+        && (!('reminderRepeat' in record) || record.reminderRepeat == null)
+        && (!('folderId' in record) || record.folderId == null)
+        && (!('attachments' in record) || (record.attachments is list && record.attachments.size() == 0))
+        && (!('versions' in record) || (record.versions is list && record.versions.size() == 0))
+        && (!('history' in record) || (record.history is list && record.history.size() == 0))
+        && record.privateData is map
+        && record.privateData.keys().hasOnly(['version', 'algorithm', 'kdf', 'iterations', 'salt', 'iv', 'ciphertext'])
+        && record.privateData.keys().hasAll(['version', 'algorithm', 'kdf', 'iterations', 'salt', 'iv', 'ciphertext'])
+        && record.privateData.version == 1
+        && record.privateData.algorithm == 'AES-GCM'
+        && record.privateData.kdf == 'PBKDF2-SHA-256'
+        && record.privateData.iterations == 600000
+        && record.privateData.salt is string
+        && record.privateData.iv is string
+        && record.privateData.ciphertext is string
+        && record.privateData.salt.size() > 0
+        && record.privateData.iv.size() > 0
+        && record.privateData.ciphertext.size() > 0;
+    }
+    function safePrivateNoteVersion(version, versionId) {
+      return version is map
+        && version.keys().hasOnly(['noteId', 'documentKey', 'fingerprint', 'record'])
+        && version.keys().hasAll(['noteId', 'documentKey', 'fingerprint', 'record'])
+        && version.noteId is string
+        && version.documentKey is string
+        && version.fingerprint is string
+        && version.fingerprint == versionId
+        && version.record is map
+        && version.record.id == version.noteId
+        && version.record.documentKey == version.documentKey
+        && safePrivateNote(version.record, version.documentKey)
+        && archiveRevisionBumped(uid, version.documentKey, version.noteId);
+    }
     match /users/{uid} {
       allow read: if isOwner(uid) && !hasDeletionTombstone(uid);
-      allow create, update, delete: if isOwner(uid)
+      allow create, update: if isOwner(uid)
+        && !isDeletionProcessing(uid)
+        && !hasDeletionTombstone(uid)
+        && separationWriteCompatible(uid);
+      allow delete: if isOwner(uid)
         && !isDeletionProcessing(uid)
         && !hasDeletionTombstone(uid);
       match /libraries/{revision}/pages/{pageId} {
-        allow read, write: if isOwner(uid)
+        allow read: if isOwner(uid)
           && !isDeletionProcessing(uid)
           && !hasDeletionTombstone(uid);
+        allow create: if isOwner(uid)
+          && !isDeletionProcessing(uid)
+          && !hasDeletionTombstone(uid)
+          && schemaV3PageWrite();
+        allow update: if isOwner(uid)
+          && !isDeletionProcessing(uid)
+          && !hasDeletionTombstone(uid)
+          && schemaV3PageWrite()
+          && request.resource.data.schemaWriteNonce != resource.data.get('schemaWriteNonce', '');
+        allow delete: if isOwner(uid)
+          && !isDeletionProcessing(uid)
+          && !hasDeletionTombstone(uid);
+      }
+      match /privateNotes/{noteId} {
+        allow read: if isOwner(uid)
+          && !isDeletionProcessing(uid)
+          && !hasDeletionTombstone(uid);
+        allow create, update: if isOwner(uid)
+          && !isDeletionProcessing(uid)
+          && !hasDeletionTombstone(uid)
+          && safePrivateNote(request.resource.data, noteId);
+        allow delete: if isOwner(uid)
+          && !isDeletionProcessing(uid)
+          && !hasDeletionTombstone(uid);
+      }
+      match /privateNoteVersions/{versionId} {
+        allow read: if isOwner(uid)
+          && !isDeletionProcessing(uid)
+          && !hasDeletionTombstone(uid);
+        allow create: if isOwner(uid)
+          && !isDeletionProcessing(uid)
+          && !hasDeletionTombstone(uid)
+          && safePrivateNoteVersion(request.resource.data, versionId);
+        allow update: if false;
+        allow delete: if isOwner(uid)
+          && !isDeletionProcessing(uid)
+          && !hasDeletionTombstone(uid);
+      }
+      match /privateNoteRevisions/{revisionId} {
+        allow read: if isOwner(uid)
+          && !isDeletionProcessing(uid)
+          && !hasDeletionTombstone(uid);
+        allow create: if isOwner(uid)
+          && !isDeletionProcessing(uid)
+          && !hasDeletionTombstone(uid)
+          && request.resource.data.keys().hasOnly(['noteId', 'documentKey', 'revision'])
+          && request.resource.data.keys().hasAll(['noteId', 'documentKey', 'revision'])
+          && request.resource.data.noteId is string
+          && request.resource.data.documentKey == revisionId
+          && request.resource.data.revision == 1
+          && revisionMatchesCanonical(uid, revisionId, request.resource.data.noteId);
+        allow update: if isOwner(uid)
+          && !isDeletionProcessing(uid)
+          && !hasDeletionTombstone(uid)
+          && request.resource.data.keys().hasOnly(['noteId', 'documentKey', 'revision'])
+          && request.resource.data.keys().hasAll(['noteId', 'documentKey', 'revision'])
+          && request.resource.data.noteId == resource.data.noteId
+          && request.resource.data.documentKey == revisionId
+          && resource.data.revision is int
+          && request.resource.data.revision == resource.data.revision + 1
+          && revisionMatchesCanonical(uid, revisionId, request.resource.data.noteId);
+        allow delete: if false;
       }
       // Required by readCloudNoteDeletionIds() and persistNoteDeletionMarkers().
       // Only the account owner may access their own deletion tombstones.
       match /deletedNotes/{noteId} {
-        allow read, write: if isOwner(uid)
+        allow read: if isOwner(uid)
           && !isDeletionProcessing(uid)
           && !hasDeletionTombstone(uid);
+        allow create: if isOwner(uid)
+          && !isDeletionProcessing(uid)
+          && !hasDeletionTombstone(uid)
+          && request.resource.data.keys().hasOnly(['noteId', 'documentKey', 'deletedAt'])
+          && request.resource.data.keys().hasAll(['noteId', 'documentKey', 'deletedAt'])
+          && request.resource.data.noteId is string
+          && request.resource.data.documentKey is string
+          && request.resource.data.documentKey == noteId
+          && request.resource.data.deletedAt is string;
+        allow update, delete: if false;
       }
     }
     match /accountDeletionTombstones/{uid} {
       allow get: if isOwner(uid);
+      allow list, create, update, delete: if false;
+    }
+    match /privateNotesMigrationPreflights/{preflightId} {
+      allow get: if request.auth != null && preflightId == 'global';
       allow list, create, update, delete: if false;
     }
   }

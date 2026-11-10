@@ -34,6 +34,18 @@
     word-break: break-word;
 }
 
+.private-recovery-badge {
+    display: inline-flex;
+    vertical-align: middle;
+    margin-left: 7px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: var(--surface-soft);
+    color: var(--muted-color);
+    font-size: 10px;
+    font-weight: 700;
+}
+
 .note-card-body {
     margin: 9px 0 0;
     color: var(--text-color);

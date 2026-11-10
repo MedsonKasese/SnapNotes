@@ -1,59 +1,23 @@
 # Firestore sync and security rules
 
-SnapNotes stores an account's active library as bounded page documents under `users/{uid}/libraries/{revision}/pages/{pageId}`. The account document stores only the active revision pointer and sync metadata. The app still reads legacy `notes` and `folders` fields during migration, then removes them when the first paged revision commits.
+## Storage layout
 
-No Firestore rules file or Firebase deployment config existed in this repository when this change was made, so rules managed in the Firebase Console are not overwritten. Merge equivalent owner-only conditions into the existing ruleset before deploying paged sync. The rules must allow a signed-in owner to read their root account document, write only while deletion is not processing, and access their own library pages. They must also let that owner read (but never write) the short-lived deletion tombstone. The following is an example for projects whose only Firestore data is this user's library:
+The account's ordinary library uses bounded pages under `users/{uid}/libraries/{revision}/pages/{pageId}`. It contains regular notes and folders only. The account document stores the active revision pointer and sync metadata. Encrypted Private Notes use owner-scoped documents under `users/{uid}/privateNotes/{encodedNoteId}`; divergent encrypted variants that cannot safely replace the canonical record are retained under `users/{uid}/privateNoteVersions/{fingerprint}` and appear as labeled recovered copies in the Private Notes list. Per-note archive revision counters make move-out cleanup detect an archive written concurrently. The PWA encrypts private payloads in the browser and strips plaintext metadata before writing. Firestore rules constrain the record shape and owner access, but cannot cryptographically prove that a client-supplied ciphertext string is actually encrypted; the client encryption path and its tests remain part of the security boundary.
 
-```text
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    function isOwner(uid) {
-      return request.auth != null && request.auth.uid == uid;
-    }
+Local PWA snapshots remain a combined library so the existing UI and offline behavior can continue to work. The first schema-v3 cloud sync reads the root-level legacy fields, the active paged library, and the retained revisions before changing the ordinary snapshot. **Preflight requirement:** this browser client can only discover the active and listed retained revisions; before enabling the first v3 sync, a trusted Admin must inventory every account for untracked/orphaned revision pages. The client-unwritable `privateNotesMigrationPreflights/global` marker is accepted only when it includes a non-empty `inventoryId`, an integer `accountCount` matching the full `accounts` array, and one entry for every account (including accounts with no unlisted revisions). Each account entry must have a unique `uid`, an `unlistedRevisionCount` matching its `unlistedRevisions` array, and an explicit resolution for every revision. `resolution: "retained"` is valid only after that revision appears in the account's `inactiveLibraryRevisions`; `resolution: "admin-reviewed"` requires non-empty `reviewedDisposition` and `reviewedBy` plus a parseable `reviewedAt` timestamp. Missing accounts, count mismatches, duplicates, unsupported or pending resolutions, and retained revisions not actually listed keep first sync paused. Aggregate inventory counts alone cannot populate this manifest. Do not mark it complete until every inventoried account and revision has a verified resolution and the review is documented; no disposition authorizes automatic deletion or rewriting. Firestore rules deny client writes to the marker. The PWA validates each private record's encrypted envelope and sanitized metadata, re-encrypts legacy metadata in the browser when unlocked, writes or archives the encrypted record in the separate private store, then reads the stored record back. Archived variants are integrity-checked and materialized as separately labeled Private Notes so users can inspect and recover them. Before staging ordinary pages, the PWA replaces legacy plaintext in the active local snapshot and, when that account owns the root localStorage snapshot, verifies both IndexedDB and localStorage contain the sanitized copy. If either save or verification fails, ordinary cloud pages are not changed. Any invalid record, read/write error, or failed verification aborts before the ordinary snapshot stage; existing cloud library pointers and source pages remain available for retry. Re-running is idempotent.
 
-    function isDeletionProcessing(uid) {
-      let userPath = /databases/$(database)/documents/users/$(uid);
-      return exists(userPath) &&
-        (get(userPath).data.get('accountDeletion', {}) is map) &&
-        get(userPath).data.get('accountDeletion', {}).get('status', '') == 'processing';
-    }
+After preservation and local sanitation, sync writes `privateNotesSchemaRequired: true`, `syncVersion: 3`, and a fresh schema nonce to the account document as a compatibility fence before staging pages; only the successful pointer transaction sets `privateNotesSeparated: true`. Offline-deletion-marker or account-deletion operations may establish the fence earlier, without claiming that private separation has completed. The rules in [`firestore.rules`](../firestore.rules) permit owner-only access to the new collections, constrain private records to an encrypted envelope and sanitized shell, and require fresh nonces on all account-root writes and page updates. This prevents older clients from reusing v3 fields through merge writes. Deploying these rules immediately blocks older PWA writers from staging or publishing schema-v2 data; coordinate the rules rollout with the updated app and do not promise old-client sync compatibility. Merge the rules carefully into the Firebase project's active ruleset; do not replace unrelated rules or assume this repository file deploys itself.
 
-    function hasDeletionTombstone(uid) {
-      return exists(/databases/$(database)/documents/accountDeletionTombstones/$(uid));
-    }
+## Rules and account deletion
 
-    match /users/{uid} {
-      allow read: if isOwner(uid) && !hasDeletionTombstone(uid);
-      allow create, update, delete: if isOwner(uid) &&
-        !isDeletionProcessing(uid) && !hasDeletionTombstone(uid);
+The rules allow a signed-in owner to read their root account document, write only while deletion is not processing, and access their own library pages. They also allow the owner to read (but not write) the short-lived deletion tombstone. The scheduled deletion worker uses Firebase Admin and bypasses client rules. After it removes storage objects, it writes an Admin-only tombstone, deletes the Firebase Auth user, and recursively deletes the user's Firestore data. Ensure no existing, more-permissive overlapping `allow` rule overrides these restrictions.
 
-      match /libraries/{revision}/pages/{pageId} {
-        allow read, write: if isOwner(uid) &&
-          !isDeletionProcessing(uid) && !hasDeletionTombstone(uid);
-      }
+Permanent note deletion uses immutable ID-only markers at `users/{uid}/deletedNotes/{encodedNoteId}`. The marker contains `noteId`, its matching encoded `documentKey`, and `deletedAt`—not note content—and is retained so a device reconnecting after a long offline period cannot recreate the deleted note. The user's `deletedNotesVersion` increments transactionally with marker creation; library sync compares that version before switching the active page revision, preventing a concurrent sync from winning a race against a permanent delete.
 
-      match /deletedNotes/{noteId} {
-        allow read: if isOwner(uid) &&
-          !isDeletionProcessing(uid) && !hasDeletionTombstone(uid);
-        allow create: if isOwner(uid) &&
-          !isDeletionProcessing(uid) && !hasDeletionTombstone(uid) &&
-          request.resource.data.keys().hasOnly(['noteId', 'deletedAt']) &&
-          request.resource.data.noteId is string;
-        allow update, delete: if false;
-      }
-    }
+## Page sizing, recovery, and rollback
 
-    match /accountDeletionTombstones/{uid} {
-      allow get: if isOwner(uid);
-      allow list, create, update, delete: if false;
-    }
-  }
-}
-```
+Each ordinary page targets at most 450 KiB of serialized JSON, below Firestore's 1 MiB document ceiling. A single oversized record is left local and reported as pending rather than truncated. Sync stages immutable revision pages and changes the active pointer in a transaction. The private-note preservation path uses transactions for canonical-record reconciliation and deterministic encrypted-version archives; read-back checks must succeed before ordinary page staging begins. For move-out/permanent deletion, the expected canonical records and per-note archive counters are captured together before pointer staging, then checked in the cleanup transaction; any intervening archive causes cleanup to abort and retain the newer private copy.
 
-The scheduled deletion worker uses Firebase Admin, so it bypasses client rules. Once it has removed the user's storage objects, it writes an Admin-only tombstone, deletes the Firebase Auth user, and recursively deletes the user's Firestore data. The tombstone blocks a still-valid ID token from recreating data after deletion; it contains only deletion timestamps, expires after 24 hours, and is purged on a subsequent daily worker run (so it may remain longer than 24 hours). This exceeds a Firebase ID token's lifetime. The user document's `processing` status also blocks client writes during the cleanup phase. Ensure no existing, more-permissive overlapping `allow` rule overrides these restrictions; merge into the project's active rules rather than replacing project rules blindly.
+Do not delete or rewrite existing snapshots as a migration shortcut. Old ordinary revisions containing private records are eligible for cleanup only after their encrypted records have been preserved and verified in the separate store. If preservation or the ordinary pointer transaction fails, retry from the retained source snapshots. A rollback to an older PWA build after separation is not safe as a writer: the schema-v3 Firestore rules intentionally reject its pointer update. Mobile cloud previews remain read-only and are not granted a write path by this change.
 
-Each page targets at most 450 KiB of serialized JSON, safely below Firestore's 1 MiB document ceiling. A single oversized note is left local and reported as pending instead of being split or silently truncated. Sync stages immutable revision pages and changes the active pointer in a transaction. Note versions merge into the canonical note history: a longer shared edit-history lineage takes precedence over skewed device timestamps, and the alternate content is retained as a history entry instead of a duplicate conflict note. If another device commits first, the client reloads and retries from the new library revision.
-
-Permanent note deletion uses immutable ID-only markers at `users/{uid}/deletedNotes/{encodedNoteId}`. The marker contains only `noteId` and `deletedAt`—not note content—and is retained so a device that reconnects after a long offline period cannot recreate the deleted note. The user's `deletedNotesVersion` increments transactionally with marker creation; library sync compares that version before switching the active page revision, preventing a concurrent sync from winning a race against a permanent delete. After committing the filtered revision, the old page documents are deleted. Failed page cleanup remains listed in `inactiveLibraryRevisions` and is retried by later syncs. Configure rules to allow owner reads and creates for these markers, while denying updates and deletes.
+This PR changes code and tests only. It does not run a live migration, alter production Firestore data or rules, or deploy. The owner must review the migration PR and deploy the corresponding rules and app code through the normal release process before production use.

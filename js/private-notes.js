@@ -179,6 +179,62 @@ async function decryptPrivateAttachmentBlob(blob, iv, type) {
     return decryptPrivateAttachment(blob, privateKey, iv, type);
 }
 
+async function preparePrivateRecordForSeparation(note) {
+    if (!note?.isPrivate || !privateKey || !privateSalt) {
+        throw new Error("Unlock Private Notes before migrating legacy private metadata.");
+    }
+    const decrypted = await decryptPrivatePayload(note, privateKey);
+    const payload = buildPrivatePayload({
+        ...note,
+        ...decrypted,
+        title: Object.hasOwn(decrypted, "title") ? decrypted.title : (note.title || ""),
+        text: Object.hasOwn(decrypted, "text") ? decrypted.text : (note.text || ""),
+        html: Object.hasOwn(decrypted, "html") ? decrypted.html : (note.html || ""),
+        category: Object.hasOwn(decrypted, "category") ? decrypted.category : (note.category || "general"),
+        tags: Array.isArray(decrypted.tags) ? decrypted.tags : (Array.isArray(note.tags) ? note.tags : []),
+        time: Object.hasOwn(decrypted, "time") ? decrypted.time : (note.time || ""),
+        folderId: Object.hasOwn(decrypted, "folderId") ? decrypted.folderId : (note.folderId || null),
+        reminderAt: Object.hasOwn(decrypted, "reminderAt") ? decrypted.reminderAt : (note.reminderAt || null),
+        reminderNotified: Object.hasOwn(decrypted, "reminderNotified") ? decrypted.reminderNotified : Boolean(note.reminderNotified),
+        reminderRepeat: Object.hasOwn(decrypted, "reminderRepeat") ? decrypted.reminderRepeat : (note.reminderRepeat || null),
+        attachments: Array.isArray(decrypted.attachments) ? decrypted.attachments : (Array.isArray(note.attachments) ? note.attachments : []),
+        history: Array.isArray(decrypted.history) ? decrypted.history : (Array.isArray(note.history) ? note.history : (note.versions || []))
+    });
+
+    let originalAttachments = [];
+    if (payload.attachments.some(attachment => attachment && attachment.encrypted !== true)) {
+        const conversion = await window.protectPrivateAttachmentsForPrivate?.(note.id, payload.attachments);
+        if (!conversion) throw new Error("Legacy private attachments could not be protected; the original snapshot remains untouched.");
+        payload.attachments = conversion.attachments;
+        originalAttachments = conversion.originals;
+    }
+
+    return {
+        record: {
+            id: note.id,
+            isPrivate: true,
+            privateData: await encryptPrivatePayload(payload, privateKey, privateSalt),
+            createdAt: typeof note.createdAt === "string" ? note.createdAt : "",
+            updatedAt: typeof note.updatedAt === "string" ? note.updatedAt : "",
+            pinned: Boolean(note.pinned),
+            archived: Boolean(note.archived),
+            deletedAt: typeof note.deletedAt === "string" ? note.deletedAt : null,
+            restoredAt: typeof note.restoredAt === "string" ? note.restoredAt : null,
+            title: "Private note",
+            text: "",
+            html: "",
+            category: "general",
+            tags: [],
+            time: "Private note",
+            reminderAt: null,
+            reminderNotified: false,
+            reminderRepeat: null,
+            versions: []
+        },
+        originalAttachments
+    };
+}
+
 function getPrivateNotes() {
     return (Array.isArray(window.notes) ? window.notes : [])
         .filter(note => note?.isPrivate);
@@ -605,6 +661,11 @@ async function moveNoteFromPrivate(id) {
             updatedAt: new Date().toISOString()
         });
         delete note.privateData;
+        delete note.documentKey;
+        delete note.privateRecovery;
+        delete note.privateRecoveryFingerprint;
+        delete note.privateRecoverySourceId;
+        delete note.privateRecoveryParentId;
         privateUnlockCache.delete(id);
 
         const saveResult = await saveNotes();
@@ -739,6 +800,11 @@ async function duplicatePrivateNote(id) {
         archived: false,
         deletedAt: null
     };
+    delete duplicate.documentKey;
+    delete duplicate.privateRecovery;
+    delete duplicate.privateRecoveryFingerprint;
+    delete duplicate.privateRecoverySourceId;
+    delete duplicate.privateRecoveryParentId;
 
     duplicate.privateData = await encryptPrivatePayload(duplicatePayload, privateKey, privateSalt);
     stripPrivateMetadata(duplicate);
@@ -826,6 +892,7 @@ window.schedulePrivateLockOnLeave = schedulePrivateLockOnLeave;
 window.cancelScheduledPrivateLock = cancelScheduledPrivateLock;
 window.encryptPrivateAttachmentBlob = encryptPrivateAttachmentBlob;
 window.decryptPrivateAttachmentBlob = decryptPrivateAttachmentBlob;
+window.preparePrivateRecordForSeparation = preparePrivateRecordForSeparation;
 window.moveNoteToPrivate = moveNoteToPrivate;
 window.moveNoteFromPrivate = moveNoteFromPrivate;
 window.updatePrivateNote = updatePrivateNote;
